@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { faker } from '@faker-js/faker';
 import { BASE, goto } from './helpers';
 
 test.describe('06 · Search', () => {
@@ -51,9 +52,11 @@ test.describe('06 · Search', () => {
     const count = await searchInput.count();
     if (count === 0) test.skip(true, 'No search input found');
 
-    await searchInput.fill('zerno');
+    // Use a random commerce term — we just verify the input accepts text
+    const randomTerm = faker.commerce.product().toLowerCase();
+    await searchInput.fill(randomTerm);
     const value = await searchInput.inputValue();
-    expect(value).toBe('zerno');
+    expect(value).toBe(randomTerm);
   });
 
   test('search form submits and shows results page', async ({ page }) => {
@@ -105,8 +108,10 @@ test.describe('06 · Search', () => {
   });
 
   test('search results for unknown term shows no-results message', async ({ page }) => {
+    // Use a random UUID — guaranteed to return no results
+    const nonsenseTerm = faker.string.uuid();
     await page.goto(
-      `${BASE}/search?q=qzxqzxqzxthisdoesnotexistqzx&type=product`,
+      `${BASE}/search?q=${encodeURIComponent(nonsenseTerm)}&type=product`,
       { waitUntil: 'domcontentloaded' },
     );
 
@@ -142,6 +147,28 @@ test.describe('06 · Search', () => {
   });
 
   // ─── Predictive search (live suggestions) ──────────────────────────────────
+
+  // ─── Faker-driven queries ───────────────────────────────────────────────────
+
+  test('search results page renders without JS errors for random commerce terms', async ({ page }) => {
+    const terms = [
+      faker.commerce.productAdjective(),
+      faker.commerce.productMaterial(),
+      faker.word.noun(),
+    ];
+
+    const jsErrors: string[] = [];
+    page.on('pageerror', err => jsErrors.push(err.message));
+
+    for (const term of terms) {
+      await page.goto(`${BASE}/search?q=${encodeURIComponent(term)}&type=product`, {
+        waitUntil: 'domcontentloaded',
+      });
+      await expect(page).not.toHaveTitle(/404|not found/i);
+    }
+
+    expect(jsErrors, `JS errors during search: ${jsErrors.join(' | ')}`).toHaveLength(0);
+  });
 
   test('predictive search dropdown appears while typing (if supported)', async ({ page }) => {
     await goto(page);
