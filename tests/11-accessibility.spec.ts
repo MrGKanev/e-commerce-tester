@@ -110,6 +110,86 @@ test.describe('11 · Accessibility (axe)', () => {
     ).toBe(0);
   });
 
+  // ─── Collections ───────────────────────────────────────────────────────────
+
+  test('collections page — no critical violations', async ({ page }) => {
+    await page.goto(`${BASE}/collections`, { waitUntil: 'domcontentloaded' });
+
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa'])
+      .exclude(THIRD_PARTY_EXCLUDES)
+      .analyze();
+
+    const blockers = results.violations.filter(
+      v => v.impact === 'critical' || v.impact === 'serious',
+    );
+
+    expect(
+      blockers.length,
+      `Critical/serious violations on collections page:\n  ${formatViolations(blockers as Violation[])}`,
+    ).toBe(0);
+  });
+
+  test('collections page — product cards have accessible names', async ({ page }) => {
+    await page.goto(`${BASE}/collections`, { waitUntil: 'domcontentloaded' });
+
+    const results = await new AxeBuilder({ page })
+      .withRules(['link-name', 'image-alt'])
+      .exclude(THIRD_PARTY_EXCLUDES)
+      .analyze();
+
+    expect(
+      results.violations.length,
+      `Product card links/images without accessible names:\n  ${formatViolations(results.violations as Violation[])}`,
+    ).toBe(0);
+  });
+
+  // ─── Cart ──────────────────────────────────────────────────────────────────
+
+  test('cart page — no critical violations', async ({ page }) => {
+    await page.goto(`${BASE}/cart`, { waitUntil: 'domcontentloaded' });
+
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa'])
+      .exclude(THIRD_PARTY_EXCLUDES)
+      .analyze();
+
+    const blockers = results.violations.filter(
+      v => v.impact === 'critical' || v.impact === 'serious',
+    );
+
+    expect(
+      blockers.length,
+      `Critical/serious violations on cart page:\n  ${formatViolations(blockers as Violation[])}`,
+    ).toBe(0);
+  });
+
+  // ─── Static page ───────────────────────────────────────────────────────────
+
+  test('contact/about page — no critical violations (if exists)', async ({ page }) => {
+    // Try /pages/contact first, fall back to /pages/about
+    for (const path of ['/pages/contact', '/pages/about', '/pages/about-us']) {
+      const resp = await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
+      if (resp?.status() === 200 && !page.url().includes('404')) {
+        const results = await new AxeBuilder({ page })
+          .withTags(['wcag2a', 'wcag2aa'])
+          .exclude(THIRD_PARTY_EXCLUDES)
+          .analyze();
+
+        const blockers = results.violations.filter(
+          v => v.impact === 'critical' || v.impact === 'serious',
+        );
+
+        expect(
+          blockers.length,
+          `Critical/serious violations on ${path}:\n  ${formatViolations(blockers as Violation[])}`,
+        ).toBe(0);
+        return; // tested one page — done
+      }
+    }
+    test.skip(true, 'No contact/about page found');
+  });
+
   // ─── Specific checks ───────────────────────────────────────────────────────
 
   test('homepage — all images have alt text', async ({ page }) => {

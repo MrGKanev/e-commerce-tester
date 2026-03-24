@@ -81,6 +81,20 @@ test.describe('12a · Performance API', () => {
     expect(t.ttfb).toBeLessThan(PERF.ttfb);
   });
 
+  test('collections page — TTFB < 2 s', async ({ page }) => {
+    await page.goto(`${BASE}/collections`, { waitUntil: 'load' });
+    const t = await getNavTiming(page);
+    console.log(`Collections timing: TTFB ${t.ttfb}ms | Load ${t.loadComplete}ms`);
+    expect(t.ttfb).toBeLessThan(PERF.ttfb);
+  });
+
+  test('cart page — TTFB < 2 s', async ({ page }) => {
+    await page.goto(`${BASE}/cart`, { waitUntil: 'load' });
+    const t = await getNavTiming(page);
+    console.log(`Cart timing: TTFB ${t.ttfb}ms | Load ${t.loadComplete}ms`);
+    expect(t.ttfb).toBeLessThan(PERF.ttfb);
+  });
+
   test('homepage — no render-blocking resources > 2 s', async ({ page }) => {
     const longResources: string[] = [];
 
@@ -182,6 +196,68 @@ test.describe('12b · Lighthouse', () => {
         reports: {
           formats: { html: true, json: true },
           name: 'lighthouse-product',
+          directory: './reports/lighthouse',
+        },
+      });
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('collections page — Lighthouse scores meet thresholds', async () => {
+    const browser = await chromium.launch({
+      args: [`--remote-debugging-port=${LIGHTHOUSE_PORT + 2}`, '--no-sandbox'],
+    });
+    const context = await browser.newContext({
+      locale: 'bg-BG',
+      timezoneId: 'Europe/Sofia',
+    });
+    const page = await context.newPage();
+
+    try {
+      await page.goto(`${BASE}/collections`, {
+        waitUntil: 'networkidle',
+        timeout: 60_000,
+      });
+
+      await playAudit({
+        page,
+        port: LIGHTHOUSE_PORT + 2,
+        thresholds: LIGHTHOUSE_THRESHOLDS,
+        reports: {
+          formats: { html: true, json: true },
+          name: 'lighthouse-collections',
+          directory: './reports/lighthouse',
+        },
+      });
+    } finally {
+      await browser.close();
+    }
+  });
+
+  test('search results page — Lighthouse scores meet thresholds', async () => {
+    const browser = await chromium.launch({
+      args: [`--remote-debugging-port=${LIGHTHOUSE_PORT + 3}`, '--no-sandbox'],
+    });
+    const context = await browser.newContext({
+      locale: 'bg-BG',
+      timezoneId: 'Europe/Sofia',
+    });
+    const page = await context.newPage();
+
+    try {
+      await page.goto(`${BASE}/search?q=zerno&type=product`, {
+        waitUntil: 'networkidle',
+        timeout: 60_000,
+      });
+
+      await playAudit({
+        page,
+        port: LIGHTHOUSE_PORT + 3,
+        thresholds: LIGHTHOUSE_THRESHOLDS,
+        reports: {
+          formats: { html: true, json: true },
+          name: 'lighthouse-search',
           directory: './reports/lighthouse',
         },
       });
