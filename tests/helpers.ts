@@ -86,6 +86,44 @@ export const MOBILE_MENU_OPEN_SEL = [
   '[aria-expanded="true"]',
 ].join(', ');
 
+/** Cookie consent accept button selectors — covers common Shopify/EU consent tools */
+export const COOKIE_CONSENT_SEL = [
+  '#onetrust-accept-btn-handler',
+  '#accept-cookies',
+  '#cookie-accept',
+  'button[id*="accept"][id*="cookie"]',
+  'button[id*="cookie"][id*="accept"]',
+  'button[class*="cookie"][class*="accept"]',
+  'button[class*="accept"][class*="cookie"]',
+  '[data-cookiebanner] button',
+  '[data-cookie-consent] button',
+  '.cookie-banner button',
+  '.cookie-consent button',
+  '.cc-btn.cc-allow',
+  'button:has-text("Accept all")',
+  'button:has-text("Accept")',
+  'button:has-text("Приемам всички")',
+  'button:has-text("Приемам")',
+  'button:has-text("Приемане")',
+  'button:has-text("Съгласен съм")',
+  'button:has-text("Разрешаване на всички")',
+].join(', ');
+
+/**
+ * Tries to dismiss a cookie consent banner if one is visible.
+ * Silently skips if no banner appears within the timeout.
+ */
+export async function dismissCookieConsent(page: Page): Promise<void> {
+  try {
+    const btn = page.locator(COOKIE_CONSENT_SEL).first();
+    await btn.waitFor({ state: 'visible', timeout: 5000 });
+    await btn.click();
+    await page.waitForTimeout(400);
+  } catch {
+    // No cookie banner — that's fine
+  }
+}
+
 /** Navigate and wait for DOM */
 export async function goto(page: Page, path = '/'): Promise<void> {
   await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
