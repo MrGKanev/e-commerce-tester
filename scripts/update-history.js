@@ -288,8 +288,19 @@ function collectSuites(suites, depth = 0) {
   const result = [];
   for (const suite of suites) {
     if (!suite) continue;
-    // Top-level suite = file; second-level = describe block
-    if (depth === 1 && suite.title) {
+
+    // Playwright JSON structure:
+    //   depth 0 = root
+    //   depth 1 = spec file  (e.g. "01-homepage.spec.ts")
+    //   depth 2 = test.describe block  (e.g. "01 · Homepage")
+    //
+    // Capture describe blocks (depth 2). If a file has no describe blocks
+    // and puts tests directly at depth 1, capture those too.
+    const hasDescribeChildren = (suite.suites || []).some((s) => s.title);
+    const isDescribeBlock = depth === 2 && suite.title;
+    const isTopLevelNoDescribe = depth === 1 && suite.title && !hasDescribeChildren;
+
+    if (isDescribeBlock || isTopLevelNoDescribe) {
       let passed = 0, failed = 0, skipped = 0;
       const countSpecs = (s) => {
         for (const spec of s.specs || []) {
@@ -305,6 +316,7 @@ function collectSuites(suites, depth = 0) {
       countSpecs(suite);
       result.push({ title: suite.title, passed, failed, skipped, total: passed + failed + skipped });
     }
+
     result.push(...collectSuites(suite.suites || [], depth + 1));
   }
   return result;

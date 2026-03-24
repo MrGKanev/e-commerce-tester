@@ -81,12 +81,8 @@ test.describe('06 · Search', () => {
   // ─── Search results ────────────────────────────────────────────────────────
 
   test('search results page loads for a known product name', async ({ page }) => {
-    await page.goto(`${BASE}/search?q=zerno&type=product`, {
-      waitUntil: 'domcontentloaded',
-    });
+    await page.goto(`${BASE}/search?q=zerno&type=product`, { waitUntil: 'load' });
     await expect(page).not.toHaveTitle(/404|not found/i);
-    const resp = await page.evaluate(() => document.readyState);
-    expect(resp).toBe('complete');
   });
 
   test('search results show at least one product for "zerno"', async ({ page }) => {

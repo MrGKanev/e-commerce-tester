@@ -93,8 +93,10 @@ export async function goto(page: Page, path = '/'): Promise<void> {
 
 /** Returns unique internal pathnames from a CSS selector scope */
 export async function internalLinks(page: Page, scope: string): Promise<string[]> {
+  // Use :is(...) so comma-separated scopes all get the a[href] descendant combinator applied
+  const selector = scope.includes(',') ? `:is(${scope}) a[href]` : `${scope} a[href]`;
   return page.$$eval(
-    `${scope} a[href]`,
+    selector,
     (anchors, base) => {
       const paths = anchors
         .map((a) => (a as HTMLAnchorElement).getAttribute('href') ?? '')
