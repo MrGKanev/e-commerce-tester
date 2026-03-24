@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { STORAGE_STATE } from './global-setup';
 
 const runDate =
   process.env.TEST_RUN_DATE ||
@@ -9,6 +10,10 @@ const reportDir = `./reports/${runDate}`;
 export default defineConfig({
   testDir: './tests',
   outputDir: `${reportDir}/screenshots`,
+
+  // Global setup runs once before all tests: accepts cookie consent and saves
+  // browser storage state so every test inherits accepted cookies.
+  globalSetup: require.resolve('./global-setup'),
 
   // Sequential — avoids Shopify rate-limiting and cart state collisions
   fullyParallel: false,
@@ -26,8 +31,12 @@ export default defineConfig({
   use: {
     baseURL: 'https://zerno.co',
 
-    // Screenshot after every test (pass & fail) — saved to outputDir
-    screenshot: 'on',
+    // Reuse the storage state (cookies) from global setup.
+    // Shopify sees a single returning visitor → less bot-detection risk.
+    storageState: STORAGE_STATE,
+
+    // Screenshots only on failure — no folder created for passing test runs.
+    screenshot: 'only-on-failure',
     video: 'off',
     // Keep trace only on failure for debugging
     trace: 'retain-on-failure',
