@@ -124,9 +124,23 @@ export async function dismissCookieConsent(page: Page): Promise<void> {
   }
 }
 
-/** Navigate and wait for DOM */
+/**
+ * Navigate and wait for DOM.
+ * Adds a small random delay (150–550 ms) before each navigation to mimic
+ * human browsing pace and reduce Shopify rate-limit / bot-detection risk.
+ * Also dismisses any cookie consent banner that appears after load.
+ */
 export async function goto(page: Page, path = '/'): Promise<void> {
+  await page.waitForTimeout(150 + Math.floor(Math.random() * 400));
   await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
+  await dismissCookieConsent(page);
+}
+
+/** Returns true if the product page has an enabled add-to-cart button */
+export async function isProductAvailable(page: Page): Promise<boolean> {
+  const btn = page.locator(ADD_TO_CART_SEL).first();
+  if ((await btn.count()) === 0) return false;
+  return !(await btn.isDisabled());
 }
 
 /** Returns unique internal pathnames from a CSS selector scope */

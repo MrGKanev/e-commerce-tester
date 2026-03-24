@@ -11,9 +11,10 @@ export default defineConfig({
   testDir: './tests',
   outputDir: `${reportDir}/screenshots`,
 
-  // Global setup runs once before all tests: accepts cookie consent and saves
-  // browser storage state so every test inherits accepted cookies.
+  // Global setup/teardown: setup accepts cookie consent + saves browser state;
+  // teardown clears the cart so each run starts clean.
   globalSetup: require.resolve('./global-setup'),
+  globalTeardown: require.resolve('./global-teardown'),
 
   // Sequential — avoids Shopify rate-limiting and cart state collisions
   fullyParallel: false,
