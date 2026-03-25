@@ -252,6 +252,32 @@ export async function findBrokenImages(page: Page): Promise<string[]> {
   });
 }
 
+/**
+ * Fetches product handles dynamically from Shopify's products.json API.
+ * Returns up to `limit` products. Falls back to KNOWN_PRODUCTS on any error.
+ */
+export async function fetchProductHandles(
+  limit = 10,
+): Promise<Array<{ handle: string; url: string }>> {
+  try {
+    const res = await fetch(`${BASE}/products.json?limit=${limit}`, {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'Mozilla/5.0 (compatible; health-check/1.0)',
+      },
+    });
+    if (!res.ok) return KNOWN_PRODUCTS;
+    const data = (await res.json()) as { products?: Array<{ handle: string }> };
+    const products = (data.products ?? []).map((p) => ({
+      handle: p.handle,
+      url: `${BASE}/products/${p.handle}`,
+    }));
+    return products.length > 0 ? products : KNOWN_PRODUCTS;
+  } catch {
+    return KNOWN_PRODUCTS;
+  }
+}
+
 /** Scroll page to element and screenshot it — helper for visual verification */
 export async function scrollAndScreenshot(page: Page, selector: string, label: string): Promise<void> {
   const el = page.locator(selector).first();
