@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { STORAGE_STATE } from './global-setup';
+import { BASE, USER_AGENT, LOCALE, TIMEZONE_ID } from './tests/helpers';
 
 const runDate =
   process.env.TEST_RUN_DATE ||
@@ -30,7 +31,7 @@ export default defineConfig({
   ],
 
   use: {
-    baseURL: 'https://zerno.co',
+    baseURL: BASE,
 
     // Reuse the storage state (cookies) from global setup.
     // Shopify sees a single returning visitor → less bot-detection risk.
@@ -49,13 +50,11 @@ export default defineConfig({
     viewport: { width: 1280, height: 800 },
 
     // Real browser UA — avoids 403/bot-detection on Shopify
-    userAgent:
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
-      '(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+    userAgent: USER_AGENT,
 
     // Locale — Bulgarian store
-    locale: 'bg-BG',
-    timezoneId: 'Europe/Sofia',
+    locale: LOCALE,
+    timezoneId: TIMEZONE_ID,
   },
 
   projects: [

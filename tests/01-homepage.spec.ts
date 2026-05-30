@@ -143,6 +143,32 @@ test.describe('01 · Homepage', () => {
     expect(bgColor).toBeTruthy();
   });
 
+  // ─── Redirects ────────────────────────────────────────────────────────────
+
+  test('HTTP redirects to HTTPS', async ({ page }) => {
+    const httpUrl = BASE.replace(/^https:\/\//, 'http://');
+    if (httpUrl === BASE) {
+      test.skip(true, 'BASE URL is already HTTP — redirect check not applicable');
+      return;
+    }
+    await page.goto(httpUrl, { waitUntil: 'domcontentloaded' });
+    expect(page.url(), 'HTTP should redirect to HTTPS').toMatch(/^https:/i);
+  });
+
+  test('www subdomain redirects to canonical domain', async ({ request }) => {
+    const url = new URL(BASE);
+    const wwwUrl = `${url.protocol}//www.${url.host}${url.pathname}`;
+    const resp = await request.get(wwwUrl).catch(() => null);
+    if (!resp) {
+      test.skip(true, 'www subdomain is not responding — may not be configured');
+      return;
+    }
+    const finalUrl = resp.url();
+    // Either it redirected away from www, or it serves the same content (both are valid)
+    const isCanonical = !finalUrl.includes('//www.') || finalUrl.startsWith(BASE);
+    expect(isCanonical, `www should redirect to canonical; got ${finalUrl}`).toBe(true);
+  });
+
   // ─── Fixed overlay audit ──────────────────────────────────────────────────
 
   test('fixed/sticky elements are audited and not excessively blocking viewport', async ({ page }) => {

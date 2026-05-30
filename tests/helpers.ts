@@ -1,6 +1,13 @@
 import { Page, expect } from '@playwright/test';
 
-export const BASE = 'https://zerno.co';
+export const BASE = (process.env.STORE_URL ?? 'https://zerno.co').replace(/\/$/, '');
+
+export const USER_AGENT =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
+  '(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36';
+
+export const LOCALE = 'bg-BG';
+export const TIMEZONE_ID = 'Europe/Sofia';
 
 /** Known products for targeted tests */
 export const KNOWN_PRODUCTS = [

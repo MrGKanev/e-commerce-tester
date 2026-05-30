@@ -6,3 +6,4 @@ dist/
 *.log
 storageState.json
 package-lock.json
+.env

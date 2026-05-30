@@ -9,20 +9,18 @@
  *     every test — reducing the risk of bot-detection / rate-limiting
  */
 
-import { chromium } from '@playwright/test';
+import { chromium, request } from '@playwright/test';
 import path from 'path';
-import { BASE, dismissCookieConsent } from './tests/helpers';
+import { BASE, USER_AGENT, LOCALE, TIMEZONE_ID, dismissCookieConsent } from './tests/helpers';
 
 export const STORAGE_STATE = path.join(__dirname, 'storageState.json');
 
 export default async function globalSetup(): Promise<void> {
   const browser = await chromium.launch();
   const context = await browser.newContext({
-    userAgent:
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
-      '(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-    locale: 'bg-BG',
-    timezoneId: 'Europe/Sofia',
+    userAgent: USER_AGENT,
+    locale: LOCALE,
+    timezoneId: TIMEZONE_ID,
     viewport: { width: 1280, height: 800 },
   });
 
@@ -34,4 +32,17 @@ export default async function globalSetup(): Promise<void> {
 
   await context.storageState({ path: STORAGE_STATE });
   await browser.close();
+
+  // Validate the saved session can reach the store before handing off to tests
+  const reqCtx = await request.newContext({ baseURL: BASE, storageState: STORAGE_STATE });
+  try {
+    const resp = await reqCtx.get('/cart.js');
+    if (resp.status() !== 200) {
+      console.warn(`[setup] Session health-check: /cart.js returned HTTP ${resp.status()} — tests may behave unexpectedly`);
+    }
+  } catch {
+    console.warn('[setup] Session health-check failed — store may be unreachable');
+  } finally {
+    await reqCtx.dispose();
+  }
 }

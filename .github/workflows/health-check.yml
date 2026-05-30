@@ -1,0 +1,56 @@
+name: Shopify Health Check
+
+on:
+  schedule:
+    - cron: '0 7 * * *'   # daily at 07:00 UTC (09:00 Sofia time)
+  workflow_dispatch:
+
+# Only one health-check at a time — never cancel a running check mid-flight
+concurrency:
+  group: health-check
+  cancel-in-progress: false
+
+jobs:
+  health-check:
+    name: Playwright health check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Write .env
+        env:
+          STORE_URL: ${{ secrets.STORE_URL || 'https://zerno.co' }}
+        run: printf 'STORE_URL=%s\n' "$STORE_URL" > .env
+
+      - name: Run health check
+        run: pnpm test
+
+      - name: Update history report
+        if: always()
+        run: node scripts/update-history.js || true
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-${{ github.run_id }}
+          path: reports/
+          retention-days: 30

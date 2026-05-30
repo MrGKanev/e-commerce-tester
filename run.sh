@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 # ─────────────────────────────────────────────
 #  Zerno.co — Shopify health-check runner
@@ -30,6 +30,14 @@ echo ""
 echo "──────────────────────────────────────────"
 echo "  Updating history..."
 node scripts/update-history.js || echo "  ⚠  Could not update history (non-fatal)"
+
+# Prune: keep only the 30 most recent dated report directories
+PRUNE_LIST=$(find reports -maxdepth 1 -type d -name "????-??-??_??-??" 2>/dev/null | sort -r | tail -n +31)
+if [ -n "${PRUNE_LIST}" ]; then
+  PRUNE_COUNT=$(echo "${PRUNE_LIST}" | wc -l | tr -d ' ')
+  echo "${PRUNE_LIST}" | xargs rm -rf
+  echo "  Pruned ${PRUNE_COUNT} old report(s)"
+fi
 
 echo ""
 echo "══════════════════════════════════════════"

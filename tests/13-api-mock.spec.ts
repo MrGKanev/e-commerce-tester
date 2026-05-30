@@ -15,7 +15,7 @@
  *  - Product JSON endpoint is unavailable
  */
 import { test, expect } from '@playwright/test';
-import { BASE, KNOWN_PRODUCT, goto } from './helpers';
+import { BASE, KNOWN_PRODUCT, ADD_TO_CART_SEL, goto } from './helpers';
 
 // ─── Cart API mocks ───────────────────────────────────────────────────────────
 
@@ -41,9 +41,7 @@ test.describe('13 · API Mocks — Cart', () => {
 
     await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
 
-    const addBtn = page.locator(
-      'button[name="add"], #AddToCart, .product-form__submit, form[action*="/cart/add"] button[type="submit"]',
-    ).first();
+    const addBtn = page.locator(ADD_TO_CART_SEL).first();
 
     if ((await addBtn.count()) > 0 && !(await addBtn.isDisabled())) {
       await addBtn.click();
@@ -69,9 +67,7 @@ test.describe('13 · API Mocks — Cart', () => {
 
     await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
 
-    const addBtn = page.locator(
-      'button[name="add"], #AddToCart, .product-form__submit, form[action*="/cart/add"] button[type="submit"]',
-    ).first();
+    const addBtn = page.locator(ADD_TO_CART_SEL).first();
 
     if ((await addBtn.count()) > 0 && !(await addBtn.isDisabled())) {
       await addBtn.click();
@@ -122,9 +118,7 @@ test.describe('13 · API Mocks — Cart', () => {
 
     await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
 
-    const addBtn = page.locator(
-      'button[name="add"], #AddToCart, .product-form__submit, form[action*="/cart/add"] button[type="submit"]',
-    ).first();
+    const addBtn = page.locator(ADD_TO_CART_SEL).first();
 
     if ((await addBtn.count()) > 0 && !(await addBtn.isDisabled())) {
       await addBtn.click();
