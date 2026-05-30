@@ -8,7 +8,7 @@
  * HOW IT WORKS
  * ─────────────
  * First run (or after intentional design changes):
- *   npx playwright test tests/10-visual.spec.ts --update-snapshots
+ *   pnpm exec playwright test tests/10-visual.spec.ts --update-snapshots
  *
  * Every subsequent run compares against those saved baselines. A pixel diff
  * above the threshold fails the test with a side-by-side diff image.

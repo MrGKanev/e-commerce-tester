@@ -10,7 +10,7 @@
  * beforeAll product list is available to all assertions.
  */
 import { test, expect } from '@playwright/test';
-import { BASE, KNOWN_PRODUCTS, fetchProductHandles } from './helpers';
+import { BASE, KNOWN_PRODUCTS, ADD_TO_CART_SEL, fetchProductHandles } from './helpers';
 
 type Product = { handle: string; url: string };
 
@@ -98,23 +98,11 @@ test.describe('16 · Dynamic Product Crawling', () => {
   test('all in-stock crawled products have an enabled add-to-cart button', async ({ page }) => {
     test.setTimeout(products.length * 10_000 + 15_000);
 
-    const ATC_SEL = [
-      'form[action*="/cart/add"] button[type="submit"]',
-      'button[name="add"]',
-      '#AddToCart',
-      '.product-form__submit',
-      'button:has-text("Add to cart")',
-      'button:has-text("Добавяне в количката")',
-      'button:has-text("Добавяне")',
-      'button:has-text("В количката")',
-      'button:has-text("Купи")',
-    ].join(', ');
-
     const issues: string[] = [];
     for (const p of products) {
       await page.goto(p.url, { waitUntil: 'domcontentloaded' });
 
-      const btn = page.locator(ATC_SEL).first();
+      const btn = page.locator(ADD_TO_CART_SEL).first();
       const count = await btn.count();
       if (count === 0) {
         issues.push(`${p.handle}: no add-to-cart button found`);

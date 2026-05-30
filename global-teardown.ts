@@ -7,13 +7,14 @@
 
 import { request } from '@playwright/test';
 import { STORAGE_STATE } from './global-setup';
+import { BASE } from './tests/helpers';
 import fs from 'fs';
 
 export default async function globalTeardown(): Promise<void> {
   if (!fs.existsSync(STORAGE_STATE)) return;
 
   const context = await request.newContext({
-    baseURL: 'https://zerno.co',
+    baseURL: BASE,
     storageState: STORAGE_STATE,
     extraHTTPHeaders: {
       'Content-Type': 'application/json',

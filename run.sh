@@ -22,14 +22,14 @@ echo ""
 # Disable -e around the test run so that history/summary always executes,
 # even when some tests fail (which is the most important time to update them).
 set +e
-npx playwright test "$@"
+pnpm exec playwright test "$@"
 EXIT_CODE=$?
 set -e
 
 echo ""
 echo "──────────────────────────────────────────"
 echo "  Updating history..."
-node scripts/update-history.js
+node scripts/update-history.js || echo "  ⚠  Could not update history (non-fatal)"
 
 echo ""
 echo "══════════════════════════════════════════"
@@ -43,7 +43,7 @@ echo "  Detailed report : ${REPORT_DIR}/index.html"
 echo "  History         : reports/history.html"
 echo ""
 echo "  Open report:"
-echo "    npx playwright show-report ${REPORT_DIR}"
+echo "    pnpm exec playwright show-report ${REPORT_DIR}"
 echo "══════════════════════════════════════════"
 echo ""
 

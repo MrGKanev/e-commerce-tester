@@ -118,7 +118,7 @@ export async function dismissCookieConsent(page: Page): Promise<void> {
     const btn = page.locator(COOKIE_CONSENT_SEL).first();
     await btn.waitFor({ state: 'visible', timeout: 5000 });
     await btn.click();
-    await page.waitForTimeout(400);
+    await btn.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => null);
   } catch {
     // No cookie banner — that's fine
   }
@@ -265,6 +265,7 @@ export async function fetchProductHandles(
         Accept: 'application/json',
         'User-Agent': 'Mozilla/5.0 (compatible; health-check/1.0)',
       },
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) return KNOWN_PRODUCTS;
     const data = (await res.json()) as { products?: Array<{ handle: string }> };
@@ -278,9 +279,3 @@ export async function fetchProductHandles(
   }
 }
 
-/** Scroll page to element and screenshot it — helper for visual verification */
-export async function scrollAndScreenshot(page: Page, selector: string, label: string): Promise<void> {
-  const el = page.locator(selector).first();
-  await el.scrollIntoViewIfNeeded().catch(() => null);
-  await page.screenshot({ path: `${label}.png`, fullPage: false });
-}

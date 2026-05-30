@@ -51,7 +51,7 @@ export default defineConfig({
     // Real browser UA — avoids 403/bot-detection on Shopify
     userAgent:
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
-      '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      '(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
 
     // Locale — Bulgarian store
     locale: 'bg-BG',

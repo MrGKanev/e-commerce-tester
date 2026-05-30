@@ -11,7 +11,7 @@
 
 import { chromium } from '@playwright/test';
 import path from 'path';
-import { dismissCookieConsent } from './tests/helpers';
+import { BASE, dismissCookieConsent } from './tests/helpers';
 
 export const STORAGE_STATE = path.join(__dirname, 'storageState.json');
 
@@ -20,14 +20,14 @@ export default async function globalSetup(): Promise<void> {
   const context = await browser.newContext({
     userAgent:
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
-      '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      '(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
     locale: 'bg-BG',
     timezoneId: 'Europe/Sofia',
     viewport: { width: 1280, height: 800 },
   });
 
   const page = await context.newPage();
-  await page.goto('https://zerno.co', { waitUntil: 'domcontentloaded' });
+  await page.goto(BASE, { waitUntil: 'domcontentloaded' });
 
   // Accept cookie consent once — persisted via storage state for all tests
   await dismissCookieConsent(page);

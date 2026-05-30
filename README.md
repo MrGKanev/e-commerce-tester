@@ -62,7 +62,7 @@ reports/
 
 Open the detailed report:
 ```bash
-npx playwright show-report reports/2024-01-15_10-30
+pnpm exec playwright show-report reports/2024-01-15_10-30
 ```
 
 Open the history dashboard:
