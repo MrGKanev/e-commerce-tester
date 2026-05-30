@@ -9,10 +9,13 @@ export const USER_AGENT =
 export const LOCALE = 'bg-BG';
 export const TIMEZONE_ID = 'Europe/Sofia';
 
-/** Known products for targeted tests */
+/** Known products for targeted tests — configurable via .env */
+const _handle1 = process.env.PRODUCT_HANDLE ?? 'zerno-z1';
+const _handle2 = process.env.PRODUCT_HANDLE_2 ?? 'zerno-z2';
+
 export const KNOWN_PRODUCTS = [
-  { handle: 'zerno-z1', url: `${BASE}/products/zerno-z1` },
-  { handle: 'zerno-z2', url: `${BASE}/products/zerno-z2` },
+  { handle: _handle1, url: `${BASE}/products/${_handle1}` },
+  { handle: _handle2, url: `${BASE}/products/${_handle2}` },
 ];
 /** Backwards-compat shorthand */
 export const KNOWN_PRODUCT = KNOWN_PRODUCTS[0].url;
