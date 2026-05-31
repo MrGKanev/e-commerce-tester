@@ -9,6 +9,9 @@ export const USER_AGENT =
 export const LOCALE = 'bg-BG';
 export const TIMEZONE_ID = 'Europe/Sofia';
 
+/** Search term used by search-related tests — configurable via .env */
+export const SEARCH_TERM = process.env.SEARCH_TERM ?? 'zerno';
+
 /** Known products for targeted tests — configurable via .env */
 const _handle1 = process.env.PRODUCT_HANDLE ?? 'zerno-z1';
 const _handle2 = process.env.PRODUCT_HANDLE_2 ?? 'zerno-z2';

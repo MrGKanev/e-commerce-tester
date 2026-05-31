@@ -14,6 +14,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import {
   BASE,
+  SEARCH_TERM,
   KNOWN_PRODUCTS,
   ADD_TO_CART_SEL,
   MOBILE_MENU_TOGGLE_SEL,
@@ -34,7 +35,7 @@ const KEY_PAGES = [
   { label: 'Homepage', path: '/' },
   { label: 'Collections', path: '/collections/all' },
   { label: 'Cart', path: '/cart' },
-  { label: 'Search', path: '/search?q=zerno' },
+  { label: 'Search', path: `/search?q=${SEARCH_TERM}` },
   ...KNOWN_PRODUCTS.map((p) => ({
     label: `Product ${p.handle}`,
     path: `/products/${p.handle}`,

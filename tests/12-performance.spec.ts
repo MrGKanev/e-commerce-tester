@@ -10,7 +10,7 @@
  */
 import { test, expect, chromium } from '@playwright/test';
 import { playAudit } from 'playwright-lighthouse';
-import { BASE, KNOWN_PRODUCT } from './helpers';
+import { BASE, SEARCH_TERM, KNOWN_PRODUCT } from './helpers';
 
 // ─── Thresholds ──────────────────────────────────────────────────────────────
 
@@ -142,7 +142,7 @@ test.describe('12a · Performance API', () => {
   });
 
   test('search results page — TTFB < 2 s', async ({ page }) => {
-    await page.goto(`${BASE}/search?q=zerno&type=product`, { waitUntil: 'load' });
+    await page.goto(`${BASE}/search?q=${SEARCH_TERM}&type=product`, { waitUntil: 'load' });
     const t = await getNavTiming(page);
     console.log(`Search timing: TTFB ${t.ttfb}ms | Load ${t.loadComplete}ms`);
     expect(t.ttfb).toBeLessThan(PERF.ttfb);
@@ -313,7 +313,7 @@ test.describe('12b · Lighthouse', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`${BASE}/search?q=zerno&type=product`, {
+      await page.goto(`${BASE}/search?q=${SEARCH_TERM}&type=product`, {
         waitUntil: 'networkidle',
         timeout: 60_000,
       });

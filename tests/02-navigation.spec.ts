@@ -96,7 +96,10 @@ test.describe('02 · Desktop navigation', () => {
 
     const trigger = dropdownTriggers.first();
     await trigger.hover();
-    await page.waitForTimeout(400); // CSS transition
+    await page.waitForFunction(
+      () => !!document.querySelector('header nav li ul:not([hidden]), header [class*="dropdown"]:not([hidden])'),
+      { timeout: 1500 },
+    ).catch(() => null);
 
     const dropdown = page.locator(
       'header nav li ul:visible, header [class*="dropdown"]:visible, .site-nav__dropdown:visible',
@@ -198,7 +201,10 @@ test.describe('02 · Mobile navigation', () => {
     if (toggleCount === 0) test.skip(true, 'Mobile menu toggle not found');
 
     await toggle.click();
-    await page.waitForTimeout(500); // CSS animation
+    await page.waitForFunction(
+      () => !!document.querySelector('#menu-drawer[open], [aria-expanded="true"]'),
+      { timeout: 2000 },
+    ).catch(() => null);
 
     // Menu should now be open — check for any of the open states
     const menuOpen = page.locator(
@@ -225,7 +231,10 @@ test.describe('02 · Mobile navigation', () => {
     if ((await toggle.count()) === 0) test.skip(true, 'Mobile menu toggle not found');
 
     await toggle.click();
-    await page.waitForTimeout(600);
+    await page.waitForFunction(
+      () => !!document.querySelector('#menu-drawer[open], [aria-expanded="true"]'),
+      { timeout: 2000 },
+    ).catch(() => null);
 
     // Find links that appeared after opening
     const menuLinks = page.locator(
@@ -241,7 +250,10 @@ test.describe('02 · Mobile navigation', () => {
     if ((await toggle.count()) === 0) test.skip(true, 'Mobile menu toggle not found');
 
     await toggle.click();
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      () => !!document.querySelector('#menu-drawer[open], [aria-expanded="true"]'),
+      { timeout: 2000 },
+    ).catch(() => null);
 
     // Try close button first
     const closeBtn = page.locator(
@@ -254,7 +266,10 @@ test.describe('02 · Mobile navigation', () => {
       // Try pressing Escape
       await page.keyboard.press('Escape');
     }
-    await page.waitForTimeout(500);
+    await page.waitForFunction(
+      () => !document.querySelector('#menu-drawer[open]'),
+      { timeout: 2000 },
+    ).catch(() => null);
 
     // Verify menu is no longer fully visible / blocking content
     const expandedCount = await page.locator('[aria-expanded="true"]').count();
@@ -269,7 +284,10 @@ test.describe('02 · Mobile navigation', () => {
     const toggle = page.locator(MOBILE_MENU_TOGGLE_SEL).first();
     if ((await toggle.count()) > 0) {
       await toggle.click();
-      await page.waitForTimeout(500);
+      await page.waitForFunction(
+        () => !!document.querySelector('#menu-drawer[open], [aria-expanded="true"]'),
+        { timeout: 2000 },
+      ).catch(() => null);
     }
 
     const navLinks = page.locator(
@@ -300,9 +318,15 @@ test.describe('02 · Mobile navigation', () => {
 
     if ((await toggle.count()) > 0) {
       await toggle.click();
-      await page.waitForTimeout(400);
+      await page.waitForFunction(
+        () => !!document.querySelector('#menu-drawer[open], [aria-expanded="true"]'),
+        { timeout: 2000 },
+      ).catch(() => null);
       await page.keyboard.press('Escape');
-      await page.waitForTimeout(500);
+      await page.waitForFunction(
+        () => !document.querySelector('#menu-drawer[open]'),
+        { timeout: 2000 },
+      ).catch(() => null);
     }
 
     // Check main content is accessible

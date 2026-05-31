@@ -92,7 +92,7 @@ test.describe('01 · Homepage', () => {
     const errors: string[] = [];
     page.on('pageerror', (err) => errors.push(err.message));
     await goto(page);
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => null);
     const critical = errors.filter(
       (e) =>
         !e.includes('Non-Error promise rejection') &&
@@ -114,7 +114,7 @@ test.describe('01 · Homepage', () => {
         !url.includes('facebook') &&
         !url.includes('analytics') &&
         !url.includes('pixel') &&
-        url.includes('zerno.co')
+        url.includes(new URL(BASE).hostname)
       ) {
         failed.push(`${status} ${url}`);
       }

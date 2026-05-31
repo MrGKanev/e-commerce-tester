@@ -216,7 +216,7 @@ const html = `<!DOCTYPE html>
         </tr>
       </thead>
       <tbody>
-        ${runs.length === 0 ? `<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:32px">No runs yet. Run <code>npm test</code> to get started.</td></tr>` : ''}
+        ${runs.length === 0 ? `<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:32px">No runs yet. Run <code>pnpm test</code> to get started.</td></tr>` : ''}
         ${runs.map((r) => `
         <tr>
           <td><strong>${r.date}</strong></td>

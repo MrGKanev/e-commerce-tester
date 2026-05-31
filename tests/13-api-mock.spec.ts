@@ -15,7 +15,7 @@
  *  - Product JSON endpoint is unavailable
  */
 import { test, expect } from '@playwright/test';
-import { BASE, KNOWN_PRODUCT, KNOWN_PRODUCTS, ADD_TO_CART_SEL, goto } from './helpers';
+import { BASE, SEARCH_TERM, KNOWN_PRODUCT, KNOWN_PRODUCTS, ADD_TO_CART_SEL, goto } from './helpers';
 
 // ─── Cart API mocks ───────────────────────────────────────────────────────────
 
@@ -45,7 +45,7 @@ test.describe('13 · API Mocks — Cart', () => {
 
     if ((await addBtn.count()) > 0 && !(await addBtn.isDisabled())) {
       await addBtn.click();
-      await page.waitForTimeout(1_500);
+      await page.waitForResponse(r => /\/cart(\/add)?\.js/.test(r.url()), { timeout: 3000 }).catch(() => null);
     }
 
     // Page should still be functional — no JS crash
@@ -71,7 +71,7 @@ test.describe('13 · API Mocks — Cart', () => {
 
     if ((await addBtn.count()) > 0 && !(await addBtn.isDisabled())) {
       await addBtn.click();
-      await page.waitForTimeout(1_500);
+      await page.waitForResponse(r => /\/cart(\/add)?\.js/.test(r.url()), { timeout: 3000 }).catch(() => null);
     }
 
     expect(jsErrors, `JS errors after 500: ${jsErrors.join(' | ')}`).toHaveLength(0);
@@ -122,7 +122,7 @@ test.describe('13 · API Mocks — Cart', () => {
 
     if ((await addBtn.count()) > 0 && !(await addBtn.isDisabled())) {
       await addBtn.click();
-      await page.waitForTimeout(2_000);
+      await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => null);
     }
 
     // Page must remain usable — no full crash
@@ -160,7 +160,7 @@ test.describe('13 · API Mocks — Search', () => {
     ).first();
     if ((await searchToggle.count()) > 0) {
       await searchToggle.click();
-      await page.waitForTimeout(400);
+      await page.locator('input[type="search"], input[name="q"]').first().waitFor({ state: 'visible', timeout: 2000 }).catch(() => null);
     }
 
     const searchInput = page.locator('input[type="search"], input[name="q"]').first();
@@ -169,8 +169,8 @@ test.describe('13 · API Mocks — Search', () => {
       return;
     }
 
-    await searchInput.type('test', { delay: 60 });
-    await page.waitForTimeout(1_000);
+    await searchInput.type(SEARCH_TERM, { delay: 60 });
+    await page.waitForResponse(r => r.url().includes('/search/suggest'), { timeout: 2000 }).catch(() => null);
 
     expect(jsErrors, `JS errors with empty search mock: ${jsErrors.join(' | ')}`).toHaveLength(0);
   });
@@ -190,7 +190,7 @@ test.describe('13 · API Mocks — Search', () => {
     ).first();
     if ((await searchToggle.count()) > 0) {
       await searchToggle.click();
-      await page.waitForTimeout(400);
+      await page.locator('input[type="search"], input[name="q"]').first().waitFor({ state: 'visible', timeout: 2000 }).catch(() => null);
     }
 
     const searchInput = page.locator('input[type="search"], input[name="q"]').first();
@@ -199,8 +199,8 @@ test.describe('13 · API Mocks — Search', () => {
       return;
     }
 
-    await searchInput.type('zerno', { delay: 60 });
-    await page.waitForTimeout(1_500);
+    await searchInput.type(SEARCH_TERM, { delay: 60 });
+    await page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => null);
 
     // No crash — the search bar should still be interactable
     expect(jsErrors.filter(e => /unhandled|uncaught/i.test(e))).toHaveLength(0);
@@ -211,7 +211,7 @@ test.describe('13 · API Mocks — Search', () => {
     await page.route('**/search/suggest*', route => route.abort('failed'));
 
     // Direct search (not predictive) should always work via full page navigation
-    await page.goto(`${BASE}/search?q=zerno&type=product`, {
+    await page.goto(`${BASE}/search?q=${SEARCH_TERM}&type=product`, {
       waitUntil: 'domcontentloaded',
     });
 

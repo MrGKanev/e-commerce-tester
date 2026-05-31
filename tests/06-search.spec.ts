@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { faker } from '@faker-js/faker';
-import { BASE, goto } from './helpers';
+import { BASE, SEARCH_TERM, goto } from './helpers';
 
 test.describe('06 · Search', () => {
 
@@ -73,7 +73,7 @@ test.describe('06 · Search', () => {
     const searchInput = page.locator('input[type="search"], input[name="q"]').first();
     if ((await searchInput.count()) === 0) test.skip(true, 'No search input found');
 
-    await searchInput.fill('zerno');
+    await searchInput.fill(SEARCH_TERM);
     await searchInput.press('Enter');
     await page.waitForLoadState('domcontentloaded');
 
@@ -84,12 +84,12 @@ test.describe('06 · Search', () => {
   // ─── Search results ────────────────────────────────────────────────────────
 
   test('search results page loads for a known product name', async ({ page }) => {
-    await page.goto(`${BASE}/search?q=zerno&type=product`, { waitUntil: 'load' });
+    await page.goto(`${BASE}/search?q=${SEARCH_TERM}&type=product`, { waitUntil: 'load' });
     await expect(page).not.toHaveTitle(/404|not found/i);
   });
 
-  test('search results show at least one product for "zerno"', async ({ page }) => {
-    await page.goto(`${BASE}/search?q=zerno&type=product`, {
+  test(`search results show at least one product for "${SEARCH_TERM}"`, async ({ page }) => {
+    await page.goto(`${BASE}/search?q=${SEARCH_TERM}&type=product`, {
       waitUntil: 'domcontentloaded',
     });
 
@@ -104,7 +104,7 @@ test.describe('06 · Search', () => {
 
     const results = page.locator(resultSel);
     const count = await results.count();
-    expect(count, 'No search results found for "zerno"').toBeGreaterThan(0);
+    expect(count, `No search results found for "${SEARCH_TERM}"`).toBeGreaterThan(0);
   });
 
   test('search results for unknown term shows no-results message', async ({ page }) => {
@@ -139,7 +139,7 @@ test.describe('06 · Search', () => {
   });
 
   test('search page has no horizontal overflow', async ({ page }) => {
-    await page.goto(`${BASE}/search?q=zerno`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`${BASE}/search?q=${SEARCH_TERM}`, { waitUntil: 'domcontentloaded' });
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth + 5,
     );

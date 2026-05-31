@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { BASE, KNOWN_PRODUCT, ADD_TO_CART_SEL, CART_ITEMS_SEL } from './helpers';
+import { BASE, KNOWN_PRODUCT, KNOWN_PRODUCTS, ADD_TO_CART_SEL, CART_ITEMS_SEL } from './helpers';
 
 // Helper: add the known product to cart and return to the cart page
 async function addKnownProductToCart(page: import('@playwright/test').Page) {
@@ -10,7 +10,7 @@ async function addKnownProductToCart(page: import('@playwright/test').Page) {
   // Wait for any cart response
   await Promise.race([
     page.waitForURL('**/cart**', { timeout: 6000 }).catch(() => null),
-    page.waitForTimeout(4000),
+    page.waitForResponse(r => /\/cart(\/add)?\.js/.test(r.url()), { timeout: 6000 }).catch(() => null),
   ]);
   if (!page.url().includes('/cart')) {
     await page.goto(`${BASE}/cart`, { waitUntil: 'domcontentloaded' });
@@ -73,7 +73,7 @@ test.describe('05 · Cart', () => {
 
     const cartText = await page.textContent('body');
     // Z1 product handle should appear somewhere on the cart page
-    const hasProductName = /zerno|z1|z-1/i.test(cartText ?? '');
+    const hasProductName = cartText?.toLowerCase().includes(KNOWN_PRODUCTS[0].handle.toLowerCase()) ?? false;
     expect(hasProductName, 'Product name not found in cart page').toBe(true);
   });
 
@@ -126,7 +126,7 @@ test.describe('05 · Cart', () => {
       }
       const oldText = await page.textContent('body');
       await increaseBtn.click();
-      await page.waitForTimeout(1500);
+      await page.waitForResponse(r => r.url().includes('/cart'), { timeout: 3000 }).catch(() => null);
       const newText = await page.textContent('body');
       // Subtotal should change or quantity should change
       expect(newText).not.toBe(oldText);
@@ -137,7 +137,7 @@ test.describe('05 · Cart', () => {
     const valueBefore = await qtyInput.inputValue();
     await qtyInput.fill(String(Number(valueBefore) + 1));
     await qtyInput.press('Enter');
-    await page.waitForTimeout(1500);
+    await page.waitForResponse(r => r.url().includes('/cart'), { timeout: 3000 }).catch(() => null);
 
     const valueAfter = await qtyInput.inputValue();
     expect(Number(valueAfter), 'Quantity did not increase').toBeGreaterThan(Number(valueBefore));
@@ -173,7 +173,7 @@ test.describe('05 · Cart', () => {
       await removeBtn.click();
     }
 
-    await page.waitForTimeout(2000);
+    await page.waitForResponse(r => r.url().includes('/cart'), { timeout: 3000 }).catch(() => null);
 
     const countAfter = await page.locator(CART_ITEMS_SEL).count();
     expect(

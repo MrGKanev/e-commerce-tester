@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { BASE, goto, KNOWN_PRODUCT } from './helpers';
+import { BASE, SEARCH_TERM, goto, KNOWN_PRODUCT } from './helpers';
 
 // Exclude third-party widgets that we cannot fix (chat, consent banners, etc.)
 const THIRD_PARTY_EXCLUDES = [
@@ -91,7 +91,7 @@ test.describe('11 · Accessibility (axe)', () => {
   // ─── Search results ────────────────────────────────────────────────────────
 
   test('search results page — no critical violations', async ({ page }) => {
-    await page.goto(`${BASE}/search?q=zerno&type=product`, {
+    await page.goto(`${BASE}/search?q=${SEARCH_TERM}&type=product`, {
       waitUntil: 'domcontentloaded',
     });
 
