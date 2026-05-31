@@ -8,7 +8,7 @@
  *     Best Practices, Accessibility) via playwright-lighthouse.
  *     Requires launching a separate Chrome instance with a debug port.
  */
-import { test, expect, chromium } from '@playwright/test';
+import { test, expect, chromium, type BrowserContext } from '@playwright/test';
 import { playAudit } from 'playwright-lighthouse';
 import { BASE, SEARCH_TERM, KNOWN_PRODUCT } from './helpers';
 
@@ -402,7 +402,8 @@ test.describe('12c · Core Web Vitals', () => {
 
 test.describe('12d · Network Resilience', () => {
 
-  test('homepage — loads within 12 s on fast-4G (10 Mbps / 20 ms RTT)', async ({ page }) => {
+  test('homepage — loads within 12 s on fast-4G (10 Mbps / 20 ms RTT)', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'CDP network throttling is Chromium-only');
     const client = await page.context().newCDPSession(page);
     await client.send('Network.emulateNetworkConditions', {
       offline: false,
@@ -423,7 +424,8 @@ test.describe('12d · Network Resilience', () => {
     expect(elapsed, `Homepage took ${elapsed}ms on fast-4G (budget: 12 s)`).toBeLessThan(12_000);
   });
 
-  test('homepage — DOMContentLoaded within 20 s on slow-3G (1.5 Mbps / 40 ms RTT)', async ({ page }) => {
+  test('homepage — DOMContentLoaded within 20 s on slow-3G (1.5 Mbps / 40 ms RTT)', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'CDP network throttling is Chromium-only');
     const client = await page.context().newCDPSession(page);
     await client.send('Network.emulateNetworkConditions', {
       offline: false,
