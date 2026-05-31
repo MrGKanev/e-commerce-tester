@@ -11,10 +11,13 @@
 
 import { chromium, request } from '@playwright/test';
 import path from 'path';
-import { BASE, USER_AGENT, LOCALE, TIMEZONE_ID, dismissCookieConsent } from './tests/helpers';
+import { BASE, USER_AGENT, LOCALE, TIMEZONE_ID, dismissCookieConsent } from '../tests/helpers';
+
+// storageState lives in the project root regardless of where this file is
+const ROOT = path.join(__dirname, '..');
 
 export const STORAGE_STATE = path.join(
-  __dirname,
+  ROOT,
   process.env.SITE_SLUG
     ? `storageState.${process.env.SITE_SLUG}.json`
     : 'storageState.json',

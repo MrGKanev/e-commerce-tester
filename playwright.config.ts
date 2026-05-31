@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import { STORAGE_STATE } from './global-setup';
+import { STORAGE_STATE } from './config/global-setup';
 import { BASE, USER_AGENT, LOCALE, TIMEZONE_ID } from './tests/helpers';
 
 const runDate  = process.env.TEST_RUN_DATE ||
@@ -16,8 +16,8 @@ export default defineConfig({
 
   // Global setup/teardown: setup accepts cookie consent + saves browser state;
   // teardown clears the cart so each run starts clean.
-  globalSetup: require.resolve('./global-setup'),
-  globalTeardown: require.resolve('./global-teardown'),
+  globalSetup: require.resolve('./config/global-setup'),
+  globalTeardown: require.resolve('./config/global-teardown'),
 
   // Sequential — avoids Shopify rate-limiting and cart state collisions
   fullyParallel: false,

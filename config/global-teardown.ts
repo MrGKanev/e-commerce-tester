@@ -7,7 +7,7 @@
 
 import { request } from '@playwright/test';
 import { STORAGE_STATE } from './global-setup';
-import { BASE } from './tests/helpers';
+import { BASE } from '../tests/helpers';
 import fs from 'fs';
 
 export default async function globalTeardown(): Promise<void> {
