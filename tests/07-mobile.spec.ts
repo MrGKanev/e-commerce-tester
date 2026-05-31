@@ -105,7 +105,7 @@ test.describe('07 · Mobile — element overlap & z-index audit', () => {
     if (!(await btn.isVisible().catch(() => false))) return;
 
     await btn.scrollIntoViewIfNeeded();
-    await page.waitForTimeout(300);
+    await page.evaluate(() => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
 
     const result = await page.evaluate((sel) => {
       const el = document.querySelector(sel);
@@ -156,25 +156,28 @@ test.describe('07 · Mobile — element overlap & z-index audit', () => {
     }
   }
 
-  test('add-to-cart button is not covered on product page (zerno-z1)', async ({ page }) => {
-    await page.goto(`${BASE}/products/zerno-z1`, { waitUntil: 'domcontentloaded' });
+  test(`add-to-cart button is not covered on product page (${KNOWN_PRODUCTS[0].handle})`, async ({ page }) => {
+    await page.goto(KNOWN_PRODUCTS[0].url, { waitUntil: 'domcontentloaded' });
     await checkNotCovered(page, ADD_TO_CART_SEL.split(', ')[0], 'Add to cart button');
     // Also try the generic selector
     await checkNotCovered(page, 'form[action*="/cart/add"] button[type="submit"]', 'Cart form submit');
   });
 
-  test('add-to-cart button is not covered on product page (zerno-z2)', async ({ page }) => {
-    await page.goto(`${BASE}/products/zerno-z2`, { waitUntil: 'domcontentloaded' });
+  test(`add-to-cart button is not covered on product page (${KNOWN_PRODUCTS[1].handle})`, async ({ page }) => {
+    await page.goto(KNOWN_PRODUCTS[1].url, { waitUntil: 'domcontentloaded' });
     await checkNotCovered(page, 'form[action*="/cart/add"] button[type="submit"]', 'Add to cart button');
   });
 
   test('checkout button on cart is not covered', async ({ page }) => {
     // Add item first
-    await page.goto(`${BASE}/products/zerno-z1`, { waitUntil: 'domcontentloaded' });
+    await page.goto(KNOWN_PRODUCTS[0].url, { waitUntil: 'domcontentloaded' });
     const addBtn = page.locator(ADD_TO_CART_SEL).first();
     if ((await addBtn.count()) > 0 && !(await addBtn.isDisabled())) {
       await addBtn.click();
-      await page.waitForTimeout(3000);
+      await page.waitForResponse(
+        r => /\/cart(\/add)?\.js/.test(r.url()),
+        { timeout: 5000 },
+      ).catch(() => null);
     }
     await page.goto(`${BASE}/cart`, { waitUntil: 'domcontentloaded' });
     await checkNotCovered(page, '[name="checkout"], a[href*="/checkout"]', 'Checkout button');
@@ -187,7 +190,7 @@ test.describe('07 · Mobile — element overlap & z-index audit', () => {
 
   test('fixed elements audit — homepage', async ({ page }) => {
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(1000); // let chat widgets / cookie banners load
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => null);
 
     const fixed = await getFixedElements(page);
 
@@ -218,8 +221,8 @@ test.describe('07 · Mobile — element overlap & z-index audit', () => {
   });
 
   test('fixed elements audit — product page', async ({ page }) => {
-    await page.goto(`${BASE}/products/zerno-z1`, { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(1000);
+    await page.goto(KNOWN_PRODUCTS[0].url, { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => null);
 
     const fixed = await getFixedElements(page);
     if (fixed.length > 0) {
@@ -276,7 +279,7 @@ test.describe('07 · Mobile — font sizes', () => {
   });
 
   test('product description font-size is at least 14px', async ({ page }) => {
-    await page.goto(`${BASE}/products/zerno-z1`, { waitUntil: 'domcontentloaded' });
+    await page.goto(KNOWN_PRODUCTS[0].url, { waitUntil: 'domcontentloaded' });
     const descSel = '.product__description, .rte, .product-single__description, [class*="description"]';
     const desc = page.locator(descSel).first();
     if ((await desc.count()) === 0) return;
@@ -286,7 +289,7 @@ test.describe('07 · Mobile — font sizes', () => {
   });
 
   test('form inputs font-size is ≥16px (prevents iOS auto-zoom)', async ({ page }) => {
-    await page.goto(`${BASE}/products/zerno-z1`, { waitUntil: 'domcontentloaded' });
+    await page.goto(KNOWN_PRODUCTS[0].url, { waitUntil: 'domcontentloaded' });
 
     const inputs = page.locator('input:not([type="hidden"]), select, textarea');
     const count = await inputs.count();
@@ -341,7 +344,7 @@ test.describe('07 · Mobile — touch targets', () => {
   });
 
   test('add-to-cart button touch target is ≥44px tall', async ({ page }) => {
-    await page.goto(`${BASE}/products/zerno-z1`, { waitUntil: 'domcontentloaded' });
+    await page.goto(KNOWN_PRODUCTS[0].url, { waitUntil: 'domcontentloaded' });
     const btn = page.locator(ADD_TO_CART_SEL).first();
     if ((await btn.count()) === 0) return;
 
@@ -358,7 +361,7 @@ test.describe('07 · Mobile — images', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test('product images do not exceed viewport width', async ({ page }) => {
-    await page.goto(`${BASE}/products/zerno-z1`, { waitUntil: 'domcontentloaded' });
+    await page.goto(KNOWN_PRODUCTS[0].url, { waitUntil: 'domcontentloaded' });
 
     const vw = await page.evaluate(() => window.innerWidth);
     const imgSel = 'img[src*="products"], .product__media img';
@@ -421,7 +424,7 @@ test.describe('07 · Mobile — sticky header', () => {
   });
 
   test('sticky header does not cover content permanently on product page', async ({ page }) => {
-    await page.goto(`${BASE}/products/zerno-z1`, { waitUntil: 'domcontentloaded' });
+    await page.goto(KNOWN_PRODUCTS[0].url, { waitUntil: 'domcontentloaded' });
 
     // Scroll mid-page
     await page.evaluate(() => window.scrollTo(0, 400));
@@ -470,7 +473,7 @@ test.describe('07 · Tablet (768px)', () => {
   });
 
   test('product page usable at 768px', async ({ page }) => {
-    await page.goto(`${BASE}/products/zerno-z1`, { waitUntil: 'domcontentloaded' });
+    await page.goto(KNOWN_PRODUCTS[0].url, { waitUntil: 'domcontentloaded' });
 
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth + 5,

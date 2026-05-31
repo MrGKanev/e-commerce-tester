@@ -38,7 +38,12 @@ jobs:
       - name: Write .env
         env:
           STORE_URL: ${{ secrets.STORE_URL || 'https://zerno.co' }}
-        run: printf 'STORE_URL=%s\n' "$STORE_URL" > .env
+          PRODUCT_HANDLE: ${{ secrets.PRODUCT_HANDLE || 'zerno-z1' }}
+          PRODUCT_HANDLE_2: ${{ secrets.PRODUCT_HANDLE_2 || 'zerno-z2' }}
+        run: |
+          printf 'STORE_URL=%s\n'       "$STORE_URL"       > .env
+          printf 'PRODUCT_HANDLE=%s\n'  "$PRODUCT_HANDLE"  >> .env
+          printf 'PRODUCT_HANDLE_2=%s\n' "$PRODUCT_HANDLE_2" >> .env
 
       - name: Run health check
         run: pnpm test

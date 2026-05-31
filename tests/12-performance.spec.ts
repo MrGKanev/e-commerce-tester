@@ -10,7 +10,7 @@
  */
 import { test, expect, chromium } from '@playwright/test';
 import { playAudit } from 'playwright-lighthouse';
-import { BASE } from './helpers';
+import { BASE, KNOWN_PRODUCT } from './helpers';
 
 // ─── Thresholds ──────────────────────────────────────────────────────────────
 
@@ -21,7 +21,7 @@ const PERF = {
   loadComplete:     12_000,   // ms — images / iframes done
 };
 
-const LIGHTHOUSE_PORT = 9_224;   // separate from any dev server
+const LIGHTHOUSE_PORT = parseInt(process.env.LIGHTHOUSE_PORT ?? '9224', 10);
 
 const LIGHTHOUSE_THRESHOLDS = {
   performance:      50,   // 2026 target: mobile ≥ 50 (up from 30)
@@ -135,7 +135,7 @@ test.describe('12a · Performance API', () => {
   });
 
   test('product page — TTFB < 2 s', async ({ page }) => {
-    await page.goto(`${BASE}/products/zerno-z1`, { waitUntil: 'load' });
+    await page.goto(KNOWN_PRODUCT, { waitUntil: 'load' });
     const t = await getNavTiming(page);
     console.log(`Product timing: TTFB ${t.ttfb}ms | Load ${t.loadComplete}ms`);
     expect(t.ttfb).toBeLessThan(PERF.ttfb);
@@ -251,7 +251,7 @@ test.describe('12b · Lighthouse', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`${BASE}/products/zerno-z1`, {
+      await page.goto(KNOWN_PRODUCT, {
         waitUntil: 'networkidle',
         timeout: 60_000,
       });
@@ -353,7 +353,7 @@ test.describe('12c · Core Web Vitals', () => {
   });
 
   test('product page — LCP < 2500 ms', async ({ page }) => {
-    await page.goto(`${BASE}/products/zerno-z1`, { waitUntil: 'load' });
+    await page.goto(KNOWN_PRODUCT, { waitUntil: 'load' });
     await page.waitForTimeout(1_000);
 
     const lcp = await measureLCP(page);
@@ -374,7 +374,7 @@ test.describe('12c · Core Web Vitals', () => {
   });
 
   test('product page — CLS < 0.1', async ({ page }) => {
-    await page.goto(`${BASE}/products/zerno-z1`, { waitUntil: 'load' });
+    await page.goto(KNOWN_PRODUCT, { waitUntil: 'load' });
     await page.waitForTimeout(500);
 
     const cls = await measureCLS(page);

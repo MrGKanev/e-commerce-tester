@@ -234,7 +234,7 @@ for (const product of KNOWN_PRODUCTS) {
 
       // Scroll button into view first
       await btn.scrollIntoViewIfNeeded();
-      await page.waitForTimeout(300);
+      await page.evaluate(() => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
 
       // Get element sitting on top at the button's center
       const topEl = await getTopElementAt(page, ADD_TO_CART_SEL.split(', ')[0]);
@@ -306,7 +306,10 @@ for (const product of KNOWN_PRODUCTS) {
 
       const priceBefore = await page.locator(PRICE_SEL).first().textContent();
       await variants.nth(1).click();
-      await page.waitForTimeout(500);
+      await page.waitForResponse(
+        r => r.url().includes('/variants') || r.url().includes('/products'),
+        { timeout: 2000 },
+      ).catch(() => null);
       // Price may or may not change — just verify it's still visible
       const priceAfter = await page.locator(PRICE_SEL).first().textContent();
       expect(priceAfter?.trim()).toBeTruthy();
@@ -345,7 +348,7 @@ for (const product of KNOWN_PRODUCTS) {
     test('related / recommended products section is present', async ({ page }) => {
       // Scroll to bottom to trigger lazy load
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      await page.waitForTimeout(1000);
+      await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => null);
 
       const relatedSel = [
         '[class*="related"]',

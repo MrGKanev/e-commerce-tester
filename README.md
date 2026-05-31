@@ -1,53 +1,84 @@
-# Zerno.co — Automated Store Health Check
+# e-commerce-tester — Shopify Store Health Check
 
-Automated weekly health-check system for [zerno.co](https://zerno.co), built with [Playwright](https://playwright.dev).
+Automated health-check suite for Shopify stores, built with [Playwright](https://playwright.dev). Point it at any Shopify store via a `.env` file and it validates every critical aspect — from broken images to GDPR consent persistence.
 
-## What we built and why
+## What we test
 
-Изградихме автоматизирана система за седмична проверка на здравето на Shopify магазин, която симулира реален потребител и валидира всеки критичен аспект — от заредени изображения до GDPR съответствие. Тестовете са организирани в 16 файла с нарастваща сложност: основни проверки на страниците (01–09), разширено покритие с достъпност, производителност и API грешки (10–13), и 2026 допълнения, насочени към актуалните Google ranking сигнали и регулаторни изисквания (14–16). В 2026 добавихме Core Web Vitals (LCP, CLS, INP), тъй като INP замени FID като официален Google метрик от март 2024, а LCP и CLS директно влияят на позициите в търсачката. Добавихме и structured data валидация (JSON-LD + OG тагове), защото богатите резултати в Google изискват точна Product схема с `name`, `offers` и `image` полета. Накрая въведохме динамично crawling на продукти от `/products.json` и GDPR тестове, за да не разчитаме на хардкодиран списък и да гарантираме, че cookie consent механизмът работи коректно при всяко ново посещение.
+- **Functionality** — homepage, navigation, collections, product pages, cart, search, static pages
+- **Responsive design** — overflow, z-index, touch targets, font sizes at 375 / 390 / 768 px
+- **Media** — broken images, alt text, srcset, fonts, video assets
+- **Visual regression** — pixel-level snapshot comparisons with 3 % tolerance
+- **Accessibility** — WCAG 2.1 AA via axe-core on all key pages
+- **Performance** — TTFB, DOMContentLoaded, Lighthouse (≥ 50 / 80 / 80 / 85), Core Web Vitals (LCP / CLS / INP), network throttling
+- **Structured data** — Product JSON-LD, Open Graph tags, canonical URL, sitemap.xml, robots.txt
+- **API error handling** — Shopify AJAX mocks (422, 500, network abort, malformed JSON)
+- **GDPR / Cookie consent** — first-visit behaviour, persistence, storage validation
+- **Dynamic coverage** — live catalogue from `/products.json` (up to 25 products), fallback to `KNOWN_PRODUCTS`
 
-**Какво тестваме:**
-- Функционалност — homepage, навигация, колекции, продуктови страници, количка, търсене, статични страници
-- Responsive design — overflow, z-index, touch targets, font sizes на 3 viewport-а (375 / 390 / 768 px)
-- Медия — счупени изображения, alt текст, srcset, шрифтове, видео assets
-- Visual regression — pixel-level snapshot сравнения с 3 % tolerance
-- Достъпност — WCAG 2.1 AA чрез axe-core на всички ключови страници
-- Производителност — TTFB, DOMContentLoaded, Lighthouse (≥ 50 / 80 / 80 / 85), Core Web Vitals (LCP / CLS / INP), network throttling
-- Structured data — Product JSON-LD, Open Graph тагове, canonical URL, sitemap.xml, robots.txt
-- API error handling — Shopify AJAX мокове (422, 500, network abort, malformed JSON)
-- GDPR / Cookie consent — поведение при first visit, persistence, storage валидация
-- Динамично покритие — live каталог от `/products.json` (до 25 продукта), fallback към `KNOWN_PRODUCTS`
-
-**Пълен списък с тест кейсове:** вижте [TESTS.md](TESTS.md)
+Full test case list: [TESTS.md](TESTS.md)
 
 ---
 
-## Setup (first time)
+## Requirements
 
-**Requirements:** Node.js 18+
+- **Node.js 20+**
+- **pnpm 9+** — install with `npm install -g pnpm` if needed
+
+---
+
+## Setup
 
 ```bash
-# Install dependencies
-npm install
+# 1. Install dependencies
+pnpm install
 
-# Install Chromium (only needed once)
-npm run install:browsers
+# 2. Install Chromium (only needed once)
+pnpm run install:browsers
+
+# 3. Configure your store
+cp .env.example .env
 ```
+
+Edit `.env`:
+
+```dotenv
+# URL of the Shopify store to test (no trailing slash)
+STORE_URL=https://your-store.myshopify.com
+
+# Two product handles used by targeted tests
+PRODUCT_HANDLE=your-first-product
+PRODUCT_HANDLE_2=your-second-product
+```
+
+`STORE_URL` defaults to `https://zerno.co` and both handles default to `zerno-z1` / `zerno-z2` if omitted.
 
 ---
 
 ## Running the tests
 
 ```bash
-# Headless (recommended for weekly checks)
-npm test
+# Headless (recommended for CI / scheduled checks)
+pnpm test
 
 # Watch the browser while testing
-npm run test:headed
+pnpm run test:headed
 
-# Debug mode (step through tests)
-npm run test:debug
+# Step-through debugger
+pnpm run test:debug
+
+# TypeScript type-check only (no browser launch)
+pnpm run type-check
 ```
+
+### Using the convenience script
+
+```bash
+./run.sh             # headless
+./run.sh --headed    # with browser
+./run.sh --debug     # debugger
+```
+
+The script prints a summary, updates the history dashboard, and prunes old reports (keeps last 30).
 
 ### Output after each run
 
@@ -55,7 +86,7 @@ npm run test:debug
 reports/
 ├── history.html                  ← cumulative dashboard (all runs)
 └── 2024-01-15_10-30/
-    ├── index.html                ← HTML report with all screenshots
+    ├── index.html                ← HTML report with screenshots
     ├── results.json              ← machine-readable results
     └── screenshots/              ← one screenshot per test
 ```
@@ -65,24 +96,19 @@ Open the detailed report:
 pnpm exec playwright show-report reports/2024-01-15_10-30
 ```
 
-Open the history dashboard:
-```bash
-npm run history
-# or: open reports/history.html
-```
-
 ---
 
-## Weekly cron schedule (Mac)
+## GitHub Actions / CI
 
-```bash
-crontab -e
-```
+The workflow at `.github/workflows/health-check.yml` runs daily at 07:00 UTC and on every manual dispatch.
 
-Add (adjust path):
-```
-0 9 * * 1 cd /path/to/e-commerce-tester && npm test >> reports/cron.log 2>&1
-```
+Set these repository secrets for your store:
+
+| Secret             | Default          | Description                          |
+|--------------------|------------------|--------------------------------------|
+| `STORE_URL`        | `https://zerno.co` | Full URL of the store                |
+| `PRODUCT_HANDLE`   | `zerno-z1`       | First product handle for targeted tests |
+| `PRODUCT_HANDLE_2` | `zerno-z2`       | Second product handle                |
 
 ---
 
@@ -95,7 +121,7 @@ e-commerce-tester/
 │   ├── 01-homepage.spec.ts
 │   ├── 02-navigation.spec.ts       desktop + mobile nav
 │   ├── 03-collections.spec.ts
-│   ├── 04-product.spec.ts          zerno-z1, zerno-z2, generic
+│   ├── 04-product.spec.ts          KNOWN_PRODUCTS + generic first-found product
 │   ├── 05-cart.spec.ts
 │   ├── 06-search.spec.ts
 │   ├── 07-mobile.spec.ts           overflow, z-index, touch targets
@@ -111,8 +137,18 @@ e-commerce-tester/
 ├── scripts/
 │   └── update-history.js           generates reports/history.html
 ├── reports/                        auto-generated, gitignored
+├── .env.example                    copy to .env and configure
 ├── playwright.config.ts
+├── global-setup.ts
+├── global-teardown.ts
 ├── run.sh
 ├── TESTS.md                        full test case reference
+├── CONTRIBUTING.md
 └── package.json
 ```
+
+---
+
+## License
+
+[MIT](LICENSE) © Gabriel Kanev

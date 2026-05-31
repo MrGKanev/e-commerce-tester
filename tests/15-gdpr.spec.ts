@@ -14,7 +14,7 @@
  *  6. Decline button (if present) hides banner without JS errors
  */
 import { test, expect } from '@playwright/test';
-import { BASE, LOCALE, TIMEZONE_ID, COOKIE_CONSENT_SEL } from './helpers';
+import { BASE, KNOWN_PRODUCT, LOCALE, TIMEZONE_ID, COOKIE_CONSENT_SEL } from './helpers';
 
 /** Selectors for the "decline / reject all" button — less standardised than accept */
 const COOKIE_DECLINE_SEL = [
@@ -110,7 +110,7 @@ test.describe('15 · GDPR / Cookie Consent', () => {
       await banner.waitFor({ state: 'hidden', timeout: 3_000 }).catch(() => null);
 
       // Navigate to product page — banner should stay gone
-      await page.goto(`${BASE}/products/zerno-z1`, { waitUntil: 'domcontentloaded' });
+      await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
 
       const bannerOnProduct = await page.locator(COOKIE_CONSENT_SEL).first()
         .waitFor({ state: 'visible', timeout: 2_000 })

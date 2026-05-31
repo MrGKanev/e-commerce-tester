@@ -15,7 +15,7 @@
  *  - Product JSON endpoint is unavailable
  */
 import { test, expect } from '@playwright/test';
-import { BASE, KNOWN_PRODUCT, ADD_TO_CART_SEL, goto } from './helpers';
+import { BASE, KNOWN_PRODUCT, KNOWN_PRODUCTS, ADD_TO_CART_SEL, goto } from './helpers';
 
 // ─── Cart API mocks ───────────────────────────────────────────────────────────
 
@@ -33,7 +33,7 @@ test.describe('13 · API Mocks — Cart', () => {
         body: JSON.stringify({
           status: 422,
           message: 'Cart Error',
-          description: 'All 1 of the zerno-z1 are already in your cart.',
+          description: `All 1 of the ${KNOWN_PRODUCTS[0].handle} are already in your cart.`,
           errors: { quantity: ['is not available'] },
         }),
       }),
@@ -229,7 +229,7 @@ test.describe('13 · API Mocks — Product', () => {
     page.on('pageerror', err => jsErrors.push(err.message));
 
     // Intercept product.js variant of the product endpoint
-    await page.route('**/products/zerno-z1.js', route =>
+    await page.route(`**/products/${KNOWN_PRODUCTS[0].handle}.js`, route =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
