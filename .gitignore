@@ -1,10 +1,12 @@
 node_modules/
 reports/*/
 !reports/.gitkeep
-reports/history.html
+reports/dashboard.html
 dist/
 .DS_Store
 *.log
 storageState.json
+storageState.*.json
+sites.json
 package-lock.json
 .env

@@ -14,7 +14,7 @@ jobs:
   health-check:
     name: Playwright health check
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -35,22 +35,38 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install chromium --with-deps
 
-      - name: Write .env
+      # Multi-site: set SITES_JSON secret to a JSON array of sites.
+      # Single-site fallback: set STORE_URL / PRODUCT_HANDLE / PRODUCT_HANDLE_2 secrets.
+      - name: Write sites config
         env:
-          STORE_URL: ${{ secrets.STORE_URL || 'https://zerno.co' }}
-          PRODUCT_HANDLE: ${{ secrets.PRODUCT_HANDLE || 'zerno-z1' }}
+          SITES_JSON:       ${{ secrets.SITES_JSON }}
+          STORE_URL:        ${{ secrets.STORE_URL        || 'https://zerno.co' }}
+          PRODUCT_HANDLE:   ${{ secrets.PRODUCT_HANDLE   || 'zerno-z1' }}
           PRODUCT_HANDLE_2: ${{ secrets.PRODUCT_HANDLE_2 || 'zerno-z2' }}
+          SEARCH_TERM:      ${{ secrets.SEARCH_TERM      || 'zerno' }}
         run: |
-          printf 'STORE_URL=%s\n'       "$STORE_URL"       > .env
-          printf 'PRODUCT_HANDLE=%s\n'  "$PRODUCT_HANDLE"  >> .env
-          printf 'PRODUCT_HANDLE_2=%s\n' "$PRODUCT_HANDLE_2" >> .env
+          if [ -n "$SITES_JSON" ]; then
+            echo "$SITES_JSON" > sites.json
+            echo "Using SITES_JSON secret ($(node -e "console.log(require('./sites.json').length)") site(s))"
+          else
+            node -e "
+              const url  = process.env.STORE_URL;
+              const slug = url.replace(/https?:\/\//, '').split('/')[0].replace(/[^a-z0-9]/gi, '-').toLowerCase();
+              const site = {
+                name:          slug,
+                slug,
+                url,
+                productHandle:  process.env.PRODUCT_HANDLE,
+                productHandle2: process.env.PRODUCT_HANDLE_2,
+                searchTerm:     process.env.SEARCH_TERM || slug,
+              };
+              require('fs').writeFileSync('sites.json', JSON.stringify([site], null, 2));
+              console.log('Created sites.json for ' + url);
+            "
+          fi
 
       - name: Run health check
         run: pnpm test
-
-      - name: Update history report
-        if: always()
-        run: node scripts/update-history.js || true
 
       - name: Upload report
         if: always()

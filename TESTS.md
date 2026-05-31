@@ -1,6 +1,6 @@
 # Test Cases
 
-Full test coverage reference for the Zerno.co automated health-check suite.
+Full test coverage reference for the e-commerce-tester automated health-check suite.
 
 ## Original suite (01–09)
 
@@ -34,7 +34,7 @@ Full test coverage reference for the Zerno.co automated health-check suite.
 | `09-media` | Font loading | @font-face declarations present |
 | `09-media` | Videos | No failed video assets |
 
-## Extended suite (10–13)
+## Extended suite (10–16)
 
 | File | Suite | What's checked |
 |------|-------|----------------|
@@ -42,16 +42,23 @@ Full test coverage reference for the Zerno.co automated health-check suite.
 | `11-accessibility` | WCAG 2.1 AA | axe-core audit on homepage, product, search, collections, cart, contact — no critical/serious violations; image alt text, heading order, color contrast (≤ 5 instances), form labels |
 | `12-performance` | Performance API | TTFB < 2 s, DOMContentLoaded < 6 s, full load < 12 s for all key pages; no render-blocking JS/CSS > 2 s; page weight < 10 MB |
 | `12-performance` | Lighthouse | Performance ≥ 50, Accessibility ≥ 80, Best Practices ≥ 80, SEO ≥ 85 on homepage, product, collections, search |
+| `12-performance` | Core Web Vitals | LCP < 2500 ms (homepage + product); CLS < 0.1 (homepage + product); INP < 200 ms (homepage) via PerformanceObserver — Google ranking signals |
+| `12-performance` | Network resilience | Homepage load < 12 s on fast-4G (10 Mbps); DOMContentLoaded < 20 s on slow-3G (1.5 Mbps) via CDP — Chromium only |
 | `13-api-mock` | API error handling | Shopify AJAX mocks — cart/add 422/500/network-abort, cart.js empty, search suggest empty/500/abort, product.js malformed JSON, recommendations unavailable, collections 429; page must not crash |
+| `14-structured-data` | JSON-LD schemas | Product schema: `name`, `offers.price`, `offers.priceCurrency`, `image`; homepage: WebSite/Organization/Store schema; all pages: valid JSON parse |
+| `14-structured-data` | Open Graph | `og:title`, `og:description`, `og:image` (absolute URL) on homepage; `og:title`, `og:image`, `og:type` on product page |
+| `14-structured-data` | Technical SEO | Canonical URL present on product page; `sitemap.xml` returns 200 with `<urlset>`; `robots.txt` present and not blocking all crawlers |
+| `15-gdpr` | Cookie consent | Banner visible on first visit; does not reappear after accepting; persists across navigation; consent recorded in cookies/localStorage; no JS errors; decline button works |
+| `16-dynamic-products` | Dynamic crawling | Fetches live catalogue from `/products.json` (up to 25 handles); checks each product: HTTP < 400, H1 title, price, JSON-LD, add-to-cart, hero image |
 
-## 2026 additions (12c, 12d, 14–16)
+## 2026 additions (17–23)
 
 | File | Suite | What's checked |
 |------|-------|----------------|
-| `12-performance` | **Core Web Vitals** | LCP < 2500 ms (homepage + product); CLS < 0.1 (homepage + product); INP < 200 ms (homepage) via PerformanceObserver `event` entries — Google ranking signals updated March 2024 |
-| `12-performance` | **Network Resilience** | Homepage load < 12 s on fast-4G (10 Mbps / 20 ms RTT); DOMContentLoaded < 20 s on slow-3G (1.5 Mbps / 40 ms RTT) via CDP `Network.emulateNetworkConditions` |
-| `14-structured-data` | JSON-LD schemas | Product schema: `name`, `offers.price`, `offers.priceCurrency`, `image`; homepage: WebSite/Organization/Store schema; all pages: valid JSON parse — no broken scripts |
-| `14-structured-data` | Open Graph | `og:title`, `og:description`, `og:image` (absolute URL) on homepage; `og:title`, `og:image`, `og:type` on product page; `og:title` on collections |
-| `14-structured-data` | Technical SEO | Canonical URL present and absolute on product page; `sitemap.xml` returns 200 and contains `<urlset>`/`<sitemapindex>`; `robots.txt` returns 200, has `User-agent`, does not block all crawlers with `Disallow: /` |
-| `15-gdpr` | Cookie consent | Banner visible on first visit (fresh context, no cookies); does not reappear after accepting; persists across page navigation; consent recorded in cookies or localStorage; no JS errors during accept flow; decline button hides banner without errors |
-| `16-dynamic-products` | Dynamic crawling | Fetches live catalogue from `/products.json` (up to 25 handles, fallback to `KNOWN_PRODUCTS`); checks each product: HTTP < 400, H1 title present, price visible, JSON-LD script present, add-to-cart button found, hero image not broken |
+| `17-checkout` | Checkout flow | Cart shows checkout button; redirect lands on `/checkout`; URL is HTTPS; page loads without JS errors; contact/email field present; shipping address fields present; express checkout buttons (Apple Pay, Shop Pay, Google Pay) visible if enabled |
+| `18-variants` | Product variants | Variant selector present or single-variant product skips gracefully; disabled variants have visual sold-out indicator (opacity/strikethrough/class); selecting a variant appends `?variant=ID` to URL; variant ID is numeric; price remains visible after switch; main image swaps when variant has different image; radio inputs are keyboard-reachable (tabIndex ≥ 0); select-based dropdowns update price |
+| `19-filters` | Filters & sorting | All 5 sort params (`price-ascending`, `price-descending`, `title-ascending`, `title-descending`, `created-descending`) return a product grid; `sort_by` param preserved in URL; sort UI dropdown present if rendered; tag/facet filter URL returns valid page with products or no-results message; active filter shows clear/reset link if available; pagination or load-more present when product count ≥ 12 |
+| `20-security` | Security headers | HTTP redirects to HTTPS; final URL is HTTPS; `Strict-Transport-Security` header present with max-age ≥ 15 768 000 s; `X-Content-Type-Options: nosniff`; `X-Frame-Options` or CSP `frame-ancestors` set; no mixed HTTP content on HTTPS pages; session cookies have `Secure` flag; cookies have `SameSite` attribute; `Server` header has no version; no `X-Powered-By`; `robots.txt` accessible; `/admin` not publicly accessible |
+| `21-trust` | Trust signals | Payment badge icons visible (footer/cart/product); refund/return policy link in footer; privacy policy link present; contact info (email, phone, form, or chat) accessible; footer has copyright/company text; product page mentions shipping/delivery; product page mentions return/guarantee; reviews/ratings section present if enabled; social share buttons present if enabled |
+| `22-newsletter` | Newsletter signup | Email signup input exists on homepage; input is inside a form element; empty submit does not navigate away without validation; invalid email format is rejected by browser validation; submit button visible and enabled; privacy/GDPR notice near form |
+| `23-404` | 404 page | Non-existent URLs (`/products/*`, `/collections/*`, `/pages/*`) return HTTP 404; page body is non-empty; title matches "not found" / "404" pattern; at least one navigation link back to the store; store header/logo present; no stack trace, Unix/Windows paths, or `Exception` text exposed; no horizontal overflow; no JS errors |

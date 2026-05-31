@@ -11,8 +11,8 @@
     "test": "bash run.sh",
     "test:headed": "bash run.sh --headed",
     "test:debug": "bash run.sh --debug",
-    "history": "open reports/history.html 2>/dev/null || xdg-open reports/history.html",
-    "install:browsers": "pnpm exec playwright install chromium",
+    "dashboard": "open reports/dashboard.html 2>/dev/null || xdg-open reports/dashboard.html",
+    "install:browsers": "pnpm exec playwright install chromium firefox webkit",
     "type-check": "tsc --noEmit"
   },
   "devDependencies": {

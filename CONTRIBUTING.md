@@ -8,14 +8,16 @@ Thank you for your interest in contributing! This project is a Playwright-based 
 git clone https://github.com/MrGKanev/e-commerce-tester.git
 cd e-commerce-tester
 pnpm install
-pnpm run install:browsers
-cp .env.example .env   # then edit .env with your store URL
+pnpm run install:browsers   # installs Chromium, Firefox, and WebKit
+cp .env.example .env        # then edit .env with your store URL
 ```
+
+**Requirements:** Node.js 22.13+ and pnpm 11+.
 
 ## Running the tests
 
 ```bash
-pnpm test              # headless
+pnpm test              # headless, all browsers
 pnpm run test:headed   # watch the browser
 pnpm run test:debug    # step-through debugger
 pnpm run type-check    # TypeScript check without running tests
@@ -23,11 +25,12 @@ pnpm run type-check    # TypeScript check without running tests
 
 ## Adding a test
 
-1. Pick the spec file that best matches the area (or create `tests/17-yourfeature.spec.ts`).
+1. Pick the spec file that best matches the area (or create `tests/24-yourfeature.spec.ts`).
 2. Import shared selectors and helpers from `tests/helpers.ts` — avoid hardcoding URLs or selectors that already exist there.
 3. Use condition-based waits (`waitFor`, `waitForLoadState`, `waitForResponse`) instead of fixed `waitForTimeout` delays.
 4. Keep tests independent — each `test()` should set up its own state and not rely on execution order.
-5. Add a corresponding entry to `TESTS.md`.
+5. If your test uses a Chrome-only API (e.g. `newCDPSession`), add `test.skip(browserName !== 'chromium', '...')` so Firefox and Safari skip it gracefully.
+6. Add a corresponding entry to `TESTS.md`.
 
 ## Commit style
 

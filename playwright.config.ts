@@ -2,11 +2,13 @@ import { defineConfig, devices } from '@playwright/test';
 import { STORAGE_STATE } from './global-setup';
 import { BASE, USER_AGENT, LOCALE, TIMEZONE_ID } from './tests/helpers';
 
-const runDate =
-  process.env.TEST_RUN_DATE ||
+const runDate  = process.env.TEST_RUN_DATE ||
   new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
 
-const reportDir = `./reports/${runDate}`;
+const siteSlug = process.env.SITE_SLUG || '';
+const reportDir = siteSlug
+  ? `./reports/${siteSlug}/${runDate}`
+  : `./reports/${runDate}`;
 
 export default defineConfig({
   testDir: './tests',
