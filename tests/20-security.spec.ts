@@ -206,3 +206,128 @@ test.describe('20 · Security headers', () => {
     expect(resp.status(), '/admin returned 200 — admin panel may be exposed').not.toBe(200);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('20b · Exposed API keys in JavaScript bundles', () => {
+
+  /**
+   * Patterns that should NEVER appear in client-side JavaScript:
+   *  - shpat_ / shppa_ : Shopify private app tokens
+   *  - sk_live_ / sk_test_ : Stripe secret keys (publishable keys pk_ are fine)
+   *  - ghp_ / gho_ / ghs_ : GitHub personal / OAuth / server-to-server tokens
+   *  - AKIA[A-Z0-9]{16} : AWS access key IDs
+   *  - private_key / privateKey inside a JSON structure
+   */
+  const DANGEROUS_PATTERNS: Array<{ name: string; regex: RegExp }> = [
+    { name: 'Shopify private app token (shpat_)',    regex: /shpat_[a-zA-Z0-9]{32,}/       },
+    { name: 'Shopify private app password (shppa_)', regex: /shppa_[a-zA-Z0-9]{32,}/      },
+    { name: 'Stripe secret key (sk_live_ / sk_test_)', regex: /sk_(live|test)_[a-zA-Z0-9]{20,}/ },
+    { name: 'GitHub PAT (ghp_)',                    regex: /ghp_[a-zA-Z0-9]{36,}/          },
+    { name: 'GitHub OAuth token (gho_)',            regex: /gho_[a-zA-Z0-9]{36,}/          },
+    { name: 'AWS Access Key ID (AKIA…)',            regex: /AKIA[A-Z0-9]{16}/              },
+    { name: 'Generic private_key in JS',            regex: /"private_key"\s*:\s*"-----BEGIN/ },
+  ];
+
+  test('homepage JavaScript bundles contain no private API keys', async ({ page }) => {
+    const scriptUrls: string[] = [];
+    const findings: string[] = [];
+
+    // Collect all JS file URLs as they load
+    page.on('response', resp => {
+      const url = resp.url();
+      const ct = resp.headers()['content-type'] ?? '';
+      if (ct.includes('javascript') || url.endsWith('.js')) {
+        scriptUrls.push(url);
+      }
+    });
+
+    await page.goto(BASE, { waitUntil: 'networkidle' });
+
+    // Scan each script body (skip CDN scripts that are not from the store)
+    for (const url of scriptUrls) {
+      if (!url.includes(new URL(BASE).hostname) && !url.includes('myshopify.com')) continue;
+
+      let body = '';
+      try {
+        const resp = await page.context().request.get(url, { timeout: 10_000 });
+        body = await resp.text();
+      } catch {
+        continue;
+      }
+
+      for (const { name, regex } of DANGEROUS_PATTERNS) {
+        if (regex.test(body)) {
+          findings.push(`[${name}] found in: ${url}`);
+        }
+      }
+    }
+
+    expect(
+      findings,
+      `Private API keys detected in JavaScript bundles:\n${findings.join('\n')}`,
+    ).toHaveLength(0);
+  });
+
+  test('product page JavaScript bundles contain no private API keys', async ({ page }) => {
+    const { KNOWN_PRODUCT } = await import('./helpers');
+    const scriptUrls: string[] = [];
+    const findings: string[] = [];
+
+    page.on('response', resp => {
+      const url = resp.url();
+      const ct = resp.headers()['content-type'] ?? '';
+      if (ct.includes('javascript') || url.endsWith('.js')) {
+        scriptUrls.push(url);
+      }
+    });
+
+    await page.goto(KNOWN_PRODUCT, { waitUntil: 'networkidle' });
+
+    for (const url of scriptUrls) {
+      if (!url.includes(new URL(BASE).hostname) && !url.includes('myshopify.com')) continue;
+
+      let body = '';
+      try {
+        const resp = await page.context().request.get(url, { timeout: 10_000 });
+        body = await resp.text();
+      } catch {
+        continue;
+      }
+
+      for (const { name, regex } of DANGEROUS_PATTERNS) {
+        if (regex.test(body)) {
+          findings.push(`[${name}] found in: ${url}`);
+        }
+      }
+    }
+
+    expect(
+      findings,
+      `Private API keys detected in JavaScript bundles:\n${findings.join('\n')}`,
+    ).toHaveLength(0);
+  });
+
+  test('inline <script> tags on homepage contain no private API keys', async ({ page }) => {
+    await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+
+    const inlineScripts = await page.$$eval(
+      'script:not([src])',
+      scripts => (scripts as HTMLScriptElement[]).map(s => s.textContent ?? ''),
+    );
+
+    const findings: string[] = [];
+    for (const [i, content] of inlineScripts.entries()) {
+      for (const { name, regex } of DANGEROUS_PATTERNS) {
+        if (regex.test(content)) {
+          findings.push(`[${name}] in inline script #${i + 1}`);
+        }
+      }
+    }
+
+    expect(
+      findings,
+      `Private API keys detected in inline scripts:\n${findings.join('\n')}`,
+    ).toHaveLength(0);
+  });
+});

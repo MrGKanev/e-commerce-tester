@@ -1,0 +1,14 @@
+services:
+  e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      CI: "true"
+    volumes:
+      # Reports are written here so they survive container exit
+      - ./reports:/app/reports
+    restart: "no"
