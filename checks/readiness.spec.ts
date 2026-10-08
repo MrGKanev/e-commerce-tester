@@ -8,6 +8,7 @@ import {
   optionalVisible,
   cartAction,
   waitForImages,
+  waitForContent,
   clearCart,
 } from '../tests/helpers';
 
@@ -158,4 +159,9 @@ test('a configured product with a disabled add control fails rather than being s
   await expect(addProductToCart(page)).rejects.toThrow(
     'Configured product cannot be added to cart',
   );
+});
+
+test('graphic-only main content is ready for visual and OCR inspection', async ({ page }) => {
+  await page.setContent('<main><canvas width="100" height="40"></canvas></main>');
+  await waitForContent(page);
 });

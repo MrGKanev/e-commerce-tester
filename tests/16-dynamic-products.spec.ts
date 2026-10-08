@@ -1,10 +1,11 @@
+import { readSiteSettings } from '../config/site-settings';
 /**
  * Dynamic Product Crawling
  *
- * Instead of a hardcoded list, fetches the live product catalogue from
+ * Instead of a hardcoded list, reads the shared cached product catalogue prepared from
  * Shopify's /products.json API (up to 25 handles) and runs sanity checks
  * against every discovered product.  Falls back to KNOWN_PRODUCTS if the
- * API is unavailable.
+ * discovery is disabled.
  *
  * Each test uses crawlConcurrently() with CONCURRENCY=2 worker pages to
  * keep run time reasonable while staying within Shopify's rate limits.
@@ -50,7 +51,7 @@ test.describe('16 · Dynamic Product Crawling', { tag: ["@full"] }, () => {
 
   test.beforeAll(async () => {
     products = await fetchProductHandles(25);
-    const source = products === KNOWN_PRODUCTS ? 'fallback (KNOWN_PRODUCTS)' : '/products.json';
+    const source = readSiteSettings().inventory.discoverProducts ? 'cached discovered inventory' : 'configured inventory';
     console.log(
       `[16] Source: ${source} — ${products.length} product(s): ` +
       products.map(p => p.handle).join(', '),

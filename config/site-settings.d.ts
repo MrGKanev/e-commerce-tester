@@ -59,6 +59,13 @@ export interface SiteSettings {
     acceptedFindings: string[];
     excludeSelectors: string[];
     maxFindings: number;
+    ocr: {
+      enabled: boolean;
+      selector: string;
+      minConfidence: number;
+      maxImages: number;
+      tessdataPath: string;
+    };
   };
 }
 export function resolveSiteSettings(input?: unknown): SiteSettings;

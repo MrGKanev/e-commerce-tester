@@ -9,7 +9,7 @@ const DEFAULTS = {
     visual: { maxDiffPixelRatio: 0.03 },
   },
   inventory: { discoverProducts: false, productLimit: 5, pages: [] },
-  spelling: { mode: 'report', languages: ['bg', 'en'], allowWords: [], acceptedFindings: [], excludeSelectors: [], maxFindings: 0 },
+  spelling: { mode: 'report', languages: ['bg', 'en'], allowWords: [], acceptedFindings: [], excludeSelectors: [], maxFindings: 0, ocr: { enabled: false, selector: 'img, canvas', minConfidence: 85, maxImages: 3, tessdataPath: '' } },
 };
 const CAPABILITIES = ['checkout', 'discounts', 'currency', 'language', 'recommendations', 'recentlyViewed', 'newsletter', 'reviews', 'filters', 'variants', 'mobileMenu'];
 const SELECTORS = ['addToCart', 'productTitle', 'price', 'cartCount', 'cartItems', 'mobileMenuToggle', 'consentAccept', 'main'];
@@ -70,11 +70,15 @@ function resolveSiteSettings(input = {}) {
   if (input.spelling !== undefined) {
     keys(input.spelling, Object.keys(DEFAULTS.spelling), 'spelling');
     Object.assign(result.spelling, input.spelling);
+    if (input.spelling.ocr !== undefined) keys(input.spelling.ocr, Object.keys(DEFAULTS.spelling.ocr), 'spelling.ocr');
+    result.spelling.ocr = { ...DEFAULTS.spelling.ocr, ...(input.spelling.ocr || {}) };
   }
   if (!['off', 'report', 'strict'].includes(result.spelling.mode)) throw new Error('spelling.mode must be off, report or strict');
   for (const key of ['languages', 'allowWords', 'acceptedFindings', 'excludeSelectors']) strings(result.spelling[key], `spelling.${key}`);
   if (!result.spelling.languages.length || result.spelling.languages.some(language => !['bg', 'en'].includes(language))) throw new Error('Spelling currently supports bg and en');
   if (!Number.isInteger(result.spelling.maxFindings) || result.spelling.maxFindings < 0) throw new Error('spelling.maxFindings must be a non-negative integer');
+  const ocr = result.spelling.ocr;
+  if (typeof ocr.enabled !== 'boolean' || typeof ocr.selector !== 'string' || !ocr.selector.trim() || typeof ocr.tessdataPath !== 'string' || !Number.isFinite(ocr.minConfidence) || ocr.minConfidence < 0 || ocr.minConfidence > 100 || !Number.isInteger(ocr.maxImages) || ocr.maxImages < 1 || ocr.maxImages > 20) throw new Error('Invalid OCR settings');
   return result;
 }
 function readSiteSettings() {

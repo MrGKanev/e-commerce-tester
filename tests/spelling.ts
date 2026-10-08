@@ -1,3 +1,5 @@
+import { readRasterText } from './ocr';
+import { createHash } from 'node:crypto';
 import nspell from 'nspell';
 import type { Page, TestInfo } from '@playwright/test';
 import { expect } from '@playwright/test';
@@ -6,6 +8,7 @@ import { fingerprint, mergeFindings, type Finding } from '../scripts/spelling-mo
 
 const settings = readSiteSettings().spelling;
 const suggestions = new Map<string, string[]>();
+let auditSequence = 0;
 const dictionaries = new Map<string, Promise<ReturnType<typeof nspell>>>();
 function dictionary(language: 'bg' | 'en') {
   if (!dictionaries.has(language))
@@ -27,7 +30,23 @@ export async function auditSpelling(
   fallbackLanguage = readSiteSettings().locale,
 ) {
   if (settings.mode === 'off')
-    return { findings: [] as Finding[], unsupportedLanguages: [] as string[] };
+    return {
+      findings: [] as Finding[],
+      unsupportedLanguages: [] as string[],
+      ocr: {
+        enabled: false,
+        engine: '',
+        imagesChecked: 0,
+        wordsRecognized: 0,
+        lowConfidenceSkipped: 0,
+      },
+    };
+  const contextName =
+    'spelling-context-' +
+    createHash('sha256')
+      .update(`${page.url()}|${testInfo.testId}|${testInfo.retry}|${++auditSequence}`)
+      .digest('hex')
+      .slice(0, 16);
   const samples = await page.evaluate(
     ({ exclude, fallback }) => {
       function visible(element: Element) {
@@ -110,6 +129,14 @@ export async function auditSpelling(
     },
     { exclude: settings.excludeSelectors, fallback: fallbackLanguage },
   );
+  const ocr = await readRasterText(
+    page,
+    fallbackLanguage,
+    settings.languages,
+    settings.ocr,
+    settings.excludeSelectors,
+  );
+  samples.push(...ocr.samples);
   const allowed = new Set(
     settings.allowWords.flatMap(phrase => {
       const normalized = phrase.normalize('NFC').toLocaleLowerCase();
@@ -175,7 +202,15 @@ export async function auditSpelling(
             })(),
         accepted: false,
         urls: [page.url()],
-        locations: [{ url: page.url(), locator: sample.locator, rect: sample.rect }],
+        locations: [
+          {
+            url: page.url(),
+            locator: sample.locator,
+            screenshot: contextName,
+            source: sample.source,
+            rect: sample.rect,
+          },
+        ],
       };
       finding.id = fingerprint(finding);
       finding.accepted = settings.acceptedFindings.includes(finding.id);
@@ -184,6 +219,7 @@ export async function auditSpelling(
   }
   const report = {
     schemaVersion: 1,
+    ocr: ocr.stats,
     url: page.url(),
     findings: mergeFindings([], findings),
     unsupportedLanguages: [...unsupported],
@@ -192,12 +228,16 @@ export async function auditSpelling(
     body: JSON.stringify(report, null, 2),
     contentType: 'application/json',
   });
-  if (report.findings.length)
-    await testInfo.attach('spelling-context', {
-      body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
+  if (report.findings.length || report.ocr.lowConfidenceSkipped)
+    await testInfo.attach(contextName, {
+      body: await page.screenshot({ fullPage: true, animations: 'disabled', scale: 'css' }),
       contentType: 'image/png',
     });
   if (settings.mode === 'strict') {
+    expect(
+      report.ocr.lowConfidenceSkipped,
+      'OCR words need manual review due to low confidence',
+    ).toBe(0);
     expect(report.unsupportedLanguages, 'Some content languages were not checked').toEqual([]);
     expect(
       report.findings.filter(finding => !finding.accepted).length,

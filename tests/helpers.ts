@@ -27,70 +27,82 @@ export const KNOWN_PRODUCTS = [
 export const KNOWN_PRODUCT = KNOWN_PRODUCTS[0].url;
 
 /** Shopify add-to-cart button selectors — covers Dawn, Debut, Empire, and custom themes */
-export const ADD_TO_CART_SEL = settings.selectors.addToCart || [
-  'form[action*="/cart/add"] button[type="submit"]',
-  'button[name="add"]',
-  '#AddToCart',
-  '#product-submit-button',
-  '[data-add-to-cart]',
-  '.product-form__submit',
-  'button:has-text("Add to cart")',
-  'button:has-text("Добавяне в количката")',
-  'button:has-text("Добавяне")',
-  'button:has-text("В количката")',
-  'button:has-text("Купи")',
-].join(', ');
+export const ADD_TO_CART_SEL =
+  settings.selectors.addToCart ||
+  [
+    'form[action*="/cart/add"] button[type="submit"]',
+    'button[name="add"]',
+    '#AddToCart',
+    '#product-submit-button',
+    '[data-add-to-cart]',
+    '.product-form__submit',
+    'button:has-text("Add to cart")',
+    'button:has-text("Добавяне в количката")',
+    'button:has-text("Добавяне")',
+    'button:has-text("В количката")',
+    'button:has-text("Купи")',
+  ].join(', ');
 
-export const PRODUCT_TITLE_SEL = settings.selectors.productTitle || [
-  '.product__title h1',
-  '.product__title',
-  'h1.product-single__title',
-  'h1.title',
-  '.product-title h1',
-  'h1',
-].join(', ');
+export const PRODUCT_TITLE_SEL =
+  settings.selectors.productTitle ||
+  [
+    '.product__title h1',
+    '.product__title',
+    'h1.product-single__title',
+    'h1.title',
+    '.product-title h1',
+    'h1',
+  ].join(', ');
 
-export const PRICE_SEL = settings.selectors.price || [
-  '.price__regular .price-item',
-  '.price__regular',
-  '.product__price',
-  '[data-product-price]',
-  '.price:not(.price--unavailable)',
-  '.price-item--regular',
-  'span.money',
-].join(', ');
+export const PRICE_SEL =
+  settings.selectors.price ||
+  [
+    '.price__regular .price-item',
+    '.price__regular',
+    '.product__price',
+    '[data-product-price]',
+    '.price:not(.price--unavailable)',
+    '.price-item--regular',
+    'span.money',
+  ].join(', ');
 
-export const CART_COUNT_SEL = settings.selectors.cartCount || [
-  '#cart-icon-bubble',
-  '[data-cart-count]',
-  '.cart-count',
-  '#CartCount',
-  '.header__cart-count',
-  '.cart__count',
-].join(', ');
+export const CART_COUNT_SEL =
+  settings.selectors.cartCount ||
+  [
+    '#cart-icon-bubble',
+    '[data-cart-count]',
+    '.cart-count',
+    '#CartCount',
+    '.header__cart-count',
+    '.cart__count',
+  ].join(', ');
 
-export const CART_ITEMS_SEL = settings.selectors.cartItems || [
-  '.cart__item',
-  '.cart-item',
-  'tr.cart__row',
-  '[data-cart-item]',
-  '.cart__items > *',
-  '.cart-items > *',
-].join(', ');
+export const CART_ITEMS_SEL =
+  settings.selectors.cartItems ||
+  [
+    '.cart__item',
+    '.cart-item',
+    'tr.cart__row',
+    '[data-cart-item]',
+    '.cart__items > *',
+    '.cart-items > *',
+  ].join(', ');
 
-export const MOBILE_MENU_TOGGLE_SEL = settings.selectors.mobileMenuToggle || [
-  'summary[aria-controls="menu-drawer"]',
-  'button[aria-controls="mobile-menu"]',
-  '.header__icon--menu',
-  '.mobile-nav__toggle',
-  '.hamburger',
-  '[data-nav-toggle]',
-  'button[aria-label*="Menu"]',
-  'button[aria-label*="menu"]',
-  'button[aria-label*="меню"]',
-  'button[aria-label*="Меню"]',
-  'button[aria-label*="навигация"]',
-].join(', ');
+export const MOBILE_MENU_TOGGLE_SEL =
+  settings.selectors.mobileMenuToggle ||
+  [
+    'summary[aria-controls="menu-drawer"]',
+    'button[aria-controls="mobile-menu"]',
+    '.header__icon--menu',
+    '.mobile-nav__toggle',
+    '.hamburger',
+    '[data-nav-toggle]',
+    'button[aria-label*="Menu"]',
+    'button[aria-label*="menu"]',
+    'button[aria-label*="меню"]',
+    'button[aria-label*="Меню"]',
+    'button[aria-label*="навигация"]',
+  ].join(', ');
 
 export const MOBILE_MENU_OPEN_SEL = [
   '#menu-drawer[open]',
@@ -103,27 +115,29 @@ export const MOBILE_MENU_OPEN_SEL = [
 ].join(', ');
 
 /** Cookie consent accept button selectors — covers common Shopify/EU consent tools */
-export const COOKIE_CONSENT_SEL = settings.selectors.consentAccept || [
-  '#onetrust-accept-btn-handler',
-  '#accept-cookies',
-  '#cookie-accept',
-  'button[id*="accept"][id*="cookie"]',
-  'button[id*="cookie"][id*="accept"]',
-  'button[class*="cookie"][class*="accept"]',
-  'button[class*="accept"][class*="cookie"]',
-  '[data-cookiebanner] button',
-  '[data-cookie-consent] button',
-  '.cookie-banner button',
-  '.cookie-consent button',
-  '.cc-btn.cc-allow',
-  'button:has-text("Accept all")',
-  'button:has-text("Accept")',
-  'button:has-text("Приемам всички")',
-  'button:has-text("Приемам")',
-  'button:has-text("Приемане")',
-  'button:has-text("Съгласен съм")',
-  'button:has-text("Разрешаване на всички")',
-].join(', ');
+export const COOKIE_CONSENT_SEL =
+  settings.selectors.consentAccept ||
+  [
+    '#onetrust-accept-btn-handler',
+    '#accept-cookies',
+    '#cookie-accept',
+    'button[id*="accept"][id*="cookie"]',
+    'button[id*="cookie"][id*="accept"]',
+    'button[class*="cookie"][class*="accept"]',
+    'button[class*="accept"][class*="cookie"]',
+    '[data-cookiebanner] button',
+    '[data-cookie-consent] button',
+    '.cookie-banner button',
+    '.cookie-consent button',
+    '.cc-btn.cc-allow',
+    'button:has-text("Accept all")',
+    'button:has-text("Accept")',
+    'button:has-text("Приемам всички")',
+    'button:has-text("Приемам")',
+    'button:has-text("Приемане")',
+    'button:has-text("Съгласен съм")',
+    'button:has-text("Разрешаване на всички")',
+  ].join(', ');
 
 /** Optional feature discovery catches only absence, never page/action failures. */
 export async function optionalVisible(locator: Locator, timeout = 1500): Promise<boolean> {
@@ -147,10 +161,24 @@ export async function dismissCookieConsent(page: Page, appearanceTimeout = 0): P
 }
 
 export async function waitForContent(page: Page): Promise<void> {
-  const main = page.locator(settings.selectors.main || 'main, #main-content, [role="main"]').first();
+  const main = page
+    .locator(settings.selectors.main || 'main, #main-content, [role="main"]')
+    .first();
   const content = (await main.count()) > 0 ? main : page.locator('body');
   await expect(content).toBeVisible();
-  await expect(content).toContainText(/\S/);
+  await expect
+    .poll(
+      () =>
+        content.evaluate(element => {
+          if ((element as HTMLElement).innerText?.trim()) return true;
+          return Array.from(element.querySelectorAll('img, canvas, svg, video')).some(media => {
+            const rect = media.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+          });
+        }),
+      { message: 'Main content has neither visible text nor media' },
+    )
+    .toBe(true);
 }
 
 /** Wait only for images in the viewport; off-screen lazy images need an explicit scroll. */
@@ -356,14 +384,16 @@ export async function findBrokenImages(page: Page): Promise<string[]> {
 }
 
 /**
- * Fetches product handles dynamically from Shopify's products.json API.
- * Returns up to `limit` products. Falls back to KNOWN_PRODUCTS on any error.
+ * Reads handles from the shared inventory without further catalogue requests.
+ * Discovery, if enabled, is performed once during global setup.
  */
 export async function fetchProductHandles(
   limit = 10,
 ): Promise<Array<{ handle: string; url: string }>> {
-  return pageInventory().filter(page => page.type === 'product' && page.handle)
-    .slice(0, limit).map(page => ({ handle: page.handle!, url: page.url }));
+  return pageInventory()
+    .filter(page => page.type === 'product' && page.handle)
+    .slice(0, limit)
+    .map(page => ({ handle: page.handle!, url: page.url }));
 }
 
 /** Flush a paint after DOM/scroll changes before synchronous geometry inspection. */

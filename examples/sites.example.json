@@ -24,7 +24,10 @@
       ],
       "allowWords": [
         "MyBrand"
-      ]
+      ],
+      "ocr": {
+        "enabled": false
+      }
     },
     "thresholds": {
       "lighthouse": {

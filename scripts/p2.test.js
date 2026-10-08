@@ -14,7 +14,7 @@ test('site settings merge thresholds and validate locale, capabilities, limits a
     { capabilities: false }, { inventory: null }, { locale: 'not_a_locale' }, { timezoneId: 'Invalid/Zone' }, { capabilities: { reviews: 'false' } },
     { thresholds: { lighthouse: { seo: 120 } } }, { inventory: { productLimit: 500 } },
     { inventory: { pages: [{ path: '//outside.test', type: 'home' }] } },
-    { spelling: { languages: ['unsupported'] } }, { selectors: { misspeltKey: 'h1' } },
+    { spelling: { languages: ['unsupported'] } }, { spelling: { ocr: { minConfidence: 101 } } }, { selectors: { misspeltKey: 'h1' } },
   ]) assert.throws(() => resolveSiteSettings(bad));
 });
 
@@ -24,6 +24,9 @@ test('spelling deduplicates shared components and preserves every URL and locati
   assert.equal(merged.length, 1);
   assert.equal(merged[0].urls.length, 2);
   assert.equal(merged[0].locations.length, 2);
+  const acrossSources = mergeFindings([], [finding, { ...finding, source: 'aria-label' }]);
+  assert.equal(acrossSources.length, 1);
+  assert.deepEqual(acrossSources[0].sources, ['text', 'aria-label']);
   assert.notEqual(fingerprint(finding), fingerprint({ ...finding, component: 'footer' }));
 });
 

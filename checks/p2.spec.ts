@@ -63,5 +63,16 @@ test('strict: unaccepted findings fail with contextual attachments', async ({ pa
     await expect(auditSpelling(page, testInfo)).rejects.toThrow('Unaccepted spelling findings');
   }
   expect(testInfo.attachments.some(a => a.name === 'spelling.json')).toBe(true);
-  expect(testInfo.attachments.some(a => a.name === 'spelling-context')).toBe(true);
+  expect(testInfo.attachments.some(a => a.name.startsWith('spelling-context'))).toBe(true);
+});
+
+test('report: OCR findings use the same dictionary and contextual pipeline', async ({
+  page,
+}, testInfo) => {
+  await page.setContent(
+    '<html lang="en"><main><canvas width="200" height="80"></canvas></main></html>',
+  );
+  const report = await auditSpelling(page, testInfo);
+  expect(report.findings.some(f => f.source === 'ocr' && f.word === 'heloowww')).toBe(true);
+  expect(report.ocr.imagesChecked).toBe(1);
 });

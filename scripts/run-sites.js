@@ -79,7 +79,7 @@ for (const site of sites) {
     if (site[field] !== undefined && (typeof site[field] !== 'string' || /[\s/?#]/.test(site[field]))) die(`${field} must be a product handle without path/query characters`);
   }
   seenSlugs.add(site.slug);
-  try { site.settings = resolveSiteSettings(site); } catch (error) { die(`${site.slug}: ${error.message}`); }
+  try { site.settings = resolveSiteSettings({ locale: process.env.STORE_LOCALE || 'bg-BG', timezoneId: process.env.STORE_TIMEZONE || 'Europe/Sofia', ...site }); } catch (error) { die(`${site.slug}: ${error.message}`); }
   for (const field of ['name', 'productHandle', 'productHandle2', 'searchTerm', 'discountCode']) {
     if (site[field] !== undefined && typeof site[field] !== 'string') die(`${field} must be a string`);
   }

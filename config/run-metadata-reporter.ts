@@ -55,6 +55,9 @@ export default class RunMetadataReporter implements Reporter {
   private scenarios = new Map<string, Scenario>();
   private errors: string[] = [];
   private findings: Finding[] = [];
+  private ocrTotals = { imagesChecked: 0, wordsRecognized: 0, lowConfidenceSkipped: 0 };
+  private ocrEnabled = false;
+  private ocrEngines = new Set<string>();
   private uncheckedLanguages = new Set<string>();
   constructor(options: { outputFile: string }) {
     this.file = options.outputFile;
@@ -111,7 +114,10 @@ export default class RunMetadataReporter implements Reporter {
       projects: config.projects
         .filter(project => selectedProjects.has(project.name))
         .map(p => ({
-          name: p.name,
+          name: p.name || 'Unknown browser',
+          isMobile: p.use.isMobile || false,
+          hasTouch: p.use.hasTouch || false,
+          deviceScaleFactor: p.use.deviceScaleFactor || 1,
           browser: p.use.browserName || 'chromium',
           locale: p.use.locale || 'en-US',
           timezone: p.use.timezoneId || null,
@@ -135,7 +141,7 @@ export default class RunMetadataReporter implements Reporter {
         id: test.id,
         name: test.title,
         title: test.titlePath().filter(Boolean).join(' › '),
-        project: test.parent.project()?.name || '',
+        project: test.parent.project()?.name || 'Unknown browser',
         file: path.relative(config.rootDir, test.location.file),
         line: test.location.line,
         tags: test.tags,
@@ -202,8 +208,24 @@ export default class RunMetadataReporter implements Reporter {
     for (const attachment of result.attachments.filter(a => a.name === 'spelling.json')) {
       const report = JSON.parse(
         attachment.body ? attachment.body.toString() : fs.readFileSync(attachment.path!, 'utf8'),
-      ) as { findings: Finding[]; unsupportedLanguages: string[] };
+      ) as {
+        findings: Finding[];
+        unsupportedLanguages: string[];
+        ocr?: {
+          enabled: boolean;
+          engine: string;
+          imagesChecked: number;
+          wordsRecognized: number;
+          lowConfidenceSkipped: number;
+        };
+      };
       this.findings = mergeFindings(this.findings, report.findings);
+      if (report.ocr) {
+        this.ocrEnabled ||= report.ocr.enabled;
+        if (report.ocr.engine) this.ocrEngines.add(report.ocr.engine);
+        for (const key of ['imagesChecked', 'wordsRecognized', 'lowConfidenceSkipped'] as const)
+          this.ocrTotals[key] += report.ocr[key];
+      }
       report.unsupportedLanguages.forEach(language => this.uncheckedLanguages.add(language));
       const spellingFile = path.join(path.dirname(this.file), 'spelling.json');
       fs.writeFileSync(
@@ -211,6 +233,7 @@ export default class RunMetadataReporter implements Reporter {
         JSON.stringify(
           {
             schemaVersion: 1,
+            ocr: { enabled: this.ocrEnabled, ...this.ocrTotals, engines: [...this.ocrEngines] },
             findings: this.findings,
             unsupportedLanguages: [...this.uncheckedLanguages],
           },
