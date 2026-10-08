@@ -1,10 +1,12 @@
+import { waitForVisualReady, BASE, KNOWN_PRODUCTS, findBrokenImages } from './helpers';
+
 /**
  * 09-media.spec.ts
  * Image, font, and asset quality checks across key pages.
  */
 
 import { test, expect } from './fixtures';
-import { BASE, KNOWN_PRODUCTS, findBrokenImages } from './helpers';
+
 
 const PAGES_TO_CHECK = [
   { label: 'Homepage', url: BASE },
@@ -18,25 +20,8 @@ test.describe('09 · Media & assets', () => {
 
   for (const { label, url } of PAGES_TO_CHECK) {
     test(`${label} — no broken images`, async ({ page }) => {
-      await page.goto(url, { waitUntil: 'networkidle' });
-
-      // Scroll to trigger lazy-loaded images
-      await page.evaluate(async () => {
-        await new Promise<void>((resolve) => {
-          let totalHeight = 0;
-          const distance = 300;
-          const timer = setInterval(() => {
-            window.scrollBy(0, distance);
-            totalHeight += distance;
-            if (totalHeight >= document.body.scrollHeight) {
-              clearInterval(timer);
-              window.scrollTo(0, 0);
-              resolve();
-            }
-          }, 100);
-        });
-      });
-      await page.waitForTimeout(1000);
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await waitForVisualReady(page);
 
       const broken = await findBrokenImages(page);
       expect(broken, `Broken images on ${label}:\n${broken.join('\n')}`).toHaveLength(0);
@@ -46,7 +31,8 @@ test.describe('09 · Media & assets', () => {
   // ── Alt text audit ─────────────────────────────────────────────────────────
 
   test('homepage images have alt text', async ({ page }) => {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+    await waitForVisualReady(page);
 
     const missing = await page.$$eval('img:not([alt])', (imgs) =>
       imgs
@@ -98,7 +84,8 @@ test.describe('09 · Media & assets', () => {
         }
       });
 
-      await page.goto(url, { waitUntil: 'networkidle' });
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await waitForVisualReady(page);
       expect(
         failed,
         `Failed CSS/JS assets on ${label}:\n${failed.join('\n')}`,
@@ -126,7 +113,8 @@ test.describe('09 · Media & assets', () => {
   // ── Font loading ───────────────────────────────────────────────────────────
 
   test('custom fonts are loaded on homepage', async ({ page }) => {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+    await waitForVisualReady(page);
 
     // Check if any font-face declarations exist
     const fontFaceCount = await page.evaluate(() => {
@@ -165,7 +153,8 @@ test.describe('09 · Media & assets', () => {
       }
     });
 
-    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+    await waitForVisualReady(page);
 
     const videoCount = await page.locator('video').count();
     if (videoCount === 0) {

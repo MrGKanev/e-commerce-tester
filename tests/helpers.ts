@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { Page, Locator, expect, errors } from '@playwright/test';
 import { paceRequest, recordRateLimit } from './pacing';
 
 export const BASE = (process.env.STORE_URL ?? 'https://zerno.co').replace(/\/$/, '');
@@ -123,31 +123,118 @@ export const COOKIE_CONSENT_SEL = [
   'button:has-text("Разрешаване на всички")',
 ].join(', ');
 
-/**
- * Tries to dismiss a cookie consent banner if one is visible.
- * Silently skips if no banner appears within the timeout.
- */
-export async function dismissCookieConsent(page: Page): Promise<void> {
+/** Optional feature discovery catches only absence, never page/action failures. */
+export async function optionalVisible(locator: Locator, timeout = 1500): Promise<boolean> {
   try {
-    const btn = page.locator(COOKIE_CONSENT_SEL).first();
-    await btn.waitFor({ state: 'visible', timeout: 5000 });
-    await btn.click();
-    await btn.waitFor({ state: 'hidden', timeout: 2000 }).catch(() => null);
-  } catch {
-    // No cookie banner — that's fine
+    await locator.waitFor({ state: 'visible', timeout });
+    return true;
+  } catch (error) {
+    if (error instanceof errors.TimeoutError && !locator.page().isClosed()) return false;
+    throw error;
   }
 }
 
-/**
- * Navigate and wait for DOM.
- * Adds a small random delay (150–550 ms) before each navigation to mimic
- * human browsing pace and reduce Shopify rate-limit / bot-detection risk.
- * Also dismisses any cookie consent banner that appears after load.
- */
+/** Returning sessions probe immediately; only setup explicitly waits for a new banner. */
+export async function dismissCookieConsent(page: Page, appearanceTimeout = 0): Promise<void> {
+  const button = page.locator(COOKIE_CONSENT_SEL).filter({ visible: true }).first();
+  if (appearanceTimeout > 0) {
+    if (!(await optionalVisible(button, appearanceTimeout))) return;
+  } else if (!(await button.isVisible())) return;
+  await button.click();
+  await expect(button, 'Consent action did not dismiss the banner').toBeHidden();
+}
+
+export async function waitForContent(page: Page): Promise<void> {
+  const main = page.locator('main, #main-content, [role="main"]').first();
+  const content = (await main.count()) > 0 ? main : page.locator('body');
+  await expect(content).toBeVisible();
+  await expect(content).toContainText(/\S/);
+}
+
+/** Wait only for images in the viewport; off-screen lazy images need an explicit scroll. */
+export async function waitForImages(page: Page): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.locator('img:visible').evaluateAll(images =>
+          images
+            .filter(image => {
+              const rect = image.getBoundingClientRect();
+              return (
+                rect.bottom > 0 &&
+                rect.right > 0 &&
+                rect.top < innerHeight &&
+                rect.left < innerWidth
+              );
+            })
+            .every(image => (image as HTMLImageElement).complete),
+        ),
+      { message: 'Visible images did not finish loading' },
+    )
+    .toBe(true);
+}
+
+/** Image audits explicitly trigger lazy loads and wait for each inspected image. */
+export async function loadPageImages(page: Page): Promise<void> {
+  const images = page.locator('img:visible');
+  for (let index = 0; index < (await images.count()); index++) {
+    const image = images.nth(index);
+    await image.scrollIntoViewIfNeeded();
+    await expect
+      .poll(() => image.evaluate((element: HTMLImageElement) => element.complete), {
+        message: `Image ${index + 1} did not finish loading`,
+      })
+      .toBe(true);
+  }
+}
+
+export async function waitForVisualReady(page: Page): Promise<void> {
+  await waitForContent(page);
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
+  await waitForImages(page);
+}
+
+/** Pacing lives in fixtures/pacing.ts; content readiness is independent of traffic. */
 export async function goto(page: Page, path = '/'): Promise<void> {
-  await page.waitForTimeout(150 + Math.floor(Math.random() * 400));
   await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
+  await waitForContent(page);
   await dismissCookieConsent(page);
+}
+
+/** Register response before the action to catch even immediate AJAX/form responses. */
+export async function cartAction(page: Page, action: () => Promise<unknown>): Promise<void> {
+  const [response] = await Promise.all([
+    page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return (
+        /\/cart(?:\/(?:add|change|update|clear))?(?:\.js)?\/?$/.test(url.pathname) &&
+        (response.request().method() === 'POST' ||
+          (response.request().isNavigationRequest() &&
+            /\/cart\/(?:add|change|update|clear)/.test(url.pathname)))
+      );
+    }),
+    action(),
+  ]);
+  expect(response.status(), 'Cart operation failed').toBeLessThan(400);
+}
+
+export async function clearCart(page: Page): Promise<void> {
+  const response = await page.context().request.post(`${BASE}/cart/clear.js`);
+  expect(response.ok(), 'Could not clear cart').toBe(true);
+}
+
+export async function addProductToCart(page: Page, url = KNOWN_PRODUCT): Promise<boolean> {
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
+  const button = page.locator(ADD_TO_CART_SEL).first();
+  await expect(button, 'Product add-to-cart control is missing').toBeVisible();
+  await expect(button, 'Configured product cannot be added to cart').toBeEnabled();
+  await cartAction(page, () => button.click());
+  await page.goto(`${BASE}/cart`, { waitUntil: 'domcontentloaded' });
+  await expect(
+    page.locator(CART_ITEMS_SEL).first(),
+    'Cart is empty after adding product',
+  ).toBeVisible();
+  return true;
 }
 
 /** Returns true if the product page has an enabled add-to-cart button */
@@ -165,15 +252,12 @@ export async function internalLinks(page: Page, scope: string): Promise<string[]
     selector,
     (anchors, base) => {
       const paths = anchors
-        .map((a) => (a as HTMLAnchorElement).getAttribute('href') ?? '')
-        .filter((h) => h.startsWith('/') || h.startsWith(base as string))
-        .map((h) => (h.startsWith('http') ? new URL(h).pathname : h))
+        .map(a => (a as HTMLAnchorElement).getAttribute('href') ?? '')
+        .filter(h => h.startsWith('/') || h.startsWith(base as string))
+        .map(h => (h.startsWith('http') ? new URL(h).pathname : h))
         .filter(
-          (h) =>
-            !h.startsWith('/cdn') &&
-            !h.startsWith('/s/') &&
-            !h.startsWith('#') &&
-            h.trim() !== '/',
+          h =>
+            !h.startsWith('/cdn') && !h.startsWith('/s/') && !h.startsWith('#') && h.trim() !== '/',
         );
       return [...new Set(paths)] as string[];
     },
@@ -186,7 +270,7 @@ export async function internalLinks(page: Page, scope: string): Promise<string[]
  * Returns the tag/class of whatever element sits on top at the element's center.
  */
 export async function getTopElementAt(page: Page, selector: string): Promise<string> {
-  return page.evaluate((sel) => {
+  return page.evaluate(sel => {
     const el = document.querySelector(sel);
     if (!el) return 'element not found';
     const rect = el.getBoundingClientRect();
@@ -203,7 +287,7 @@ export async function getTopElementAt(page: Page, selector: string): Promise<str
  * Returns the computed font-size (px) of an element.
  */
 export async function getFontSize(page: Page, selector: string): Promise<number> {
-  return page.evaluate((sel) => {
+  return page.evaluate(sel => {
     const el = document.querySelector(sel);
     if (!el) return 0;
     return parseFloat(window.getComputedStyle(el).fontSize);
@@ -220,10 +304,12 @@ export async function hasHorizontalOverflow(page: Page): Promise<boolean> {
 /**
  * Returns all fixed/sticky positioned elements (potential overlay culprits).
  */
-export async function getFixedElements(page: Page): Promise<Array<{ tag: string; classes: string; zIndex: string; rect: string }>> {
+export async function getFixedElements(
+  page: Page,
+): Promise<Array<{ tag: string; classes: string; zIndex: string; rect: string }>> {
   return page.evaluate(() => {
     const fixed: Array<{ tag: string; classes: string; zIndex: string; rect: string }> = [];
-    document.querySelectorAll('*').forEach((el) => {
+    document.querySelectorAll('*').forEach(el => {
       const style = window.getComputedStyle(el);
       if (style.position === 'fixed' || style.position === 'sticky') {
         const rect = el.getBoundingClientRect();
@@ -257,12 +343,13 @@ export async function elementWidth(page: Page, selector: string): Promise<number
 
 /** Check all images on current page — returns array of broken src URLs */
 export async function findBrokenImages(page: Page): Promise<string[]> {
+  await loadPageImages(page);
   return page.evaluate(() => {
     const imgs = Array.from(document.querySelectorAll('img'));
     return imgs
-      .filter((img) => !img.complete || img.naturalWidth === 0)
-      .map((img) => img.src || img.getAttribute('data-src') || '(no src)')
-      .filter((src) => !src.startsWith('data:'));
+      .filter(img => img.getClientRects().length > 0 && (!img.complete || img.naturalWidth === 0))
+      .map(img => img.src || img.getAttribute('data-src') || '(no src)')
+      .filter(src => !src.startsWith('data:'));
   });
 }
 
@@ -285,7 +372,7 @@ export async function fetchProductHandles(
     recordRateLimit(res.status, res.url, res.headers.get('retry-after'));
     if (!res.ok) return KNOWN_PRODUCTS;
     const data = (await res.json()) as { products?: Array<{ handle: string }> };
-    const products = (data.products ?? []).map((p) => ({
+    const products = (data.products ?? []).map(p => ({
       handle: p.handle,
       url: `${BASE}/products/${p.handle}`,
     }));
@@ -295,3 +382,12 @@ export async function fetchProductHandles(
   }
 }
 
+/** Flush a paint after DOM/scroll changes before synchronous geometry inspection. */
+export async function waitForPaint(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>(resolve =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+}

@@ -21,7 +21,9 @@
     "test:unit": "node --test scripts/*.test.js",
     "check": "pnpm run type-check && pnpm run lint && pnpm run test:unit",
     "test:pacing": "STORE_URL=http://127.0.0.1:45679 SITE_SLUG=pacing-local REQUEST_DELAY_MS=60 REQUEST_JITTER_MS=0 TEST_DELAY_MS=0 TEST_JITTER_MS=0 playwright test --config=checks/pacing.config.ts",
-    "dashboard:preview": "node scripts/preview-dashboard.js"
+    "dashboard:preview": "node scripts/preview-dashboard.js",
+    "test:lighthouse:local": "node scripts/check-lighthouse.js",
+    "test:readiness": "STORE_URL=http://127.0.0.1:45981 REQUEST_DELAY_MS=0 REQUEST_JITTER_MS=0 TEST_DELAY_MS=0 TEST_JITTER_MS=0 playwright test --config=checks/readiness.config.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

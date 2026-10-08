@@ -20,36 +20,29 @@ const ROOT = path.join(__dirname, '..');
 
 export const STORAGE_STATE = path.join(
   ROOT,
-  process.env.SITE_SLUG
-    ? `storageState.${process.env.SITE_SLUG}.json`
-    : 'storageState.json',
+  process.env.SITE_SLUG ? `storageState.${process.env.SITE_SLUG}.json` : 'storageState.json',
 );
 
 export default async function globalSetup(): Promise<void> {
   fs.rmSync(RATE_LIMIT_FILE, { force: true });
   const browser = await chromium.launch();
-  const context = await browser.newContext({
-    userAgent: USER_AGENT,
-    locale: LOCALE,
-    timezoneId: TIMEZONE_ID,
-    viewport: { width: 1280, height: 800 },
-  });
-
-  await paceContext(context);
-  const page = await context.newPage();
   try {
+    const context = await browser.newContext({
+      userAgent: USER_AGENT,
+      locale: LOCALE,
+      timezoneId: TIMEZONE_ID,
+      viewport: { width: 1280, height: 800 },
+    });
+    await paceContext(context);
+    const page = await context.newPage();
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
     assertNotLimited();
-  } catch (error) {
+    // Only fresh setup waits for a banner; returning sessions probe immediately.
+    await dismissCookieConsent(page, 5000);
+    await context.storageState({ path: STORAGE_STATE });
+  } finally {
     await browser.close();
-    throw error;
   }
-
-  // Accept cookie consent once — persisted via storage state for all tests
-  await dismissCookieConsent(page);
-
-  await context.storageState({ path: STORAGE_STATE });
-  await browser.close();
 
   // Validate the saved session can reach the store before handing off to tests
   const reqCtx = await request.newContext({ baseURL: BASE, storageState: STORAGE_STATE });
@@ -57,7 +50,9 @@ export default async function globalSetup(): Promise<void> {
   try {
     const resp = await reqCtx.get('/cart.js');
     if (resp.status() !== 200) {
-      console.warn(`[setup] Session health-check: /cart.js returned HTTP ${resp.status()} — tests may behave unexpectedly`);
+      console.warn(
+        `[setup] Session health-check: /cart.js returned HTTP ${resp.status()} — tests may behave unexpectedly`,
+      );
     }
   } catch {
     console.warn('[setup] Session health-check failed — store may be unreachable');

@@ -23,9 +23,10 @@ export default async function globalTeardown(): Promise<void> {
   });
 
   paceAPI(context);
-  await context.post('/cart/clear.js').catch(() => {
-    // Non-fatal — cart may already be empty or endpoint temporarily unavailable
-  });
-
-  await context.dispose();
+  try {
+    const response = await context.post('/cart/clear.js');
+    if (!response.ok()) throw new Error(`Cart cleanup failed: HTTP ${response.status()}`);
+  } finally {
+    await context.dispose();
+  }
 }

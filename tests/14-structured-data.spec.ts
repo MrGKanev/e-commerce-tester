@@ -43,12 +43,9 @@ function findSchema(
 
 /** Read a <meta property|name="…"> content attribute. */
 async function getMeta(page: AnyPage, prop: string): Promise<string | null> {
-  return page
-    .$eval(
-      `meta[property="${prop}"], meta[name="${prop}"]`,
-      (el) => el.getAttribute('content'),
-    )
-    .catch(() => null);
+  const meta = page.locator(`meta[property="${prop}"], meta[name="${prop}"]`).first();
+  if ((await meta.count()) === 0) return null;
+  return meta.getAttribute('content');
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -175,7 +172,7 @@ test.describe('14 · Structured Data & Open Graph', () => {
 
     const canonical = await page
       .$eval('link[rel="canonical"]', (el) => el.getAttribute('href'))
-      .catch(() => null);
+      ;
 
     expect(canonical, 'Missing <link rel="canonical"> on product page').toBeTruthy();
     expect(

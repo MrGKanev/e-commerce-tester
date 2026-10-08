@@ -8,9 +8,8 @@ export default tseslint.config(
     extends: [...tseslint.configs.recommended, playwright.configs['flat/recommended']],
     rules: {
       // Playwright-specific
-      // Existing store readiness checks need a separate migration to element assertions.
-      'playwright/no-networkidle': 'warn',
-      'playwright/no-wait-for-timeout': 'warn',
+      'playwright/no-networkidle': 'error',
+      'playwright/no-wait-for-timeout': 'error',
       'playwright/prefer-web-first-assertions': 'warn',
       'playwright/no-force-option': 'warn',
       'playwright/no-standalone-expect': 'error',

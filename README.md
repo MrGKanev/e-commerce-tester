@@ -58,6 +58,23 @@ Use zero only for local fixtures. Large suites will take substantially longer.
 The delays affect synthetic performance timings; account for pacing when reviewing
 load-time budgets and Lighthouse network measurements.
 
+### Content readiness
+
+`goto()` waits for visible, non-empty page content. Returning sessions only probe
+for an already-visible consent button; they do not wait five seconds on every
+navigation. Only global setup and fresh-context GDPR tests wait for a banner to
+appear. A visible banner that cannot be dismissed fails the operation.
+
+Specs use locator assertions, state polling or response listeners registered
+before the action. Visual checks wait for fonts and viewport images; image audits
+explicitly scroll lazy images into view. Optional widgets use bounded discovery,
+which only treats a timeout as absence and propagates page/action errors.
+`networkidle` and `page.waitForTimeout()` are lint errors. Request pacing remains
+unchanged. The Event Timing measurement retains a documented observation window.
+
+`pnpm test:readiness` checks these behaviors with intercepted loopback routes,
+without store requests.
+
 ### Soft-skip pattern
 
 Tests that depend on optional store features (discount codes, currency switchers, recently-viewed widgets, etc.) use `test.skip(true, reason)` when the relevant element isn't found. This means a run against a store without a wishlist widget doesn't produce a failure — it produces a skipped test with a clear reason. Only genuinely broken things fail.
@@ -174,6 +191,21 @@ pnpm exec playwright show-report reports/my-store/2024-01-15_10-30/html
 ```
 
 ---
+
+## Lighthouse reports
+
+Each of the four audit URLs runs only in the first Chromium project, with retries
+disabled. Firefox and Safari skip this suite. Chromium chooses a dynamic debug
+port (`--remote-debugging-port=0`) in an isolated temporary profile for each audit.
+
+HTML and JSON reports are stored under the test's directory in
+`reports/<site>/<run>/screenshots/<test>/lighthouse/` and attached to the Playwright
+report, including when a score threshold fails. The shared `reports/lighthouse`
+directory is no longer used. Store request pacing is retained; Lighthouse itself
+can perform several page loads internally during one audit.
+
+`pnpm test:lighthouse:local` verifies the real Lighthouse suite against loopback
+pages for two sample stores, with no requests to a live store.
 
 ## Visual baselines
 

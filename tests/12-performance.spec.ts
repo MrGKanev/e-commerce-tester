@@ -1,3 +1,5 @@
+import { waitForPaint, BASE, SEARCH_TERM, KNOWN_PRODUCT } from './helpers';
+import { setTimeout as observationWindow } from 'node:timers/promises';
 /**
  * Performance tests using two complementary approaches:
  *
@@ -8,9 +10,9 @@
  *     Best Practices, Accessibility) via playwright-lighthouse.
  *     Requires launching a separate Chrome instance with a debug port.
  */
-import { test, expect, chromium, type BrowserContext } from './fixtures';
-import { playAudit } from 'playwright-lighthouse';
-import { BASE, SEARCH_TERM, KNOWN_PRODUCT } from './helpers';
+import { test, expect } from './fixtures';
+import { runLighthouseAudit } from './lighthouse';
+
 
 // ─── Thresholds ──────────────────────────────────────────────────────────────
 
@@ -20,8 +22,6 @@ const PERF = {
   domContentLoaded:  6_000,   // ms — deferred scripts done
   loadComplete:     12_000,   // ms — images / iframes done
 };
-
-const LIGHTHOUSE_PORT = parseInt(process.env.LIGHTHOUSE_PORT ?? '9224', 10);
 
 const LIGHTHOUSE_THRESHOLDS = {
   performance:      50,   // 2026 target: mobile ≥ 50 (up from 30)
@@ -67,9 +67,9 @@ async function measureCLS(page: PwPage): Promise<number> {
   await page.evaluate(() =>
     window.scrollTo({ top: Math.min(400, document.body.scrollHeight), behavior: 'instant' }),
   );
-  await page.waitForTimeout(600);
+  await waitForPaint(page);
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
-  await page.waitForTimeout(400);
+  await waitForPaint(page);
 
   return page.evaluate(() => {
     let cls = 0;
@@ -100,7 +100,8 @@ async function measureINP(page: PwPage): Promise<number> {
   await page.mouse.click(400, 300);
   await page.keyboard.press('Tab');
   await page.keyboard.press('Tab');
-  await page.waitForTimeout(800);
+  // Event Timing entries are delivered asynchronously in a bounded measurement window.
+  await observationWindow(800);
 
   return page.evaluate(() => {
     const durations: number[] =
@@ -209,129 +210,28 @@ test.describe('12a · Performance API', () => {
 // ─── B) Lighthouse audit ──────────────────────────────────────────────────────
 
 test.describe('12b · Lighthouse', () => {
+  test.describe.configure({ retries: 0 });
+  test.skip(({ browserName }) => browserName !== 'chromium', 'Lighthouse runs only in Chromium');
 
-  test('homepage — Lighthouse scores meet thresholds', async () => {
-    // Lighthouse requires its own Chrome instance with a debug port.
-    // We launch one here, run the audit, then close it.
-    const browser = await chromium.launch({
-      args: [`--remote-debugging-port=${LIGHTHOUSE_PORT}`, '--no-sandbox'],
-    });
-    const context = await browser.newContext({
-      locale: 'bg-BG',
-      timezoneId: 'Europe/Sofia',
-    });
-    const page = await context.newPage();
-
-    try {
-      await page.goto(BASE, { waitUntil: 'networkidle', timeout: 60_000 });
-
-      await playAudit({
-        page,
-        port: LIGHTHOUSE_PORT,
-        thresholds: LIGHTHOUSE_THRESHOLDS,
-        reports: {
-          formats: { html: true, json: true },
-          name: 'lighthouse-homepage',
-          directory: './reports/lighthouse',
-        },
-      });
-    } finally {
-      await browser.close();
-    }
+  test.beforeEach(async ({}, testInfo) => {
+    const owner = testInfo.config.projects.find(project =>
+      (project.use.browserName ?? 'chromium') === 'chromium',
+    );
+    test.skip(testInfo.project.name !== owner?.name, 'Only the first Chromium project runs Lighthouse');
   });
 
-  test('product page — Lighthouse scores meet thresholds', async () => {
-    const browser = await chromium.launch({
-      args: [`--remote-debugging-port=${LIGHTHOUSE_PORT + 1}`, '--no-sandbox'],
+  const audits = [
+    { title: 'homepage', name: 'lighthouse-homepage', url: BASE },
+    { title: 'product page', name: 'lighthouse-product', url: KNOWN_PRODUCT },
+    { title: 'collections page', name: 'lighthouse-collections', url: `${BASE}/collections` },
+    { title: 'search results page', name: 'lighthouse-search', url: `${BASE}/search?q=${encodeURIComponent(SEARCH_TERM)}&type=product` },
+  ];
+
+  for (const audit of audits) {
+    test(`${audit.title} — Lighthouse scores meet thresholds`, async ({}, testInfo) => {
+      await runLighthouseAudit(audit.url, audit.name, testInfo, LIGHTHOUSE_THRESHOLDS);
     });
-    const context = await browser.newContext({
-      locale: 'bg-BG',
-      timezoneId: 'Europe/Sofia',
-    });
-    const page = await context.newPage();
-
-    try {
-      await page.goto(KNOWN_PRODUCT, {
-        waitUntil: 'networkidle',
-        timeout: 60_000,
-      });
-
-      await playAudit({
-        page,
-        port: LIGHTHOUSE_PORT + 1,
-        thresholds: LIGHTHOUSE_THRESHOLDS,
-        reports: {
-          formats: { html: true, json: true },
-          name: 'lighthouse-product',
-          directory: './reports/lighthouse',
-        },
-      });
-    } finally {
-      await browser.close();
-    }
-  });
-
-  test('collections page — Lighthouse scores meet thresholds', async () => {
-    const browser = await chromium.launch({
-      args: [`--remote-debugging-port=${LIGHTHOUSE_PORT + 2}`, '--no-sandbox'],
-    });
-    const context = await browser.newContext({
-      locale: 'bg-BG',
-      timezoneId: 'Europe/Sofia',
-    });
-    const page = await context.newPage();
-
-    try {
-      await page.goto(`${BASE}/collections`, {
-        waitUntil: 'networkidle',
-        timeout: 60_000,
-      });
-
-      await playAudit({
-        page,
-        port: LIGHTHOUSE_PORT + 2,
-        thresholds: LIGHTHOUSE_THRESHOLDS,
-        reports: {
-          formats: { html: true, json: true },
-          name: 'lighthouse-collections',
-          directory: './reports/lighthouse',
-        },
-      });
-    } finally {
-      await browser.close();
-    }
-  });
-
-  test('search results page — Lighthouse scores meet thresholds', async () => {
-    const browser = await chromium.launch({
-      args: [`--remote-debugging-port=${LIGHTHOUSE_PORT + 3}`, '--no-sandbox'],
-    });
-    const context = await browser.newContext({
-      locale: 'bg-BG',
-      timezoneId: 'Europe/Sofia',
-    });
-    const page = await context.newPage();
-
-    try {
-      await page.goto(`${BASE}/search?q=${SEARCH_TERM}&type=product`, {
-        waitUntil: 'networkidle',
-        timeout: 60_000,
-      });
-
-      await playAudit({
-        page,
-        port: LIGHTHOUSE_PORT + 3,
-        thresholds: LIGHTHOUSE_THRESHOLDS,
-        reports: {
-          formats: { html: true, json: true },
-          name: 'lighthouse-search',
-          directory: './reports/lighthouse',
-        },
-      });
-    } finally {
-      await browser.close();
-    }
-  });
+  }
 });
 
 // ─── C) Core Web Vitals (Google ranking signals, updated 2025+) ───────────────
@@ -340,7 +240,6 @@ test.describe('12c · Core Web Vitals', () => {
 
   test('homepage — LCP (Largest Contentful Paint) < 2500 ms', async ({ page }) => {
     await page.goto(BASE, { waitUntil: 'load' });
-    await page.waitForTimeout(1_000); // allow LCP observer to fire
 
     const lcp = await measureLCP(page);
     console.log(`Homepage LCP: ${lcp}ms`);
@@ -354,7 +253,6 @@ test.describe('12c · Core Web Vitals', () => {
 
   test('product page — LCP < 2500 ms', async ({ page }) => {
     await page.goto(KNOWN_PRODUCT, { waitUntil: 'load' });
-    await page.waitForTimeout(1_000);
 
     const lcp = await measureLCP(page);
     console.log(`Product LCP: ${lcp}ms`);
@@ -365,7 +263,6 @@ test.describe('12c · Core Web Vitals', () => {
 
   test('homepage — CLS (Cumulative Layout Shift) < 0.1', async ({ page }) => {
     await page.goto(BASE, { waitUntil: 'load' });
-    await page.waitForTimeout(500);
 
     const cls = await measureCLS(page);
     console.log(`Homepage CLS: ${cls}`);
@@ -375,7 +272,6 @@ test.describe('12c · Core Web Vitals', () => {
 
   test('product page — CLS < 0.1', async ({ page }) => {
     await page.goto(KNOWN_PRODUCT, { waitUntil: 'load' });
-    await page.waitForTimeout(500);
 
     const cls = await measureCLS(page);
     console.log(`Product CLS: ${cls}`);
@@ -385,7 +281,6 @@ test.describe('12c · Core Web Vitals', () => {
 
   test('homepage — INP (Interaction to Next Paint) < 200 ms', async ({ page }) => {
     await page.goto(BASE, { waitUntil: 'load' });
-    await page.waitForTimeout(500);
 
     const inp = await measureINP(page);
     console.log(`Homepage INP: ${inp}ms`);

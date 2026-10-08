@@ -8,7 +8,7 @@
  *  - Does not crash with a valid email (without actually subscribing)
  */
 import { test, expect } from './fixtures';
-import { BASE, goto } from './helpers';
+import { goto } from './helpers';
 
 const EMAIL_INPUT_SEL = [
   'form[action*="contact"] input[type="email"]',
@@ -85,7 +85,7 @@ test.describe('22 · Newsletter signup', () => {
     // Focus and submit without filling in
     await input.click();
     await page.keyboard.press('Enter');
-    await page.waitForTimeout(1_000);
+    await expect.poll(() => input.evaluate((el: HTMLInputElement) => !el.validity.valid), { message: 'Empty email was not rejected' }).toBe(true);
 
     // Should either stay on the same page or show a validation message
     const urlAfter = page.url();
@@ -119,7 +119,7 @@ test.describe('22 · Newsletter signup', () => {
 
     await input.fill('not-an-email');
     await page.keyboard.press('Enter');
-    await page.waitForTimeout(500);
+    await expect.poll(() => input.evaluate((el: HTMLInputElement) => !el.validity.valid)).toBe(true);
 
     const isInvalid = await input.evaluate((el: HTMLInputElement) => !el.validity.valid);
     expect(isInvalid, 'Email input accepted "not-an-email" as valid').toBe(true);

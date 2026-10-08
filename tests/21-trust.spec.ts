@@ -1,3 +1,4 @@
+import { optionalVisible, BASE, KNOWN_PRODUCT, goto } from './helpers';
 /**
  * 21 · Trust signals
  *
@@ -9,7 +10,7 @@
  *  - Social proof indicators (reviews, ratings)
  */
 import { test, expect } from './fixtures';
-import { BASE, KNOWN_PRODUCT, goto } from './helpers';
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -194,7 +195,6 @@ test.describe('21 · Trust signals', () => {
 
     // Scroll to bottom to allow lazy-loaded review widgets
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await page.waitForTimeout(800);
 
     const reviewSel = [
       '[class*="review"]',
@@ -210,7 +210,7 @@ test.describe('21 · Trust signals', () => {
     ].join(', ');
 
     const reviews = page.locator(reviewSel).first();
-    if ((await reviews.count()) === 0) {
+    if (!(await optionalVisible(reviews, 5000))) {
       test.skip(true, 'No reviews/ratings section found — feature may not be enabled');
       return;
     }

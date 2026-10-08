@@ -1,13 +1,7 @@
+import { cartAction, waitForImages, waitForContent, BASE, KNOWN_PRODUCTS, ADD_TO_CART_SEL, PRODUCT_TITLE_SEL, PRICE_SEL, getTopElementAt, findBrokenImages } from './helpers';
+
 import { test, expect } from './fixtures';
-import {
-  BASE,
-  KNOWN_PRODUCTS,
-  ADD_TO_CART_SEL,
-  PRODUCT_TITLE_SEL,
-  PRICE_SEL,
-  getTopElementAt,
-  findBrokenImages,
-} from './helpers';
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared product-page checker — run against every known product handle
@@ -148,7 +142,7 @@ for (const product of KNOWN_PRODUCTS) {
       const small: string[] = [];
       for (let i = 0; i < Math.min(count, 5); i++) {
         const img = imgs.nth(i);
-        if (!(await img.isVisible().catch(() => false))) continue;
+        if (!(await img.isVisible())) continue;
         const box = await img.boundingBox();
         if (box && (box.width < 100 || box.height < 100)) {
           small.push(`Image #${i}: ${box.width}x${box.height}`);
@@ -158,7 +152,9 @@ for (const product of KNOWN_PRODUCTS) {
     });
 
     test('no broken images on product page', async ({ page }) => {
-      await page.goto(product.url, { waitUntil: 'networkidle' });
+      await page.goto(product.url, { waitUntil: 'domcontentloaded' });
+    await waitForContent(page);
+      await waitForImages(page);
       const broken = await findBrokenImages(page);
       expect(broken, `Broken images:\n${broken.join('\n')}`).toHaveLength(0);
     });
@@ -306,10 +302,7 @@ for (const product of KNOWN_PRODUCTS) {
 
       const priceBefore = await page.locator(PRICE_SEL).first().textContent();
       await variants.nth(1).click();
-      await page.waitForResponse(
-        r => r.url().includes('/variants') || r.url().includes('/products'),
-        { timeout: 2000 },
-      ).catch(() => null);
+      await expect(page.locator(PRICE_SEL).first()).toBeVisible();
       // Price may or may not change — just verify it's still visible
       const priceAfter = await page.locator(PRICE_SEL).first().textContent();
       expect(priceAfter?.trim()).toBeTruthy();
@@ -348,7 +341,7 @@ for (const product of KNOWN_PRODUCTS) {
     test('related / recommended products section is present', async ({ page }) => {
       // Scroll to bottom to trigger lazy load
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => null);
+      await waitForContent(page);
 
       const relatedSel = [
         '[class*="related"]',
@@ -469,40 +462,8 @@ test.describe('04 · Product page — first available product', () => {
       return;
     }
 
-    await btn.click();
-
-    const responded = await Promise.race([
-      // Redirect to cart
-      page.waitForURL('**/cart**', { timeout: 8000 }).then(() => 'redirect'),
-      // Cart count badge updated
-      page.waitForFunction(
-        () => {
-          const badge = document.querySelector(
-            '#cart-icon-bubble, [data-cart-count], .cart-count, #CartCount',
-          );
-          return badge && badge.textContent?.trim() !== '0' && badge.textContent?.trim() !== '';
-        },
-        { timeout: 8000 },
-      ).then(() => 'badge'),
-      // Cart drawer opened
-      page.waitForSelector('.cart-drawer--open, .drawer--active, [id*="cart-drawer"][open]', {
-        timeout: 8000,
-      }).then(() => 'drawer'),
-      // Toast/notification appeared
-      page.waitForSelector(
-        '[class*="notification"], [class*="toast"], [class*="success"], [aria-live]',
-        { timeout: 8000 },
-      ).then(() => 'toast'),
-    ]).catch(() => 'timeout');
-
-    if (responded === 'timeout') {
-      // Last resort: navigate to /cart and check
-      await page.goto(`${BASE}/cart`, { waitUntil: 'domcontentloaded' });
-      const items = page.locator('.cart__item, .cart-item, tr.cart__row, [data-cart-item]');
-      const count = await items.count();
-      expect(count, 'Cart is still empty after clicking add-to-cart').toBeGreaterThan(0);
-    } else {
-      expect(['redirect', 'badge', 'drawer', 'toast']).toContain(responded);
-    }
+    await cartAction(page, () => btn.click());
+    await page.goto(`${BASE}/cart`, { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.cart__item, .cart-item, tr.cart__row, [data-cart-item]').first()).toBeVisible();
   });
 });

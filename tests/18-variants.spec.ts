@@ -1,3 +1,4 @@
+import { waitForImages, KNOWN_PRODUCTS, PRICE_SEL } from './helpers';
 /**
  * 18 · Product variants — deep tests
  *
@@ -8,7 +9,7 @@
  *  - Variant selectors are keyboard-navigable
  */
 import { test, expect } from './fixtures';
-import { KNOWN_PRODUCTS, PRICE_SEL } from './helpers';
+
 
 const VARIANT_RADIO_SEL = [
   '[name^="options["] input[type="radio"]',
@@ -28,6 +29,14 @@ const PRODUCT_IMG_SEL = [
   '.product-single__photo img',
   'img[src*="products"]',
 ].join(', ');
+
+async function chooseVariant(page: import('@playwright/test').Page, action: () => Promise<unknown>) {
+  const variant = page.locator('form[action*="/cart/add"] input[name="id"], form[action*="/cart/add"] select[name="id"]').first();
+  const readVariant = async () => (await variant.count()) > 0 ? variant.inputValue() : new URL(page.url()).searchParams.get('variant');
+  const before = await readVariant();
+  await action();
+  await expect.poll(readVariant, { message: 'Selected variant did not update' }).not.toBe(before);
+}
 
 for (const product of KNOWN_PRODUCTS) {
   test.describe(`18 · Variants — ${product.handle}`, () => {
@@ -105,11 +114,9 @@ for (const product of KNOWN_PRODUCTS) {
       }
 
       // Click the second option (first may already be selected)
-      await radios.nth(1).click();
-      await page.waitForTimeout(500);
+      await chooseVariant(page, () => radios.nth(1).click());
 
-      const url = page.url();
-      expect(url, 'URL did not update with ?variant= after selecting variant').toContain('variant=');
+      await expect(page, 'URL did not update after selecting variant').toHaveURL(/variant=/);
     });
 
     test('variant ID in URL matches a real Shopify variant', async ({ page }) => {
@@ -119,9 +126,9 @@ for (const product of KNOWN_PRODUCTS) {
         return;
       }
 
-      await radios.nth(1).click();
-      await page.waitForTimeout(500);
+      await chooseVariant(page, () => radios.nth(1).click());
 
+      await expect(page).toHaveURL(/variant=/);
       const url = new URL(page.url());
       const variantId = url.searchParams.get('variant');
       if (!variantId) {
@@ -142,8 +149,7 @@ for (const product of KNOWN_PRODUCTS) {
         return;
       }
 
-      await radios.nth(1).click();
-      await page.waitForTimeout(500);
+      await chooseVariant(page, () => radios.nth(1).click());
 
       const price = page.locator(PRICE_SEL).first();
       await expect(price).toBeVisible();
@@ -169,9 +175,9 @@ for (const product of KNOWN_PRODUCTS) {
       // Try each additional variant looking for an image change
       let imageChanged = false;
       for (let i = 1; i < Math.min(await radios.count(), 4); i++) {
-        await radios.nth(i).click();
-        await page.waitForTimeout(600);
-        const imgAfter = await page.locator(PRODUCT_IMG_SEL).first().getAttribute('src').catch(() => null);
+        await chooseVariant(page, () => radios.nth(i).click());
+        await waitForImages(page);
+        const imgAfter = await page.locator(PRODUCT_IMG_SEL).first().getAttribute('src');
         if (imgAfter && imgAfter !== imgBefore) {
           imageChanged = true;
           break;
@@ -233,8 +239,7 @@ for (const product of KNOWN_PRODUCTS) {
       const secondOption = (await select.locator('option').nth(1).getAttribute('value')) ?? '';
       if (!secondOption) return;
 
-      await select.selectOption(secondOption);
-      await page.waitForTimeout(500);
+      await chooseVariant(page, () => select.selectOption(secondOption));
 
       const price = page.locator(PRICE_SEL).first();
       await expect(price).toBeVisible();

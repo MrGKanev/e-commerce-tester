@@ -1,3 +1,4 @@
+import { BASE, SEARCH_TERM, KNOWN_PRODUCT, KNOWN_PRODUCTS, ADD_TO_CART_SEL, goto } from './helpers';
 /**
  * API Mock tests — uses Playwright's built-in page.route() to intercept
  * Shopify AJAX API calls and simulate error / edge-case scenarios.
@@ -15,7 +16,7 @@
  *  - Product JSON endpoint is unavailable
  */
 import { test, expect } from './fixtures';
-import { BASE, SEARCH_TERM, KNOWN_PRODUCT, KNOWN_PRODUCTS, ADD_TO_CART_SEL, goto } from './helpers';
+
 
 // ─── Cart API mocks ───────────────────────────────────────────────────────────
 
@@ -43,10 +44,10 @@ test.describe('13 · API Mocks — Cart', () => {
 
     const addBtn = page.locator(ADD_TO_CART_SEL).first();
 
-    if ((await addBtn.count()) > 0 && !(await addBtn.isDisabled())) {
-      await addBtn.click();
-      await page.waitForResponse(r => /\/cart(\/add)?\.js/.test(r.url()), { timeout: 3000 }).catch(() => null);
-    }
+    await expect(addBtn).toBeVisible();
+    test.skip(await addBtn.isDisabled(), 'Configured product is sold out');
+    await Promise.all([page.waitForResponse(r => /\/cart(\/add)?\.js/.test(r.url())), addBtn.click()]);
+    await expect(addBtn).toBeEnabled();
 
     // Page should still be functional — no JS crash
     expect(jsErrors, `JS errors after 422: ${jsErrors.join(' | ')}`).toHaveLength(0);
@@ -69,10 +70,10 @@ test.describe('13 · API Mocks — Cart', () => {
 
     const addBtn = page.locator(ADD_TO_CART_SEL).first();
 
-    if ((await addBtn.count()) > 0 && !(await addBtn.isDisabled())) {
-      await addBtn.click();
-      await page.waitForResponse(r => /\/cart(\/add)?\.js/.test(r.url()), { timeout: 3000 }).catch(() => null);
-    }
+    await expect(addBtn).toBeVisible();
+    test.skip(await addBtn.isDisabled(), 'Configured product is sold out');
+    await Promise.all([page.waitForResponse(r => /\/cart(\/add)?\.js/.test(r.url())), addBtn.click()]);
+    await expect(addBtn).toBeEnabled();
 
     expect(jsErrors, `JS errors after 500: ${jsErrors.join(' | ')}`).toHaveLength(0);
     await expect(page).not.toHaveTitle(/crashed|error/i);
@@ -120,10 +121,13 @@ test.describe('13 · API Mocks — Cart', () => {
 
     const addBtn = page.locator(ADD_TO_CART_SEL).first();
 
-    if ((await addBtn.count()) > 0 && !(await addBtn.isDisabled())) {
-      await addBtn.click();
-      await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => null);
-    }
+    await expect(addBtn).toBeVisible();
+    test.skip(await addBtn.isDisabled(), 'Configured product is sold out');
+    await Promise.all([
+      page.waitForEvent('requestfailed', { predicate: request => /\/cart\/add\.js/.test(request.url()) }),
+      addBtn.click(),
+    ]);
+    await expect(addBtn).toBeEnabled();
 
     // Page must remain usable — no full crash
     expect(jsErrors.filter(e => /unhandled|uncaught/i.test(e))).toHaveLength(0);
@@ -160,7 +164,7 @@ test.describe('13 · API Mocks — Search', () => {
     ).first();
     if ((await searchToggle.count()) > 0) {
       await searchToggle.click();
-      await page.locator('input[type="search"], input[name="q"]').first().waitFor({ state: 'visible', timeout: 2000 }).catch(() => null);
+      await page.locator('input[type="search"], input[name="q"]').first().waitFor({ state: 'visible', timeout: 2000 });
     }
 
     const searchInput = page.locator('input[type="search"], input[name="q"]').first();
@@ -169,8 +173,11 @@ test.describe('13 · API Mocks — Search', () => {
       return;
     }
 
-    await searchInput.type(SEARCH_TERM, { delay: 60 });
-    await page.waitForResponse(r => r.url().includes('/search/suggest'), { timeout: 2000 }).catch(() => null);
+    if ((await page.locator('predictive-search, [id*="predictive"], [class*="predictive"]').count()) === 0) test.skip(true, 'No predictive search component');
+    await Promise.all([
+      page.waitForResponse(r => r.url().includes('/search/suggest')),
+      searchInput.pressSequentially(SEARCH_TERM, { delay: 60 }),
+    ]);
 
     expect(jsErrors, `JS errors with empty search mock: ${jsErrors.join(' | ')}`).toHaveLength(0);
   });
@@ -190,7 +197,7 @@ test.describe('13 · API Mocks — Search', () => {
     ).first();
     if ((await searchToggle.count()) > 0) {
       await searchToggle.click();
-      await page.locator('input[type="search"], input[name="q"]').first().waitFor({ state: 'visible', timeout: 2000 }).catch(() => null);
+      await page.locator('input[type="search"], input[name="q"]').first().waitFor({ state: 'visible', timeout: 2000 });
     }
 
     const searchInput = page.locator('input[type="search"], input[name="q"]').first();
@@ -199,8 +206,11 @@ test.describe('13 · API Mocks — Search', () => {
       return;
     }
 
-    await searchInput.type(SEARCH_TERM, { delay: 60 });
-    await page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => null);
+    if ((await page.locator('predictive-search, [id*="predictive"], [class*="predictive"]').count()) === 0) test.skip(true, 'No predictive search component');
+    await Promise.all([
+      page.waitForResponse(r => r.url().includes('/search/suggest') && r.status() === 500),
+      searchInput.pressSequentially(SEARCH_TERM, { delay: 60 }),
+    ]);
 
     // No crash — the search bar should still be interactable
     expect(jsErrors.filter(e => /unhandled|uncaught/i.test(e))).toHaveLength(0);

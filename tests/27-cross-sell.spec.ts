@@ -1,3 +1,4 @@
+import { optionalVisible, BASE, KNOWN_PRODUCT, KNOWN_PRODUCTS, fetchProductHandles } from './helpers';
 /**
  * 27 · Cross-sell & upsell
  *
@@ -6,7 +7,7 @@
  * All tests soft-skip if the widget is absent — it's an optional theme feature.
  */
 import { test, expect } from './fixtures';
-import { BASE, KNOWN_PRODUCT, KNOWN_PRODUCTS, fetchProductHandles } from './helpers';
+
 
 // ── Selectors ─────────────────────────────────────────────────────────────────
 
@@ -56,16 +57,9 @@ const RECO_PRODUCT_CARD_SEL = [
 /** Waits for Shopify's async recommendations section to load */
 async function waitForRecommendations(page: import('@playwright/test').Page): Promise<boolean> {
   const container = page.locator(RELATED_PRODUCTS_SEL).first();
-  if ((await container.count()) === 0) return false;
-
-  // Shopify loads recommendations via a fetch after DOM ready
-  await page.waitForResponse(
-    r => r.url().includes('/recommendations') || r.url().includes('section_id'),
-    { timeout: 8_000 },
-  ).catch(() => null);
-
-  await page.waitForTimeout(1_000);
-  return (await container.count()) > 0;
+  if (!(await optionalVisible(container, 5000))) return false;
+  await expect(container.locator('a[href*="/products/"]').first(), 'Recommendations did not render products').toBeVisible();
+  return true;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -175,7 +169,7 @@ test.describe('27 · Cross-sell & upsell', () => {
       .get(`${BASE}/products/${products[0].handle}.js`)
       .then(r => r.json())
       .then((data: { id?: number }) => data.id)
-      .catch(() => null);
+      ;
 
     if (!productId) {
       test.skip(true, 'Could not resolve product ID for API call');
@@ -195,10 +189,9 @@ test.describe('27 · Cross-sell & upsell', () => {
 
   test('frequently bought together section renders correctly (if present)', async ({ page }) => {
     await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(1_500);
 
     const section = page.locator(FREQUENTLY_BOUGHT_SEL).first();
-    if ((await section.count()) === 0) {
+    if (!(await optionalVisible(section, 5000))) {
       test.skip(true, '"Frequently bought together" not present — feature not enabled');
       return;
     }
@@ -212,10 +205,9 @@ test.describe('27 · Cross-sell & upsell', () => {
 
   test('cart page upsell widget renders correctly (if present)', async ({ page }) => {
     await page.goto(`${BASE}/cart`, { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(1_000);
 
     const widget = page.locator(UPSELL_SEL).first();
-    if ((await widget.count()) === 0) {
+    if (!(await optionalVisible(widget, 5000))) {
       test.skip(true, 'No cart upsell widget — feature not enabled');
       return;
     }

@@ -10,7 +10,7 @@
  * keep run time reasonable while staying within Shopify's rate limits.
  */
 import { test, expect, Page } from './fixtures';
-import { BASE, KNOWN_PRODUCTS, ADD_TO_CART_SEL, fetchProductHandles } from './helpers';
+import { KNOWN_PRODUCTS, ADD_TO_CART_SEL, fetchProductHandles } from './helpers';
 
 type Product = { handle: string; url: string };
 
@@ -80,7 +80,7 @@ test.describe('16 · Dynamic Product Crawling', () => {
     const missing: string[] = [];
     await crawlConcurrently(page, products, CONCURRENCY, async (worker, p) => {
       await worker.goto(p.url, { waitUntil: 'domcontentloaded' });
-      const title = (await worker.locator('h1').first().textContent().catch(() => ''))?.trim();
+      const title = (await worker.locator('h1').first().textContent())?.trim();
       if (!title) missing.push(p.handle);
     });
 
@@ -97,7 +97,7 @@ test.describe('16 · Dynamic Product Crawling', () => {
         .locator('.price, [class*="price"], span.money, .product__price')
         .first()
         .textContent()
-        .catch(() => ''))?.trim();
+        )?.trim();
       if (!price) missing.push(p.handle);
     });
 

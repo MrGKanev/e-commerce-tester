@@ -90,7 +90,8 @@ test.describe('26 · Multi-currency & i18n', () => {
 
     // Capture price before switch
     const priceEl = page.locator(PRICE_SEL).first();
-    const priceBefore = (await priceEl.textContent().catch(() => ''))?.trim();
+    const priceBefore = (await priceEl.textContent())?.trim();
+    const urlBefore = page.url();
 
     // Try to pick a different currency
     const tag = await switcher.evaluate(el => el.tagName.toLowerCase());
@@ -101,17 +102,19 @@ test.describe('26 · Multi-currency & i18n', () => {
         return;
       }
       const currentVal = await switcher.inputValue();
-      const otherOption = options.find(async o => (await o.inputValue()) !== currentVal);
+      const values = await Promise.all(options.map(o => o.getAttribute('value')));
+      const index = values.findIndex(value => value !== currentVal);
+      const otherOption = index >= 0 ? options[index] : undefined;
       if (!otherOption) {
         test.skip(true, 'Cannot find alternate currency');
         return;
       }
-      const newVal = await otherOption.inputValue();
+      const newVal = (await otherOption.getAttribute('value')) || '';
       await switcher.selectOption(newVal);
     } else {
       // Button-based switcher — click to open, then pick first option
       await switcher.click();
-      await page.waitForTimeout(500);
+      await expect(page.locator('[data-currency-option], .currency-option, .localization-form__item').first()).toBeVisible();
       const options = page.locator('[data-currency-option], .currency-option, .localization-form__item').all();
       const opts = await options;
       if (opts.length === 0) {
@@ -121,11 +124,11 @@ test.describe('26 · Multi-currency & i18n', () => {
       await opts[0].click();
     }
 
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(1_000);
+    await expect.poll(async () => page.url() !== urlBefore || (await priceEl.textContent())?.trim() !== priceBefore, { message: 'Currency switch changed neither price nor URL' }).toBe(true);
+    await expect(priceEl).toBeVisible();
 
     // Price text or URL should have changed
-    const priceAfter = (await priceEl.textContent().catch(() => ''))?.trim();
+    const priceAfter = (await priceEl.textContent())?.trim();
     const urlChanged = page.url().includes('currency=') || page.url().includes('locale=');
 
     if (priceBefore && priceAfter && !urlChanged) {
@@ -154,7 +157,7 @@ test.describe('26 · Multi-currency & i18n', () => {
 
     const symbols = new Set<string>();
     for (let i = 0; i < Math.min(count, 10); i++) {
-      const text = (await priceEls.nth(i).textContent().catch(() => ''))?.trim();
+      const text = (await priceEls.nth(i).textContent())?.trim();
       if (text) {
         const sym = parseCurrencyCode(text);
         if (sym) symbols.add(sym);
@@ -178,6 +181,8 @@ test.describe('26 · Multi-currency & i18n', () => {
       return;
     }
 
+    const localeBefore = await page.locator('html').getAttribute('lang');
+    const urlBefore = page.url();
     const tag = await switcher.evaluate(el => el.tagName.toLowerCase());
     if (tag === 'select') {
       const options = await switcher.locator('option').all();
@@ -187,7 +192,7 @@ test.describe('26 · Multi-currency & i18n', () => {
       }
       const current = await switcher.inputValue();
       for (const opt of options) {
-        const val = await opt.inputValue();
+        const val = (await opt.getAttribute('value')) || '';
         if (val !== current) {
           await switcher.selectOption(val);
           break;
@@ -195,7 +200,7 @@ test.describe('26 · Multi-currency & i18n', () => {
       }
     } else {
       await switcher.click();
-      await page.waitForTimeout(500);
+      await expect(page.locator('[data-locale-option], .language-option, .localization-form__item').first()).toBeVisible();
       const items = page.locator('[data-locale-option], .language-option, .localization-form__item');
       if ((await items.count()) === 0) {
         test.skip(true, 'Language dropdown items not found');
@@ -204,7 +209,7 @@ test.describe('26 · Multi-currency & i18n', () => {
       await items.first().click();
     }
 
-    await page.waitForLoadState('domcontentloaded');
+    await expect.poll(async () => page.url() !== urlBefore || await page.locator('html').getAttribute('lang') !== localeBefore, { message: 'Locale switch did not change URL or document language' }).toBe(true);
     // A locale switch usually changes the URL path (/en, /bg, etc.) or sets a cookie
     const url = page.url();
     expect(url, 'Page did not navigate after locale switch').toBeTruthy();
@@ -216,10 +221,9 @@ test.describe('26 · Multi-currency & i18n', () => {
   test('Shopify Markets meta tag or JSON is present when multi-currency is enabled', async ({ page }) => {
     await goto(page, '/');
 
-    const currencyMeta = await page.$eval(
-      'meta[name="currency"], meta[property="og:price:currency"], [data-currency]',
-      (el): string => (el as HTMLMetaElement).content ?? el.getAttribute('data-currency') ?? '',
-    ).catch(() => '');
+    const currency = page.locator('meta[name="currency"], meta[property="og:price:currency"], [data-currency]').first();
+    if ((await currency.count()) === 0) test.skip(true, 'No currency metadata — Markets may not be active');
+    const currencyMeta = await currency.evaluate((el): string => (el as HTMLMetaElement).content ?? el.getAttribute('data-currency') ?? '');
 
     if (!currencyMeta) {
       test.skip(true, 'No currency meta tag — Markets may not be active');
@@ -231,7 +235,7 @@ test.describe('26 · Multi-currency & i18n', () => {
   });
 
   test('/localization endpoint returns valid JSON', async ({ request }) => {
-    const resp = await request.get(`${BASE}/?section_id=localization-form`).catch(() => null);
+    const resp = await request.get(`${BASE}/?section_id=localization-form`);
     if (!resp || resp.status() === 404) {
       test.skip(true, 'No localization section endpoint');
       return;

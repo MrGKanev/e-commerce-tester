@@ -1,21 +1,10 @@
+import { addProductToCart, cartAction, clearCart, BASE, KNOWN_PRODUCTS, CART_ITEMS_SEL } from './helpers';
 import { test, expect } from './fixtures';
-import { BASE, KNOWN_PRODUCT, KNOWN_PRODUCTS, ADD_TO_CART_SEL, CART_ITEMS_SEL } from './helpers';
+
 
 // Helper: add the known product to cart and return to the cart page
 async function addKnownProductToCart(page: import('@playwright/test').Page) {
-  await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
-  const btn = page.locator(ADD_TO_CART_SEL).first();
-  if ((await btn.count()) === 0 || await btn.isDisabled()) return false;
-  await btn.click();
-  // Wait for any cart response
-  await Promise.race([
-    page.waitForURL('**/cart**', { timeout: 6000 }).catch(() => null),
-    page.waitForResponse(r => /\/cart(\/add)?\.js/.test(r.url()), { timeout: 6000 }).catch(() => null),
-  ]);
-  if (!page.url().includes('/cart')) {
-    await page.goto(`${BASE}/cart`, { waitUntil: 'domcontentloaded' });
-  }
-  return true;
+  return addProductToCart(page);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -32,7 +21,7 @@ test.describe('05 · Cart', () => {
 
   test('empty cart shows an empty state message (not blank page)', async ({ page }) => {
     // Start fresh with an empty cart
-    await page.goto(`${BASE}/cart/clear`, { waitUntil: 'domcontentloaded' }).catch(() => null);
+    await clearCart(page);
     await page.goto(`${BASE}/cart`, { waitUntil: 'domcontentloaded' });
 
     const body = await page.textContent('body');
@@ -60,7 +49,7 @@ test.describe('05 · Cart', () => {
 
   test('can add a product to cart', async ({ page }) => {
     const added = await addKnownProductToCart(page);
-    if (!added) test.skip(true, 'Could not add product to cart');
+    if (!added) test.skip(true, 'Configured product is sold out');
 
     const items = page.locator(CART_ITEMS_SEL);
     const count = await items.count();
@@ -69,7 +58,7 @@ test.describe('05 · Cart', () => {
 
   test('cart shows product name after adding', async ({ page }) => {
     const added = await addKnownProductToCart(page);
-    if (!added) test.skip(true, 'Could not add product to cart');
+    if (!added) test.skip(true, 'Configured product is sold out');
 
     const cartText = await page.textContent('body');
     // Z1 product handle should appear somewhere on the cart page
@@ -79,7 +68,7 @@ test.describe('05 · Cart', () => {
 
   test('cart shows a price / subtotal', async ({ page }) => {
     const added = await addKnownProductToCart(page);
-    if (!added) test.skip(true, 'Could not add product to cart');
+    if (!added) test.skip(true, 'Configured product is sold out');
 
     const totalSel = [
       '.cart__subtotal',
@@ -104,7 +93,7 @@ test.describe('05 · Cart', () => {
 
   test('cart quantity can be increased', async ({ page }) => {
     const added = await addKnownProductToCart(page);
-    if (!added) test.skip(true, 'Could not add product to cart');
+    if (!added) test.skip(true, 'Configured product is sold out');
 
     const qtySel = [
       '.cart__qty input',
@@ -125,19 +114,15 @@ test.describe('05 · Cart', () => {
         return;
       }
       const oldText = await page.textContent('body');
-      await increaseBtn.click();
-      await page.waitForResponse(r => r.url().includes('/cart'), { timeout: 3000 }).catch(() => null);
-      const newText = await page.textContent('body');
-      // Subtotal should change or quantity should change
-      expect(newText).not.toBe(oldText);
+      await cartAction(page, () => increaseBtn.click());
+      await expect(page.locator('body')).not.toHaveText(oldText || '');
       return;
     }
 
     await expect(qtyInput).toBeVisible();
     const valueBefore = await qtyInput.inputValue();
     await qtyInput.fill(String(Number(valueBefore) + 1));
-    await qtyInput.press('Enter');
-    await page.waitForResponse(r => r.url().includes('/cart'), { timeout: 3000 }).catch(() => null);
+    await cartAction(page, () => qtyInput.press('Enter'));
 
     const valueAfter = await qtyInput.inputValue();
     expect(Number(valueAfter), 'Quantity did not increase').toBeGreaterThan(Number(valueBefore));
@@ -147,7 +132,7 @@ test.describe('05 · Cart', () => {
 
   test('can remove an item from cart', async ({ page }) => {
     const added = await addKnownProductToCart(page);
-    if (!added) test.skip(true, 'Could not add product to cart');
+    if (!added) test.skip(true, 'Configured product is sold out');
 
     const countBefore = await page.locator(CART_ITEMS_SEL).count();
     if (countBefore === 0) test.skip(true, 'No items in cart to remove');
@@ -156,24 +141,19 @@ test.describe('05 · Cart', () => {
       '[class*="remove"], [class*="delete"], a[href*="quantity=0"], button[aria-label*="Remove"], button[aria-label*="Премахни"], .cart__remove',
     ).first();
 
-    const removeBtnCount = await removeBtn.count();
-    if (removeBtnCount === 0) {
-      // Try setting qty to 0 and updating
-      const qtyInput = page.locator('input[name="updates[]"]').first();
-      if ((await qtyInput.count()) === 0) {
-        test.skip(true, 'No remove button or quantity input found');
-        return;
+    await cartAction(page, async () => {
+      if ((await removeBtn.count()) > 0) {
+        await removeBtn.click();
+      } else {
+        const qtyInput = page.locator('input[name="updates[]"]').first();
+        await expect(qtyInput).toBeVisible();
+        await qtyInput.fill('0');
+        const updateBtn = page.locator('[name="update"]').first();
+        if (await updateBtn.isVisible()) await updateBtn.click();
+        else await qtyInput.press('Enter');
       }
-      await qtyInput.fill('0');
-      const updateBtn = page.locator(
-        'button[name="update"], input[name="update"], [name="update"]',
-      ).first();
-      if ((await updateBtn.count()) > 0) await updateBtn.click();
-    } else {
-      await removeBtn.click();
-    }
-
-    await page.waitForResponse(r => r.url().includes('/cart'), { timeout: 3000 }).catch(() => null);
+    });
+    await expect.poll(() => page.locator(CART_ITEMS_SEL).count()).toBeLessThan(countBefore);
 
     const countAfter = await page.locator(CART_ITEMS_SEL).count();
     expect(
@@ -186,7 +166,7 @@ test.describe('05 · Cart', () => {
 
   test('checkout button is visible when cart has items', async ({ page }) => {
     const added = await addKnownProductToCart(page);
-    if (!added) test.skip(true, 'Could not add product to cart');
+    if (!added) test.skip(true, 'Configured product is sold out');
 
     const checkoutBtn = page.locator(
       '[name="checkout"], a[href*="/checkout"], button:has-text("Checkout"), button:has-text("Поръчай"), button:has-text("Към поръчката")',
@@ -196,7 +176,7 @@ test.describe('05 · Cart', () => {
 
   test('checkout button links to /checkout', async ({ page }) => {
     const added = await addKnownProductToCart(page);
-    if (!added) test.skip(true, 'Could not add product to cart');
+    if (!added) test.skip(true, 'Configured product is sold out');
 
     const checkoutBtn = page.locator(
       '[name="checkout"], a[href*="/checkout"], button:has-text("Checkout")',

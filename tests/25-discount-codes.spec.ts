@@ -1,3 +1,4 @@
+import { addProductToCart, optionalVisible, waitForContent, BASE } from './helpers';
 /**
  * 25 · Discount codes & promotions
  *
@@ -7,7 +8,7 @@
  * Set DISCOUNT_CODE=YOURCODE in .env to enable the valid-code tests.
  */
 import { test, expect, type Page } from './fixtures';
-import { BASE, KNOWN_PRODUCT, ADD_TO_CART_SEL } from './helpers';
+
 
 // ── Selectors ─────────────────────────────────────────────────────────────────
 
@@ -49,27 +50,30 @@ const CART_TOTAL_SEL = [
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
-async function goToCartWithItem(page: Page): Promise<boolean> {
-  await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
-  const btn = page.locator(ADD_TO_CART_SEL).first();
-  if ((await btn.count()) === 0 || (await btn.isDisabled())) return false;
-  await btn.click();
-  await Promise.race([
-    page.waitForURL('**/cart**', { timeout: 6_000 }).catch(() => null),
-    page.waitForResponse(r => /\/cart(\/add)?\.js/.test(r.url()), { timeout: 6_000 }).catch(() => null),
-  ]);
-  if (!page.url().includes('/cart')) {
-    await page.goto(`${BASE}/cart`, { waitUntil: 'domcontentloaded' });
-  }
-  return true;
+async function goToCartWithItem(page: import('@playwright/test').Page) {
+  return addProductToCart(page);
 }
 
 async function getDiscountField(page: Page) {
-  await goToCartWithItem(page).catch(() => null);
+  expect(await goToCartWithItem(page), 'Configured product is unavailable').toBe(true);
   if (!page.url().includes('/cart')) {
     await page.goto(`${BASE}/cart`, { waitUntil: 'domcontentloaded' });
   }
   return page.locator(DISCOUNT_INPUT_SEL).first();
+}
+
+async function submitDiscount(page: Page, field: import('@playwright/test').Locator) {
+  const applyBtn = page.locator(DISCOUNT_APPLY_BTN_SEL).first();
+  const [response] = await Promise.all([
+    page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.origin === new URL(BASE).origin &&
+        (response.request().isNavigationRequest() || /cart|discount|coupon/.test(url.pathname));
+    }),
+    (await applyBtn.count()) > 0 ? applyBtn.click() : field.press('Enter'),
+  ]);
+  expect(response.status(), 'Discount submission failed on the server').toBeLessThan(500);
+  return response;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -111,27 +115,18 @@ test.describe('25 · Discount codes & promotions', () => {
       return;
     }
 
-    const totalBefore = (await page.locator(CART_TOTAL_SEL).first().textContent().catch(() => ''))?.trim();
+    const totalBefore = (await page.locator(CART_TOTAL_SEL).first().textContent())?.trim();
 
     await field.fill('INVALID_CODE_XYZ_999');
-    const applyBtn = page.locator(DISCOUNT_APPLY_BTN_SEL).first();
-    if ((await applyBtn.count()) > 0) {
-      await applyBtn.click();
-    } else {
-      await field.press('Enter');
-    }
+    await submitDiscount(page, field);
 
     // Either an error message appears or the total is unchanged
-    const hasError = await page.locator(DISCOUNT_ERROR_SEL)
-      .first()
-      .waitFor({ state: 'visible', timeout: 8_000 })
-      .then(() => true)
-      .catch(() => false);
+    const hasError = await optionalVisible(page.locator(DISCOUNT_ERROR_SEL).first(), 5000);
 
     if (hasError) {
       await expect(page.locator(DISCOUNT_ERROR_SEL).first()).toBeVisible();
     } else {
-      const totalAfter = (await page.locator(CART_TOTAL_SEL).first().textContent().catch(() => ''))?.trim();
+      const totalAfter = (await page.locator(CART_TOTAL_SEL).first().textContent())?.trim();
       // Page must remain on cart and total must not have mysteriously dropped
       expect(page.url()).toMatch(/cart/);
       if (totalBefore && totalAfter) {
@@ -151,9 +146,16 @@ test.describe('25 · Discount codes & promotions', () => {
     }
 
     await field.fill('');
-    const applyBtn = page.locator(DISCOUNT_APPLY_BTN_SEL).first();
-    if ((await applyBtn.count()) > 0) await applyBtn.click();
-    await page.waitForTimeout(1_500);
+    if (await field.evaluate((element: HTMLInputElement) => !element.validity.valid)) {
+      const applyBtn = page.locator(DISCOUNT_APPLY_BTN_SEL).first();
+      if (await applyBtn.isVisible()) await applyBtn.click();
+      else await field.press('Enter');
+      await expect.poll(() => field.evaluate((element: HTMLInputElement) => !element.validity.valid)).toBe(true);
+    } else {
+      await submitDiscount(page, field);
+    }
+    await waitForContent(page);
+    await expect(field).toBeVisible();
 
     const critical = jsErrors.filter(e => !e.includes('ResizeObserver'));
     expect(critical, `JS errors after empty discount submit:\n${critical.join('\n')}`).toHaveLength(0);
@@ -169,11 +171,7 @@ test.describe('25 · Discount codes & promotions', () => {
       return;
     }
 
-    const added = await goToCartWithItem(page);
-    if (!added) {
-      test.skip(true, 'Could not add product to cart');
-      return;
-    }
+    expect(await goToCartWithItem(page), 'Configured product is unavailable').toBe(true);
 
     const field = page.locator(DISCOUNT_INPUT_SEL).first();
     if ((await field.count()) === 0) {
@@ -181,17 +179,15 @@ test.describe('25 · Discount codes & promotions', () => {
       return;
     }
 
-    const totalBefore = (await page.locator(CART_TOTAL_SEL).first().textContent().catch(() => ''))?.trim();
+    const totalBefore = (await page.locator(CART_TOTAL_SEL).first().textContent())?.trim();
 
     await field.fill(code);
-    const applyBtn = page.locator(DISCOUNT_APPLY_BTN_SEL).first();
-    if ((await applyBtn.count()) > 0) {
-      await applyBtn.click();
-    } else {
-      await field.press('Enter');
-    }
+    await submitDiscount(page, field);
 
-    await page.waitForTimeout(2_500);
+    await expect.poll(async () => {
+      const line = page.locator('.cart__discount, [data-discount], .discount-savings, .cart-discount').first();
+      return await line.isVisible() || (await page.locator(CART_TOTAL_SEL).first().textContent())?.trim() !== totalBefore;
+    }, { message: 'Valid discount produced neither a discount line nor a changed total' }).toBe(true);
 
     const discountLineSel = '.cart__discount, [data-discount], .discount-savings, .cart-discount';
     const hasDiscountLine = (await page.locator(discountLineSel).count()) > 0;
@@ -199,7 +195,7 @@ test.describe('25 · Discount codes & promotions', () => {
     if (hasDiscountLine) {
       await expect(page.locator(discountLineSel).first()).toBeVisible();
     } else {
-      const totalAfter = (await page.locator(CART_TOTAL_SEL).first().textContent().catch(() => ''))?.trim();
+      const totalAfter = (await page.locator(CART_TOTAL_SEL).first().textContent())?.trim();
       if (totalBefore && totalAfter) {
         expect(totalAfter, 'Total unchanged after applying a valid discount code').not.toBe(totalBefore);
       }

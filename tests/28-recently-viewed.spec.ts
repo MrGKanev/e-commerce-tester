@@ -1,3 +1,5 @@
+import { errors } from '@playwright/test';
+import { optionalVisible, waitForContent, waitForImages, BASE, KNOWN_PRODUCTS, fetchProductHandles, goto } from './helpers';
 /**
  * 28 · Recently viewed products
  *
@@ -8,7 +10,7 @@
  * All tests soft-skip when the feature is absent — it's an optional theme widget.
  */
 import { test, expect } from './fixtures';
-import { BASE, KNOWN_PRODUCTS, fetchProductHandles, goto } from './helpers';
+
 
 // ── Selectors ─────────────────────────────────────────────────────────────────
 
@@ -38,6 +40,12 @@ const RV_STORAGE_KEYS = [
 
 /** Returns the value of the first matching localStorage key (or null) */
 async function getRecentlyViewedStorage(page: import('@playwright/test').Page): Promise<string | null> {
+  try {
+    await page.waitForFunction(keys => keys.some(key => !!localStorage.getItem(key)), RV_STORAGE_KEYS, { timeout: 3000 });
+  } catch (error) {
+    if (!(error instanceof errors.TimeoutError) || page.isClosed()) throw error;
+    return null;
+  }
   return page.evaluate((keys: string[]) => {
     for (const key of keys) {
       const val = localStorage.getItem(key);
@@ -50,7 +58,7 @@ async function getRecentlyViewedStorage(page: import('@playwright/test').Page): 
 /** Navigate to a product page and wait for it to load */
 async function visitProduct(page: import('@playwright/test').Page, url: string): Promise<void> {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(800); // allow JS tracking scripts to fire
+  await waitForContent(page);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -120,10 +128,9 @@ test.describe('28 · Recently viewed products', () => {
 
     // Navigate to homepage
     await goto(page, '/');
-    await page.waitForTimeout(1_500); // allow lazy-load JS to render
 
     const widget = page.locator(RECENTLY_VIEWED_SEL).first();
-    if ((await widget.count()) === 0) {
+    if (!(await optionalVisible(widget, 5000))) {
       test.skip(true, 'No recently viewed widget on homepage');
       return;
     }
@@ -143,10 +150,9 @@ test.describe('28 · Recently viewed products', () => {
 
     // Navigate to second product — it should show the first in recently viewed
     await visitProduct(page, products[1].url);
-    await page.waitForTimeout(1_500);
 
     const widget = page.locator(RECENTLY_VIEWED_SEL).first();
-    if ((await widget.count()) === 0) {
+    if (!(await optionalVisible(widget, 5000))) {
       test.skip(true, 'No recently viewed widget on product page');
       return;
     }
@@ -157,16 +163,16 @@ test.describe('28 · Recently viewed products', () => {
   test('recently viewed widget is not empty when history exists', async ({ page }) => {
     await visitProduct(page, KNOWN_PRODUCTS[0].url);
     await goto(page, '/');
-    await page.waitForTimeout(1_500);
 
     const widget = page.locator(RECENTLY_VIEWED_SEL).first();
-    if ((await widget.count()) === 0) {
+    if (!(await optionalVisible(widget, 5000))) {
       test.skip(true, 'No recently viewed widget');
       return;
     }
 
     // Widget should have at least one product link
     const productLinks = widget.locator('a[href*="/products/"]');
+    await expect(productLinks.first()).toBeVisible();
     const linkCount = await productLinks.count();
 
     if (linkCount === 0) {
@@ -182,14 +188,14 @@ test.describe('28 · Recently viewed products', () => {
   test('recently viewed widget product images are not broken', async ({ page }) => {
     await visitProduct(page, KNOWN_PRODUCTS[0].url);
     await goto(page, '/');
-    await page.waitForTimeout(1_500);
 
     const widget = page.locator(RECENTLY_VIEWED_SEL).first();
-    if ((await widget.count()) === 0) {
+    if (!(await optionalVisible(widget, 5000))) {
       test.skip(true, 'No recently viewed widget');
       return;
     }
 
+    await waitForImages(page);
     const broken = await page.$$eval(
       `${RECENTLY_VIEWED_SEL.split(', ')[0]} img`,
       imgs => (imgs as HTMLImageElement[])
@@ -203,10 +209,9 @@ test.describe('28 · Recently viewed products', () => {
   test('recently viewed widget links point to valid product URLs', async ({ page }) => {
     await visitProduct(page, KNOWN_PRODUCTS[0].url);
     await goto(page, '/');
-    await page.waitForTimeout(1_500);
 
     const widget = page.locator(RECENTLY_VIEWED_SEL).first();
-    if ((await widget.count()) === 0) {
+    if (!(await optionalVisible(widget, 5000))) {
       test.skip(true, 'No recently viewed widget');
       return;
     }
@@ -237,9 +242,7 @@ test.describe('28 · Recently viewed products', () => {
 
     // Navigate elsewhere and back
     await goto(page, '/');
-    await page.waitForTimeout(500);
     await goto(page, '/collections');
-    await page.waitForTimeout(500);
 
     const storedAfter = await getRecentlyViewedStorage(page);
     expect(storedAfter, 'Recently viewed history was lost after navigation').toBeTruthy();
@@ -254,10 +257,9 @@ test.describe('28 · Recently viewed products', () => {
 
     await visitProduct(page, KNOWN_PRODUCTS[0].url);
     await page.goto(`${BASE}/cart`, { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(1_500);
 
     const widget = page.locator(RECENTLY_VIEWED_SEL).first();
-    if ((await widget.count()) > 0) {
+    if (await optionalVisible(widget, 5000)) {
       await expect(widget).toBeVisible();
     }
 

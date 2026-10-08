@@ -1,6 +1,7 @@
+import { BASE, SEARCH_TERM, goto } from './helpers';
 import { test, expect } from './fixtures';
 import { faker } from '@faker-js/faker';
-import { BASE, SEARCH_TERM, goto } from './helpers';
+
 
 test.describe('06 · Search', () => {
 
@@ -25,7 +26,6 @@ test.describe('06 · Search', () => {
     const toggleCount = await searchToggle.count();
     if (toggleCount > 0) {
       await searchToggle.click();
-      await page.waitForTimeout(500);
     }
 
     const searchInput = page.locator(
@@ -43,7 +43,6 @@ test.describe('06 · Search', () => {
     ).first();
     if ((await searchToggle.count()) > 0) {
       await searchToggle.click();
-      await page.waitForTimeout(500);
     }
 
     const searchInput = page.locator(
@@ -67,7 +66,6 @@ test.describe('06 · Search', () => {
     ).first();
     if ((await searchToggle.count()) > 0) {
       await searchToggle.click();
-      await page.waitForTimeout(400);
     }
 
     const searchInput = page.locator('input[type="search"], input[name="q"]').first();
@@ -75,9 +73,8 @@ test.describe('06 · Search', () => {
 
     await searchInput.fill(SEARCH_TERM);
     await searchInput.press('Enter');
+    await expect(page).toHaveURL(/\/search/);
     await page.waitForLoadState('domcontentloaded');
-
-    expect(page.url()).toContain('/search');
     await expect(page).not.toHaveTitle(/404|not found/i);
   });
 
@@ -178,7 +175,6 @@ test.describe('06 · Search', () => {
     ).first();
     if ((await searchToggle.count()) > 0) {
       await searchToggle.click();
-      await page.waitForTimeout(400);
     }
 
     const searchInput = page.locator('input[type="search"], input[name="q"]').first();
@@ -187,8 +183,9 @@ test.describe('06 · Search', () => {
       return;
     }
 
-    await searchInput.type('zer', { delay: 80 });
-    await page.waitForTimeout(800); // debounce
+    const predictive = page.locator('predictive-search, [id*="predictive"], [class*="predictive"], [class*="autocomplete"], [role="listbox"]');
+    if ((await predictive.count()) === 0) test.skip(true, 'Theme has no predictive-search component');
+    await searchInput.pressSequentially(SEARCH_TERM, { delay: 80 });
 
     const predictiveSel = [
       'predictive-search',
@@ -200,7 +197,8 @@ test.describe('06 · Search', () => {
     ].join(', ');
 
     const dropdown = page.locator(predictiveSel).first();
-    const isVisible = await dropdown.isVisible().catch(() => false);
+    await expect(dropdown).toBeVisible();
+    const isVisible = true;
 
     if (!isVisible) {
       test.skip(true, 'Predictive search not supported by this theme');
@@ -209,6 +207,6 @@ test.describe('06 · Search', () => {
 
     // Should have at least one suggestion
     const suggestions = dropdown.locator('a, li, [role="option"]');
-    expect(await suggestions.count(), 'Predictive search dropdown is empty').toBeGreaterThan(0);
+    await expect(suggestions.first(), 'Predictive search dropdown is empty').toBeVisible();
   });
 });

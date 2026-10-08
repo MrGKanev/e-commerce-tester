@@ -1,3 +1,5 @@
+import { clearCart, waitForVisualReady, BASE, KNOWN_PRODUCT, goto } from './helpers';
+
 /**
  * 10 · Visual regression tests
  *
@@ -25,7 +27,7 @@
  */
 
 import { test, expect } from './fixtures';
-import { BASE, KNOWN_PRODUCT, goto } from './helpers';
+
 
 // Elements that change between runs — hide them from the snapshot
 const DYNAMIC_MASKS = [
@@ -56,7 +58,7 @@ test.describe('10 · Visual regression', () => {
 
   test('homepage — above the fold', async ({ page }) => {
     await goto(page);
-    await page.waitForLoadState('networkidle');
+    await waitForVisualReady(page);
 
     // Clip to viewport so scroll position is irrelevant
     await expect(page).toHaveScreenshot('homepage-fold.png', {
@@ -69,7 +71,8 @@ test.describe('10 · Visual regression', () => {
   test('homepage — header / navigation', async ({ page }) => {
     await goto(page);
     const header = page.locator('header, #header, .site-header, [role="banner"]').first();
-    await header.waitFor({ state: 'visible' });
+    await expect(header).toBeVisible();
+    await waitForVisualReady(page);
 
     await expect(header).toHaveScreenshot('header.png', {
       ...SNAP_OPTS,
@@ -80,7 +83,8 @@ test.describe('10 · Visual regression', () => {
   // ── Product page ──────────────────────────────────────────────────────────
 
   test('product page — hero (image + title + price + ATC)', async ({ page }) => {
-    await page.goto(KNOWN_PRODUCT, { waitUntil: 'networkidle' });
+    await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
+    await waitForVisualReady(page);
 
     // Mask the price in case it changes (sale, currency rounding)
     const priceMask = page.locator(
@@ -102,8 +106,9 @@ test.describe('10 · Visual regression', () => {
 
   test('cart page — empty state', async ({ page }) => {
     // Ensure cart is empty before snapping
-    await page.goto(`${BASE}/cart/clear`, { waitUntil: 'domcontentloaded' }).catch(() => null);
-    await page.goto(`${BASE}/cart`, { waitUntil: 'networkidle' });
+    await clearCart(page);
+    await page.goto(`${BASE}/cart`, { waitUntil: 'domcontentloaded' });
+    await waitForVisualReady(page);
 
     await expect(page).toHaveScreenshot('cart-empty.png', {
       ...SNAP_OPTS,
@@ -117,7 +122,7 @@ test.describe('10 · Visual regression', () => {
   test('homepage — mobile viewport (390 px)', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await goto(page);
-    await page.waitForLoadState('networkidle');
+    await waitForVisualReady(page);
 
     await expect(page).toHaveScreenshot('homepage-mobile.png', {
       ...SNAP_OPTS,
@@ -128,7 +133,8 @@ test.describe('10 · Visual regression', () => {
 
   test('product page — mobile viewport (390 px)', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(KNOWN_PRODUCT, { waitUntil: 'networkidle' });
+    await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
+    await waitForVisualReady(page);
 
     const priceMask = page.locator('span.money, [data-product-price], .price-item--regular');
 

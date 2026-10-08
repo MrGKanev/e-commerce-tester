@@ -1,5 +1,6 @@
+import { waitForContent, BASE, goto, findBrokenImages, getFixedElements } from './helpers';
 import { test, expect } from './fixtures';
-import { BASE, goto, findBrokenImages, getFixedElements } from './helpers';
+
 
 test.describe('01 · Homepage', () => {
   // ─── Basic load ───────────────────────────────────────────────────────────
@@ -92,7 +93,7 @@ test.describe('01 · Homepage', () => {
     const errors: string[] = [];
     page.on('pageerror', (err) => errors.push(err.message));
     await goto(page);
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => null);
+    await page.waitForLoadState('load');
     const critical = errors.filter(
       (e) =>
         !e.includes('Non-Error promise rejection') &&
@@ -119,12 +120,15 @@ test.describe('01 · Homepage', () => {
         failed.push(`${status} ${url}`);
       }
     });
-    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+    await waitForContent(page);
+    await page.waitForLoadState('load');
     expect(failed, `Failed requests:\n${failed.join('\n')}`).toHaveLength(0);
   });
 
   test('homepage images all load (no broken images)', async ({ page }) => {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+    await waitForContent(page);
     const broken = await findBrokenImages(page);
     expect(broken, `Broken images:\n${broken.join('\n')}`).toHaveLength(0);
   });
@@ -158,7 +162,7 @@ test.describe('01 · Homepage', () => {
   test('www subdomain redirects to canonical domain', async ({ request }) => {
     const url = new URL(BASE);
     const wwwUrl = `${url.protocol}//www.${url.host}${url.pathname}`;
-    const resp = await request.get(wwwUrl).catch(() => null);
+    const resp = await request.get(wwwUrl);
     if (!resp) {
       test.skip(true, 'www subdomain is not responding — may not be configured');
       return;

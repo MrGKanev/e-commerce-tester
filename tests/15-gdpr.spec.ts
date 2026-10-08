@@ -1,3 +1,4 @@
+import { optionalVisible, waitForContent, BASE, KNOWN_PRODUCT, LOCALE, TIMEZONE_ID, COOKIE_CONSENT_SEL } from './helpers';
 /**
  * GDPR / Cookie Consent tests
  *
@@ -14,7 +15,7 @@
  *  6. Decline button (if present) hides banner without JS errors
  */
 import { test, expect } from './fixtures';
-import { BASE, KNOWN_PRODUCT, LOCALE, TIMEZONE_ID, COOKIE_CONSENT_SEL } from './helpers';
+
 
 /** Selectors for the "decline / reject all" button — less standardised than accept */
 const COOKIE_DECLINE_SEL = [
@@ -34,10 +35,7 @@ const CONSENT_PATTERN = /consent|cookie|gdpr|tracking|privacy|cc_/i;
 
 /** Wait for the consent banner to appear; returns true if visible, false if absent */
 async function waitForBanner(page: import('@playwright/test').Page): Promise<boolean> {
-  return page.locator(COOKIE_CONSENT_SEL).first()
-    .waitFor({ state: 'visible', timeout: 5_000 })
-    .then(() => true)
-    .catch(() => false);
+  return optionalVisible(page.locator(COOKIE_CONSENT_SEL).filter({ visible: true }).first(), 5000);
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -71,21 +69,19 @@ test.describe('15 · GDPR / Cookie Consent', () => {
     try {
       await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
-      const banner = page.locator(COOKIE_CONSENT_SEL).first();
+      const banner = page.locator(COOKIE_CONSENT_SEL).filter({ visible: true }).first();
       if (!(await waitForBanner(page))) {
         test.skip(true, 'No cookie banner detected');
         return;
       }
 
       await banner.click();
-      await banner.waitFor({ state: 'hidden', timeout: 3_000 }).catch(() => null);
+      await banner.waitFor({ state: 'hidden', timeout: 3_000 });
 
       // Full reload — consent should be remembered via cookie/localStorage
       await page.reload({ waitUntil: 'domcontentloaded' });
 
-      const reappeared = await page.locator(COOKIE_CONSENT_SEL).first()
-        .waitFor({ state: 'visible', timeout: 2_000 })
-        .then(() => true).catch(() => false);
+      const reappeared = await optionalVisible(page.locator(COOKIE_CONSENT_SEL).filter({ visible: true }).first(), 2_000);
 
       expect(reappeared, 'Cookie banner reappeared after consent was given').toBe(false);
     } finally {
@@ -100,21 +96,19 @@ test.describe('15 · GDPR / Cookie Consent', () => {
     try {
       await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
-      const banner = page.locator(COOKIE_CONSENT_SEL).first();
+      const banner = page.locator(COOKIE_CONSENT_SEL).filter({ visible: true }).first();
       if (!(await waitForBanner(page))) {
         test.skip(true, 'No cookie banner detected');
         return;
       }
 
       await banner.click();
-      await banner.waitFor({ state: 'hidden', timeout: 3_000 }).catch(() => null);
+      await banner.waitFor({ state: 'hidden', timeout: 3_000 });
 
       // Navigate to product page — banner should stay gone
       await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
 
-      const bannerOnProduct = await page.locator(COOKIE_CONSENT_SEL).first()
-        .waitFor({ state: 'visible', timeout: 2_000 })
-        .then(() => true).catch(() => false);
+      const bannerOnProduct = await optionalVisible(page.locator(COOKIE_CONSENT_SEL).filter({ visible: true }).first(), 2_000);
 
       expect(bannerOnProduct, 'Cookie banner reappeared on product page after consent').toBe(false);
     } finally {
@@ -129,14 +123,14 @@ test.describe('15 · GDPR / Cookie Consent', () => {
     try {
       await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
-      const banner = page.locator(COOKIE_CONSENT_SEL).first();
+      const banner = page.locator(COOKIE_CONSENT_SEL).filter({ visible: true }).first();
       if (!(await waitForBanner(page))) {
         test.skip(true, 'No cookie banner detected');
         return;
       }
 
       await banner.click();
-      await banner.waitFor({ state: 'hidden', timeout: 3_000 }).catch(() => null);
+      await banner.waitFor({ state: 'hidden', timeout: 3_000 });
 
       const cookies = await context.cookies();
       const lsKeys  = await page.evaluate(() => Object.keys(window.localStorage));
@@ -175,14 +169,14 @@ test.describe('15 · GDPR / Cookie Consent', () => {
     try {
       await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
-      const banner = page.locator(COOKIE_CONSENT_SEL).first();
+      const banner = page.locator(COOKIE_CONSENT_SEL).filter({ visible: true }).first();
       if (await waitForBanner(page)) {
         await banner.click();
-        await banner.waitFor({ state: 'hidden', timeout: 3_000 }).catch(() => null);
+        await banner.waitFor({ state: 'hidden', timeout: 3_000 });
       }
 
       // Allow any async side-effects to settle
-      await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => null);
+      await waitForContent(page);
 
       expect(
         errors.length,
@@ -203,9 +197,7 @@ test.describe('15 · GDPR / Cookie Consent', () => {
       await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
       const declineBtn = page.locator(COOKIE_DECLINE_SEL).first();
-      const declineVisible = await declineBtn
-        .waitFor({ state: 'visible', timeout: 5_000 })
-        .then(() => true).catch(() => false);
+      const declineVisible = await optionalVisible(declineBtn, 5_000);
 
       if (!declineVisible) {
         test.skip(true, 'No decline/reject button found — store may only offer accept');
@@ -213,12 +205,10 @@ test.describe('15 · GDPR / Cookie Consent', () => {
       }
 
       await declineBtn.click();
-      await declineBtn.waitFor({ state: 'hidden', timeout: 3_000 }).catch(() => null);
+      await declineBtn.waitFor({ state: 'hidden', timeout: 3_000 });
 
       // Banner should disappear after declining
-      const bannerAfterDecline = await page.locator(COOKIE_CONSENT_SEL).first()
-        .waitFor({ state: 'visible', timeout: 1_000 })
-        .then(() => true).catch(() => false);
+      const bannerAfterDecline = await optionalVisible(page.locator(COOKIE_CONSENT_SEL).filter({ visible: true }).first(), 1_000);
 
       expect(bannerAfterDecline, 'Banner still visible after declining consent').toBe(false);
 

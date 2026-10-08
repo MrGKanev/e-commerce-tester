@@ -1,3 +1,4 @@
+import { waitForContent, BASE } from './helpers';
 /**
  * 20 · Security headers & HTTPS
  *
@@ -9,7 +10,7 @@
  *  - Google Security Score (2026 criteria)
  */
 import { test, expect } from './fixtures';
-import { BASE } from './helpers';
+
 
 // ─── Shared: fetch headers once per describe block ───────────────────────────
 
@@ -36,7 +37,7 @@ test.describe('20 · Security headers', () => {
     const resp = await request.get(httpBase, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
       maxRedirects: 0,
-    }).catch(() => null);
+    });
 
     if (!resp) {
       test.skip(true, 'HTTP endpoint not reachable (may already block port 80)');
@@ -109,7 +110,8 @@ test.describe('20 · Security headers', () => {
       if (req.url().startsWith('http://')) httpRequests.push(req.url());
     });
 
-    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+    await waitForContent(page);
 
     expect(
       httpRequests,
@@ -242,7 +244,8 @@ test.describe('20b · Exposed API keys in JavaScript bundles', () => {
       }
     });
 
-    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+    await waitForContent(page);
 
     // Scan each script body (skip CDN scripts that are not from the store)
     for (const url of scriptUrls) {
@@ -282,7 +285,8 @@ test.describe('20b · Exposed API keys in JavaScript bundles', () => {
       }
     });
 
-    await page.goto(KNOWN_PRODUCT, { waitUntil: 'networkidle' });
+    await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
+    await waitForContent(page);
 
     for (const url of scriptUrls) {
       if (!url.includes(new URL(BASE).hostname) && !url.includes('myshopify.com')) continue;

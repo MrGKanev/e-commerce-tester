@@ -41,7 +41,7 @@ test.describe('02 · Desktop navigation', () => {
     for (const path of links) {
       const resp = await request
         .get(`${BASE}${path}`, { headers: { 'User-Agent': 'Mozilla/5.0' } })
-        .catch(() => null);
+        ;
       const status = resp?.status() ?? 0;
       if (status >= 400) failures.push(`${path} → ${status}`);
     }
@@ -64,13 +64,17 @@ test.describe('02 · Desktop navigation', () => {
       if (!href || tested.includes(href)) continue;
       tested.push(href);
 
-      const [response] = await Promise.all([
-        page.waitForResponse(
-          (r) => r.url().includes(href.replace('/', '')) && r.status() < 400,
-          { timeout: 8000 },
-        ).catch(() => null),
-        link.click(),
-      ]);
+      if (href.includes('#')) {
+        await link.click();
+      } else {
+        const [response] = await Promise.all([
+          page.waitForResponse(response => response.request().isNavigationRequest() &&
+            new URL(response.url()).pathname === new URL(href, BASE).pathname),
+          link.click(),
+        ]);
+        expect(response.status(), `Navigation to ${href} failed`).toBeLessThan(400);
+      }
+      await expect(page).toHaveURL(url => url.pathname === new URL(href, BASE).pathname);
 
       const currentUrl = page.url();
       expect(
@@ -96,17 +100,13 @@ test.describe('02 · Desktop navigation', () => {
 
     const trigger = dropdownTriggers.first();
     await trigger.hover();
-    await page.waitForFunction(
-      () => !!document.querySelector('header nav li ul:not([hidden]), header [class*="dropdown"]:not([hidden])'),
-      { timeout: 1500 },
-    ).catch(() => null);
 
     const dropdown = page.locator(
       'header nav li ul:visible, header [class*="dropdown"]:visible, .site-nav__dropdown:visible',
     ).first();
 
-    const isVisible = await dropdown.isVisible().catch(() => false);
-    expect(isVisible, 'Dropdown did not appear on hover').toBe(true);
+    await expect(dropdown, 'Dropdown did not appear on hover').toBeVisible();
+    const isVisible = true;
 
     // Verify dropdown links work
     if (isVisible) {
@@ -155,7 +155,7 @@ test.describe('02 · Footer navigation', () => {
     for (const path of links) {
       const resp = await request
         .get(`${BASE}${path}`, { headers: { 'User-Agent': 'Mozilla/5.0' } })
-        .catch(() => null);
+        ;
       const status = resp?.status() ?? 0;
       if (status >= 400) failures.push(`${path} → ${status}`);
     }
@@ -203,8 +203,9 @@ test.describe('02 · Mobile navigation', () => {
     await toggle.click();
     await page.waitForFunction(
       () => !!document.querySelector('#menu-drawer[open], [aria-expanded="true"]'),
+      null,
       { timeout: 2000 },
-    ).catch(() => null);
+    );
 
     // Menu should now be open — check for any of the open states
     const menuOpen = page.locator(
@@ -212,12 +213,12 @@ test.describe('02 · Mobile navigation', () => {
     ).first();
 
     // Either the menu container is visible or aria-expanded is true
-    const isOpen = await menuOpen.isVisible().catch(() => false);
+    const isOpen = await menuOpen.isVisible();
     const isExpanded = await page
       .locator('[aria-expanded="true"]')
       .count()
       .then((c) => c > 0)
-      .catch(() => false);
+      ;
 
     expect(
       isOpen || isExpanded,
@@ -233,8 +234,9 @@ test.describe('02 · Mobile navigation', () => {
     await toggle.click();
     await page.waitForFunction(
       () => !!document.querySelector('#menu-drawer[open], [aria-expanded="true"]'),
+      null,
       { timeout: 2000 },
-    ).catch(() => null);
+    );
 
     // Find links that appeared after opening
     const menuLinks = page.locator(
@@ -252,15 +254,16 @@ test.describe('02 · Mobile navigation', () => {
     await toggle.click();
     await page.waitForFunction(
       () => !!document.querySelector('#menu-drawer[open], [aria-expanded="true"]'),
+      null,
       { timeout: 2000 },
-    ).catch(() => null);
+    );
 
     // Try close button first
     const closeBtn = page.locator(
       '[aria-label*="Close"], [aria-label*="close"], [aria-label*="Затвори"], button.drawer__close, .mobile-nav__close, details > summary:first-child',
     ).first();
 
-    if (await closeBtn.isVisible().catch(() => false)) {
+    if (await closeBtn.isVisible()) {
       await closeBtn.click();
     } else {
       // Try pressing Escape
@@ -268,8 +271,9 @@ test.describe('02 · Mobile navigation', () => {
     }
     await page.waitForFunction(
       () => !document.querySelector('#menu-drawer[open]'),
+      null,
       { timeout: 2000 },
-    ).catch(() => null);
+    );
 
     // Verify menu is no longer fully visible / blocking content
     const expandedCount = await page.locator('[aria-expanded="true"]').count();
@@ -286,8 +290,9 @@ test.describe('02 · Mobile navigation', () => {
       await toggle.click();
       await page.waitForFunction(
         () => !!document.querySelector('#menu-drawer[open], [aria-expanded="true"]'),
+      null,
         { timeout: 2000 },
-      ).catch(() => null);
+      );
     }
 
     const navLinks = page.locator(
@@ -299,7 +304,7 @@ test.describe('02 · Mobile navigation', () => {
     const small: string[] = [];
     for (let i = 0; i < Math.min(count, 10); i++) {
       const link = navLinks.nth(i);
-      if (!(await link.isVisible().catch(() => false))) continue;
+      if (!(await link.isVisible())) continue;
       const box = await link.boundingBox();
       if (box && box.height < 32) {
         const text = await link.textContent();
@@ -320,13 +325,15 @@ test.describe('02 · Mobile navigation', () => {
       await toggle.click();
       await page.waitForFunction(
         () => !!document.querySelector('#menu-drawer[open], [aria-expanded="true"]'),
+      null,
         { timeout: 2000 },
-      ).catch(() => null);
+      );
       await page.keyboard.press('Escape');
       await page.waitForFunction(
         () => !document.querySelector('#menu-drawer[open]'),
+      null,
         { timeout: 2000 },
-      ).catch(() => null);
+      );
     }
 
     // Check main content is accessible

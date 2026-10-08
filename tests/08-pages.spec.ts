@@ -24,7 +24,7 @@ test.describe('08 · Static pages', () => {
             headers: { 'User-Agent': 'Mozilla/5.0' },
             maxRedirects: 5,
           })
-          .catch(() => null);
+          ;
         const status = resp?.status() ?? 0;
         if (status < 400) { foundPath = path; break; }
         lastStatus = status;
@@ -43,7 +43,7 @@ test.describe('08 · Static pages', () => {
       for (const path of paths) {
         const resp = await request
           .get(`${BASE}${path}`, { headers: { 'User-Agent': 'Mozilla/5.0' }, maxRedirects: 5 })
-          .catch(() => null);
+          ;
         if (resp && resp.status() < 400) { foundPath = path; break; }
       }
 
@@ -74,7 +74,7 @@ test.describe('08 · Static pages', () => {
       for (const path of paths) {
         const resp = await request
           .get(`${BASE}${path}`, { headers: { 'User-Agent': 'Mozilla/5.0' }, maxRedirects: 5 })
-          .catch(() => null);
+          ;
         if (resp && resp.status() < 400) { foundPath = path; break; }
       }
       if (!foundPath) {
@@ -97,7 +97,7 @@ test.describe('08 · Static pages', () => {
     for (const path of ['/pages/contact', '/pages/contacts', '/pages/kontakt']) {
       const resp = await request
         .get(`${BASE}${path}`, { headers: { 'User-Agent': 'Mozilla/5.0' }, maxRedirects: 5 })
-        .catch(() => null);
+        ;
       if (resp && resp.status() < 400) { foundPath = path; break; }
     }
     if (!foundPath) {
@@ -142,7 +142,7 @@ test.describe('08 · Static pages', () => {
       const url = path.startsWith('http') ? path : `${BASE}${path}`;
       const resp = await request
         .get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
-        .catch(() => null);
+        ;
       if (!resp || resp.status() >= 400) {
         failures.push(`${path} → ${resp?.status() ?? 'error'}`);
       }

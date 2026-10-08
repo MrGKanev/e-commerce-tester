@@ -1,3 +1,5 @@
+import { cartAction, waitForPaint, waitForContent, BASE, SEARCH_TERM, KNOWN_PRODUCTS, ADD_TO_CART_SEL, MOBILE_MENU_TOGGLE_SEL, getFixedElements, getFontSize } from './helpers';
+
 /**
  * 07-mobile.spec.ts
  *
@@ -12,15 +14,7 @@
  */
 
 import { test, expect, type Page } from './fixtures';
-import {
-  BASE,
-  SEARCH_TERM,
-  KNOWN_PRODUCTS,
-  ADD_TO_CART_SEL,
-  MOBILE_MENU_TOGGLE_SEL,
-  getFixedElements,
-  getFontSize,
-} from './helpers';
+
 
 // ─── Viewport presets ────────────────────────────────────────────────────────
 
@@ -103,7 +97,7 @@ test.describe('07 · Mobile — element overlap & z-index audit', () => {
   ): Promise<void> {
     const btn = page.locator(targetSelector).first();
     if ((await btn.count()) === 0) return;
-    if (!(await btn.isVisible().catch(() => false))) return;
+    if (!(await btn.isVisible())) return;
 
     await btn.scrollIntoViewIfNeeded();
     await page.evaluate(() => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
@@ -174,11 +168,7 @@ test.describe('07 · Mobile — element overlap & z-index audit', () => {
     await page.goto(KNOWN_PRODUCTS[0].url, { waitUntil: 'domcontentloaded' });
     const addBtn = page.locator(ADD_TO_CART_SEL).first();
     if ((await addBtn.count()) > 0 && !(await addBtn.isDisabled())) {
-      await addBtn.click();
-      await page.waitForResponse(
-        r => /\/cart(\/add)?\.js/.test(r.url()),
-        { timeout: 5000 },
-      ).catch(() => null);
+      await cartAction(page, () => addBtn.click());
     }
     await page.goto(`${BASE}/cart`, { waitUntil: 'domcontentloaded' });
     await checkNotCovered(page, '[name="checkout"], a[href*="/checkout"]', 'Checkout button');
@@ -191,7 +181,7 @@ test.describe('07 · Mobile — element overlap & z-index audit', () => {
 
   test('fixed elements audit — homepage', async ({ page }) => {
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => null);
+    await waitForContent(page);
 
     const fixed = await getFixedElements(page);
 
@@ -223,7 +213,7 @@ test.describe('07 · Mobile — element overlap & z-index audit', () => {
 
   test('fixed elements audit — product page', async ({ page }) => {
     await page.goto(KNOWN_PRODUCTS[0].url, { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => null);
+    await waitForContent(page);
 
     const fixed = await getFixedElements(page);
     if (fixed.length > 0) {
@@ -234,7 +224,7 @@ test.describe('07 · Mobile — element overlap & z-index audit', () => {
     }
 
     // Check that the add-to-cart button area is not completely blocked
-    const addBtnBox = await page.locator(ADD_TO_CART_SEL).first().boundingBox().catch(() => null);
+    const addBtnBox = await page.locator(ADD_TO_CART_SEL).first().boundingBox();
     if (!addBtnBox) return;
 
     const blockersOverButton = fixed.filter((el) => {
@@ -299,7 +289,7 @@ test.describe('07 · Mobile — font sizes', () => {
     const tooSmall: string[] = [];
     for (let i = 0; i < count; i++) {
       const input = inputs.nth(i);
-      if (!(await input.isVisible().catch(() => false))) continue;
+      if (!(await input.isVisible())) continue;
       const fontSize = await input.evaluate(
         (el) => parseFloat(window.getComputedStyle(el).fontSize),
       );
@@ -372,7 +362,7 @@ test.describe('07 · Mobile — images', () => {
     const tooWide: string[] = [];
     for (let i = 0; i < Math.min(count, 6); i++) {
       const img = imgs.nth(i);
-      if (!(await img.isVisible().catch(() => false))) continue;
+      if (!(await img.isVisible())) continue;
       const box = await img.boundingBox();
       if (box && box.width > vw + 10) {
         tooWide.push(`Image #${i}: ${Math.round(box.width)}px > viewport ${vw}px`);
@@ -382,7 +372,8 @@ test.describe('07 · Mobile — images', () => {
   });
 
   test('homepage images do not exceed viewport width', async ({ page }) => {
-    await page.goto(BASE, { waitUntil: 'networkidle' });
+    await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+    await waitForContent(page);
 
     const vw = await page.evaluate(() => window.innerWidth);
     const imgs = page.locator('img:visible');
@@ -391,7 +382,7 @@ test.describe('07 · Mobile — images', () => {
     const tooWide: string[] = [];
     for (let i = 0; i < Math.min(count, 10); i++) {
       const img = imgs.nth(i);
-      if (!(await img.isVisible().catch(() => false))) continue;
+      if (!(await img.isVisible())) continue;
       const box = await img.boundingBox();
       if (box && box.width > vw + 10) {
         const alt = await img.getAttribute('alt') ?? `img#${i}`;
@@ -412,7 +403,7 @@ test.describe('07 · Mobile — sticky header', () => {
   test('header is visible after scrolling down 500px', async ({ page }) => {
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
     await page.evaluate(() => window.scrollTo(0, 500));
-    await page.waitForTimeout(500);
+    await waitForPaint(page);
 
     const header = page.locator('header, .site-header, [role="banner"]').first();
     await expect(header).toBeVisible();
@@ -429,7 +420,7 @@ test.describe('07 · Mobile — sticky header', () => {
 
     // Scroll mid-page
     await page.evaluate(() => window.scrollTo(0, 400));
-    await page.waitForTimeout(500);
+    await waitForPaint(page);
 
     const header = page.locator('header, .site-header, [role="banner"]').first();
     const headerBox = await header.boundingBox();
