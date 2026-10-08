@@ -11,7 +11,7 @@
  * - Fixed/sticky element audit
  */
 
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 import {
   BASE,
   SEARCH_TERM,

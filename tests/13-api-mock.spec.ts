@@ -14,7 +14,7 @@
  *  - Search suggest API is slow (timeout)
  *  - Product JSON endpoint is unavailable
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { BASE, SEARCH_TERM, KNOWN_PRODUCT, KNOWN_PRODUCTS, ADD_TO_CART_SEL, goto } from './helpers';
 
 // ─── Cart API mocks ───────────────────────────────────────────────────────────

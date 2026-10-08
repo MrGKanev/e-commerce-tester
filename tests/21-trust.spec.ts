@@ -8,7 +8,7 @@
  *  - Shipping / return note on product pages
  *  - Social proof indicators (reviews, ratings)
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { BASE, KNOWN_PRODUCT, goto } from './helpers';
 
 // ─────────────────────────────────────────────────────────────────────────────

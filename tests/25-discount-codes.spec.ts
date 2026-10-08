@@ -6,7 +6,7 @@
  *
  * Set DISCOUNT_CODE=YOURCODE in .env to enable the valid-code tests.
  */
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 import { BASE, KNOWN_PRODUCT, ADD_TO_CART_SEL } from './helpers';
 
 // ── Selectors ─────────────────────────────────────────────────────────────────

@@ -9,7 +9,7 @@
  * Each test uses crawlConcurrently() with CONCURRENCY=2 worker pages to
  * keep run time reasonable while staying within Shopify's rate limits.
  */
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page } from './fixtures';
 import { BASE, KNOWN_PRODUCTS, ADD_TO_CART_SEL, fetchProductHandles } from './helpers';
 
 type Product = { handle: string; url: string };

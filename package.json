@@ -14,23 +14,27 @@
     "dashboard": "open reports/dashboard.html 2>/dev/null || xdg-open reports/dashboard.html",
     "install:browsers": "pnpm exec playwright install chromium firefox webkit",
     "type-check": "tsc --noEmit",
-    "lint": "eslint tests/ *.ts",
-    "lint:fix": "eslint tests/ *.ts --fix",
+    "lint": "eslint tests/ config/ *.ts",
+    "lint:fix": "eslint tests/ config/ *.ts --fix",
     "format": "prettier --write \"tests/**/*.ts\" \"*.ts\"",
-    "format:check": "prettier --check \"tests/**/*.ts\" \"*.ts\""
+    "format:check": "prettier --check \"tests/**/*.ts\" \"*.ts\"",
+    "test:unit": "node --test scripts/*.test.js",
+    "check": "pnpm run type-check && pnpm run lint && pnpm run test:unit",
+    "test:pacing": "STORE_URL=http://127.0.0.1:45679 SITE_SLUG=pacing-local REQUEST_DELAY_MS=60 REQUEST_JITTER_MS=0 TEST_DELAY_MS=0 TEST_JITTER_MS=0 playwright test --config=checks/pacing.config.ts",
+    "dashboard:preview": "node scripts/preview-dashboard.js"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.11.1",
-    "@faker-js/faker": "^10.4.0",
-    "@playwright/test": "^1.50.0",
-    "@types/node": "^25.5.0",
-    "eslint": "^9.0.0",
-    "eslint-config-prettier": "^9.0.0",
-    "eslint-plugin-playwright": "^2.0.0",
-    "lighthouse": "^13.0.3",
+    "@axe-core/playwright": "^4.13.0",
+    "@faker-js/faker": "^10.6.0",
+    "@playwright/test": "1.63.0",
+    "@types/node": "^24.19.1",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-playwright": "^2.12.1",
+    "lighthouse": "^13.5.0",
     "playwright-lighthouse": "^4.0.0",
-    "prettier": "^3.0.0",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.0.0"
+    "prettier": "^3.9.9",
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.71.1"
   }
 }

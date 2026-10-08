@@ -7,7 +7,7 @@
  *
  * All tests soft-skip when the feature is absent — it's an optional theme widget.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { BASE, KNOWN_PRODUCTS, fetchProductHandles, goto } from './helpers';
 
 // ── Selectors ─────────────────────────────────────────────────────────────────

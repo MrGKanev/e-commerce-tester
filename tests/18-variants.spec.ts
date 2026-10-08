@@ -7,7 +7,7 @@
  *  - Selecting a variant with a different image swaps the main product image
  *  - Variant selectors are keyboard-navigable
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { KNOWN_PRODUCTS, PRICE_SEL } from './helpers';
 
 const VARIANT_RADIO_SEL = [

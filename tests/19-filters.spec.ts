@@ -4,7 +4,7 @@
  * Verifies that sort-by URL params work, the product grid survives a re-sort,
  * and that tag/type filters (if available) update the URL correctly.
  */
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './fixtures';
 import { BASE, goto } from './helpers';
 
 const PRODUCT_GRID_SEL = [

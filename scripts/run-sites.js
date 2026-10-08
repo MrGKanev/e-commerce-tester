@@ -21,6 +21,9 @@ const reportsDir  = path.join(root, 'reports');
 const sitesFile   = path.join(root, 'sites.json');
 const extraArgs   = process.argv.slice(2);
 
+// Native Node loader preserves explicitly provided environment variables.
+if (fs.existsSync(path.join(root, '.env'))) process.loadEnvFile(path.join(root, '.env'));
+
 // ── Load sites ───────────────────────────────────────────────────────────────
 
 let sites;
@@ -48,6 +51,29 @@ if (fs.existsSync(sitesFile)) {
 
 if (!Array.isArray(sites) || sites.length === 0) die('sites.json must be a non-empty array');
 
+const seenSlugs = new Set();
+for (const site of sites) {
+  if (!site || typeof site !== 'object' || typeof site.url !== 'string') {
+    die('Each site must be an object with a URL');
+  }
+  let url;
+  try { url = new URL(site.url); } catch { die(`Invalid site URL: ${site.url}`); }
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password ||
+      url.pathname !== '/' || url.search || url.hash) {
+    die('Site URLs must be HTTP(S) origins without credentials, paths, query strings or fragments');
+  }
+  site.url = url.origin;
+  site.slug = site.slug ?? slugify(url.hostname);
+  if (typeof site.slug !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(site.slug)) {
+    die('Site slug must contain lowercase letters, digits and single hyphens');
+  }
+  if (seenSlugs.has(site.slug)) die(`Duplicate site slug: ${site.slug}`);
+  seenSlugs.add(site.slug);
+  for (const field of ['name', 'productHandle', 'productHandle2', 'searchTerm', 'discountCode']) {
+    if (site[field] !== undefined && typeof site[field] !== 'string') die(`${field} must be a string`);
+  }
+}
+
 // ── Run each site ────────────────────────────────────────────────────────────
 
 let overallExit = 0;
@@ -70,9 +96,10 @@ for (const site of sites) {
   const env = {
     ...process.env,
     STORE_URL:        site.url,
-    PRODUCT_HANDLE:   site.productHandle  || '',
-    PRODUCT_HANDLE_2: site.productHandle2 || '',
+    PRODUCT_HANDLE:   site.productHandle  || process.env.PRODUCT_HANDLE || 'zerno-z1',
+    PRODUCT_HANDLE_2: site.productHandle2 || process.env.PRODUCT_HANDLE_2 || 'zerno-z2',
     SEARCH_TERM:      site.searchTerm     || slug,
+    DISCOUNT_CODE:    site.discountCode ?? process.env.DISCOUNT_CODE ?? '',
     SITE_SLUG:        slug,
     TEST_RUN_DATE:    runDate,
   };
@@ -83,11 +110,28 @@ for (const site of sites) {
     cwd: root,
   });
 
+  if (result.error) console.error(`Could not start Playwright: ${result.error.message}`);
   if ((result.status ?? 1) !== 0) {
     overallExit = 1;
     console.log(`\n  ✗ ${name} — some tests failed`);
   } else {
     console.log(`\n  ✓ ${name} — all tests passed`);
+  }
+}
+
+// ── Prune old reports (keep last 30 per site) ─────────────────────────────────
+
+if (fs.existsSync(reportsDir)) {
+  for (const entry of fs.readdirSync(reportsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const siteDir = path.join(reportsDir, entry.name);
+    const runs = fs.readdirSync(siteDir)
+      .filter(d => /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}(?:-\d{2}-\d{3})?$/.test(d))
+      .sort()
+      .reverse();
+    for (const old of runs.slice(30)) {
+      fs.rmSync(path.join(siteDir, old), { recursive: true, force: true });
+    }
   }
 }
 
@@ -100,22 +144,6 @@ try {
   execSync('node scripts/update-history.js', { cwd: root, stdio: 'inherit' });
 } catch {
   console.log('  ⚠  Could not update dashboard (non-fatal)');
-}
-
-// ── Prune old reports (keep last 30 per site) ─────────────────────────────────
-
-if (fs.existsSync(reportsDir)) {
-  for (const entry of fs.readdirSync(reportsDir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const siteDir = path.join(reportsDir, entry.name);
-    const runs = fs.readdirSync(siteDir)
-      .filter(d => /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}$/.test(d))
-      .sort()
-      .reverse();
-    for (const old of runs.slice(30)) {
-      fs.rmSync(path.join(siteDir, old), { recursive: true, force: true });
-    }
-  }
 }
 
 // ── Summary ──────────────────────────────────────────────────────────────────
@@ -139,7 +167,7 @@ function slugify(str) {
 }
 
 function timestamp() {
-  return new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
+  return new Date().toISOString().replace('T', '_').replace(/[:.]/g, '-').replace('Z', '');
 }
 
 function banner(msg) {

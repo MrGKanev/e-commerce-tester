@@ -8,7 +8,7 @@
  *  - OWASP Secure Headers Project
  *  - Google Security Score (2026 criteria)
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { BASE } from './helpers';
 
 // ─── Shared: fetch headers once per describe block ───────────────────────────

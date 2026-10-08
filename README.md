@@ -1,6 +1,6 @@
 # e-commerce-tester — Shopify Store Health Check
 
-Automated health-check suite for Shopify stores, built with [Playwright](https://playwright.dev). Point it at any Shopify store and it validates 28 aspects of store health — from broken images and Core Web Vitals to exposed API keys and GDPR consent persistence — across Chrome, Firefox, and Safari.
+Automated health-check suite for Shopify stores, built with [Playwright](https://playwright.dev). Point it at any Shopify store and it covers 27 test suites of store health — from broken images and Core Web Vitals to exposed API keys and GDPR consent persistence — across Chrome, Firefox, and Safari.
 
 ## What gets tested
 
@@ -39,9 +39,24 @@ Before any test runs, `config/global-setup.ts` launches a Chromium browser, navi
 
 After all tests finish, `config/global-teardown.ts` clears the cart so the next run starts clean.
 
-### Human-like delays
+### Request pacing
 
-Every navigation in `helpers.ts` waits a random 150–550 ms before the `page.goto()` call. This mimics natural browsing pace. Shopify's bot-detection triggers on burst traffic patterns; the jitter keeps request timing unpredictable.
+Live checks run sequentially, with 5–8 seconds before each test and 2–4 seconds
+before store document navigations and browser/API requests. Static assets load
+normally; this is not a cap on every image, script or CSS request. Automatic test
+retries are disabled. Browser service workers are blocked so navigation requests
+pass through the pacing layer.
+
+HTTP 429 creates a local `.rate-limit.<site>.json` marker, stops further store
+requests and skips remaining tests for that store. Teardown avoids the store too.
+The response's `Retry-After` is recorded; a new run must be started manually later.
+This reduces request pressure; it cannot guarantee a store will never block traffic.
+
+Optional environment settings (milliseconds): `TEST_DELAY_MS=5000`,
+`TEST_JITTER_MS=3000`, `REQUEST_DELAY_MS=2000`, `REQUEST_JITTER_MS=2000`.
+Use zero only for local fixtures. Large suites will take substantially longer.
+The delays affect synthetic performance timings; account for pacing when reviewing
+load-time budgets and Lighthouse network measurements.
 
 ### Soft-skip pattern
 
@@ -49,7 +64,7 @@ Tests that depend on optional store features (discount codes, currency switchers
 
 ### Multi-site orchestration
 
-`scripts/run-sites.js` reads `sites.json` and runs the full test suite sequentially for each store, setting `STORE_URL`, `SITE_SLUG`, and related env vars before each run. Reports land in `reports/<slug>/YYYY-MM-DD_HH-MM/` so results from different stores never overwrite each other.
+`scripts/run-sites.js` reads `sites.json` and runs the full test suite sequentially for each store, setting `STORE_URL`, `SITE_SLUG`, and related env vars before each run. Reports land in `reports/<slug>/YYYY-MM-DD_HH-MM/` with millisecond timestamps so results from consecutive runs do not overwrite each other.
 
 ### Reports & dashboard
 
@@ -61,7 +76,7 @@ Each run writes an HTML report, a JSON results file, and failure screenshots und
 
 | Tool | Version |
 |------|---------|
-| Node.js | 22.13 + |
+| Node.js | 22.13 + (24 LTS recommended; `.nvmrc`) |
 | pnpm | 11 + |
 | Docker (optional) | any recent version |
 
@@ -120,8 +135,12 @@ DISCOUNT_CODE=YOURCODE
 
 ## Running tests
 
+`pnpm dashboard:preview` opens an offline dashboard demo with clearly marked sample
+results. It does not contact any store or mix demo results with real reports.
+
+
 ```bash
-# Headless (recommended for CI and scheduled runs)
+# Headless local run
 pnpm test
 
 # Watch the browser execute tests
@@ -132,10 +151,10 @@ pnpm run test:debug
 ```
 
 The `pnpm test` command runs `run.sh`, which:
-1. Iterates over every site in `sites.json`
+1. Loads `.env` (explicit environment variables take precedence), validates configuration, and iterates over every site in `sites.json`
 2. Runs the full Playwright suite for each site
-3. Updates `reports/dashboard.html` with the new results
-4. Prunes old reports — keeps the last 30 runs per site
+3. Prunes old reports — keeps the last 30 runs per site
+4. Updates `reports/dashboard.html` with the remaining results
 
 ### Output structure
 
@@ -144,17 +163,31 @@ reports/
 ├── dashboard.html              ← cumulative history across all runs
 └── my-store/
     └── 2024-01-15_10-30/
-        ├── index.html          ← HTML report (open with Playwright viewer)
+        ├── html/index.html          ← HTML report (open with Playwright viewer)
         ├── results.json        ← machine-readable pass/fail data
         └── screenshots/        ← one screenshot per failed test
 ```
 
 Open a report interactively:
 ```bash
-pnpm exec playwright show-report reports/my-store/2024-01-15_10-30
+pnpm exec playwright show-report reports/my-store/2024-01-15_10-30/html
 ```
 
 ---
+
+## Visual baselines
+
+Snapshots are now separated by store, browser project and operating system. Existing
+snapshots in the old layout are not reused automatically. Generate and review the
+new baselines on the same platform used for comparisons:
+
+```bash
+pnpm test --project="Desktop Chrome" tests/10-visual.spec.ts --update-snapshots
+```
+
+Review every intentional snapshot update. Playwright is pinned to
+1.63.0 to match the Docker browser image; update both together. TypeScript stays on
+6.0.3 because the current TypeScript ESLint parser does not support TypeScript 7.
 
 ## Docker
 
@@ -175,24 +208,11 @@ Reports are written to `/app/reports` inside the container, which is bind-mounte
 
 ---
 
-## CI / GitHub Actions
+## GitHub Actions
 
-`.github/workflows/health-check.yml` runs daily at **07:00 UTC** and on manual dispatch.
-
-### Secrets
-
-| Secret | Applies to | Description |
-|--------|-----------|-------------|
-| `SITES_JSON` | multi-store | Full `sites.json` contents as a repository secret |
-| `STORE_URL` | single-store | Store URL |
-| `PRODUCT_HANDLE` | single-store | First product handle |
-| `PRODUCT_HANDLE_2` | single-store | Second product handle |
-| `SEARCH_TERM` | single-store | Search keyword |
-| `DISCOUNT_CODE` | optional | Enables the valid-discount-code assertion in suite 25 |
-
-`SITES_JSON` takes precedence. If it is set, the individual `STORE_URL` variables are ignored.
-
-CI runs Chromium only (Firefox and Safari are omitted for speed). Reports are uploaded as workflow artifacts with 30-day retention.
+There are no GitHub Actions workflows that execute the project. Run tests and code
+quality checks locally. Dependabot remains enabled for weekly dependency update
+PRs. Updates can also be reviewed and installed manually with `pnpm outdated` and `pnpm update`; keep Docker and Playwright versions aligned.
 
 ---
 
@@ -214,7 +234,7 @@ pnpm lint:fix      # auto-fix what's possible
 
 ```bash
 pnpm format          # format all TypeScript files in-place
-pnpm format:check    # verify formatting without writing changes (good for CI)
+pnpm format:check    # verify formatting without writing changes
 ```
 
 `.prettierrc` enforces: single quotes, trailing commas, 100-character line width.
@@ -223,6 +243,8 @@ pnpm format:check    # verify formatting without writing changes (good for CI)
 
 ```bash
 pnpm run type-check   # tsc --noEmit — catches type errors without running tests
+pnpm run test:unit    # offline runner/dashboard regression checks
+pnpm run check        # type-check, lint and offline tests
 ```
 
 ---
@@ -269,9 +291,6 @@ e-commerce-tester/
 ├── scripts/                        Node.js orchestration scripts
 │   ├── run-sites.js                iterates sites.json, runs tests per site, sets env vars
 │   └── update-history.js           reads results.json files → regenerates dashboard.html
-│
-├── .github/workflows/
-│   └── health-check.yml            daily CI at 07:00 UTC, uploads artifact, 30-day retention
 │
 ├── docs/                           project documentation
 │   ├── TESTS.md                    full test case reference table

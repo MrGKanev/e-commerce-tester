@@ -47,7 +47,7 @@ function collectAllSites() {
   for (const entry of fs.readdirSync(reportsDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     // Skip dated dirs at the root (legacy single-site runs)
-    if (/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}$/.test(entry.name)) continue;
+    if (/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}(?:-\d{2}-\d{3})?$/.test(entry.name)) continue;
 
     const slug     = entry.name;
     const siteDir  = path.join(reportsDir, slug);
@@ -70,7 +70,7 @@ function collectRunsFromDir(dir, relPrefix) {
   if (!fs.existsSync(dir)) return [];
 
   return fs.readdirSync(dir)
-    .filter(d => /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}$/.test(d))
+    .filter(d => /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}(?:-\d{2}-\d{3})?$/.test(d))
     .map(d => {
       const resultsPath = path.join(dir, d, 'results.json');
       if (!fs.existsSync(resultsPath)) return null;
@@ -90,10 +90,11 @@ function collectRunsFromDir(dir, relPrefix) {
         dir: d,
         date: formatDate(d),
         passed, failed, skipped, flaky, total,
+        errors: (results.errors || []).length,
         durationSec: Math.round((stats.duration ?? 0) / 1000),
-        allPassed:   failed === 0,
+        allPassed:   passed > 0 && failed === 0 && flaky === 0 && (results.errors || []).length === 0,
         passRate,
-        reportLink:  `./${relPrefix}${d}/index.html`,
+        reportLink:  `./${relPrefix}${d}/${fs.existsSync(path.join(dir, d, 'html', 'index.html')) ? 'html/' : ''}index.html`,
         suites:      collectSuites(results.suites || []),
       };
     })
@@ -106,6 +107,7 @@ const sites    = collectAllSites();
 const generated = new Date().toLocaleString('bg-BG', { timeZone: 'Europe/Sofia' });
 
 const html = buildDashboard(sites, generated);
+fs.mkdirSync(reportsDir, { recursive: true });
 fs.writeFileSync(path.join(reportsDir, 'dashboard.html'), html, 'utf8');
 console.log(`✓ Dashboard updated → reports/dashboard.html (${sites.length} site${sites.length !== 1 ? 's' : ''})`);
 
@@ -440,6 +442,8 @@ function buildSitePanel(site) {
             <td><div class="counts">
               <span class="cnt p">✓ ${r.passed}</span>
               ${r.failed  > 0 ? `<span class="cnt f">✗ ${r.failed}</span>`  : ''}
+              ${r.errors > 0 ? `<span class="cnt f">Errors: ${r.errors}</span>` : ''}
+              ${r.flaky > 0 ? `<span class="cnt s">Flaky: ${r.flaky}</span>` : ''}
               ${r.skipped > 0 ? `<span class="cnt s">⊘ ${r.skipped}</span>` : ''}
               <span class="cnt t">/ ${r.total}</span>
             </div></td>
@@ -450,7 +454,7 @@ function buildSitePanel(site) {
                 <div class="suite-list">
                   ${r.suites.map(s => `
                   <div class="suite-row">
-                    <span class="s-pip ${s.failed > 0 ? 'ko' : s.skipped === s.total ? 'sk' : 'ok'}"></span>
+                    <span class="s-pip ${s.failed > 0 ? 'ko' : s.flaky > 0 || s.skipped === s.total ? 'sk' : 'ok'}"></span>
                     <span class="s-name">${escHtml(s.title)}</span>
                     <span class="s-score">${s.passed}/${s.total}</span>
                   </div>`).join('')}
@@ -470,7 +474,7 @@ function formatDate(dir) {
   if (!datePart || !timePart) return dir;
   const [y, m, d] = datePart.split('-');
   const [hh, mm]  = timePart.split('-');
-  return `${d}.${m}.${y} ${hh}:${mm}`;
+  return `${d}.${m}.${y} ${hh}:${mm} UTC`;
 }
 
 function formatDuration(sec) {
@@ -496,19 +500,20 @@ function collectSuites(suites, depth = 0) {
     const isDescribeBlock      = depth === 2 && suite.title;
     const isTopLevelNoDescribe = depth === 1 && suite.title && !hasDescribeChildren;
     if (isDescribeBlock || isTopLevelNoDescribe) {
-      let passed = 0, failed = 0, skipped = 0;
+      let passed = 0, failed = 0, skipped = 0, flaky = 0;
       const countSpecs = s => {
         for (const spec of s.specs || [])
           for (const test of spec.tests || []) {
             const st = test.status || test.results?.[0]?.status;
             if (st === 'passed' || st === 'expected')       passed++;
             else if (st === 'failed' || st === 'unexpected') failed++;
+            else if (st === 'flaky') flaky++;
             else skipped++;
           }
         for (const child of s.suites || []) countSpecs(child);
       };
       countSpecs(suite);
-      result.push({ title: suite.title, passed, failed, skipped, total: passed + failed + skipped });
+      result.push({ title: suite.title, passed, failed, skipped, flaky, total: passed + failed + skipped + flaky });
     }
     result.push(...collectSuites(suite.suites || [], depth + 1));
   }

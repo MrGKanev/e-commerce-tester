@@ -3,7 +3,7 @@
  * Image, font, and asset quality checks across key pages.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { BASE, KNOWN_PRODUCTS, findBrokenImages } from './helpers';
 
 const PAGES_TO_CHECK = [

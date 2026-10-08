@@ -2,16 +2,16 @@ import { defineConfig, devices } from '@playwright/test';
 import { STORAGE_STATE } from './config/global-setup';
 import { BASE, USER_AGENT, LOCALE, TIMEZONE_ID } from './tests/helpers';
 
-const runDate  = process.env.TEST_RUN_DATE ||
-  new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
+const runDate =
+  process.env.TEST_RUN_DATE ||
+  new Date().toISOString().replace('T', '_').replace(/[:.]/g, '-').replace('Z', '');
 
 const siteSlug = process.env.SITE_SLUG || '';
-const reportDir = siteSlug
-  ? `./reports/${siteSlug}/${runDate}`
-  : `./reports/${runDate}`;
+const reportDir = siteSlug ? `./reports/${siteSlug}/${runDate}` : `./reports/${runDate}`;
 
 export default defineConfig({
   testDir: './tests',
+  snapshotPathTemplate: `{testDir}/{testFilePath}-snapshots/${siteSlug || new URL(BASE).hostname.replace(/[^a-z0-9-]/gi, '-')}/{arg}-{projectName}-{platform}{ext}`,
   outputDir: `${reportDir}/screenshots`,
 
   // Global setup/teardown: setup accepts cookie consent + saves browser state;
@@ -22,13 +22,13 @@ export default defineConfig({
   // Sequential — avoids Shopify rate-limiting and cart state collisions
   fullyParallel: false,
   workers: 1,
-  retries: 1,
-  timeout: 60000,
+  retries: 0,
+  timeout: 120000,
   expect: { timeout: 15000 },
 
   reporter: [
     ['list'],
-    ['html', { outputFolder: reportDir, open: 'never' }],
+    ['html', { outputFolder: `${reportDir}/html`, open: 'never' }],
     ['json', { outputFile: `${reportDir}/results.json` }],
   ],
 

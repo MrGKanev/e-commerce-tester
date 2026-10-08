@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { BASE, goto, findBrokenImages, getFixedElements } from './helpers';
 
 test.describe('01 · Homepage', () => {

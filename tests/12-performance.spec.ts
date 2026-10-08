@@ -8,7 +8,7 @@
  *     Best Practices, Accessibility) via playwright-lighthouse.
  *     Requires launching a separate Chrome instance with a debug port.
  */
-import { test, expect, chromium, type BrowserContext } from '@playwright/test';
+import { test, expect, chromium, type BrowserContext } from './fixtures';
 import { playAudit } from 'playwright-lighthouse';
 import { BASE, SEARCH_TERM, KNOWN_PRODUCT } from './helpers';
 

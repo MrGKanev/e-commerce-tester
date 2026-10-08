@@ -1,4 +1,5 @@
-import { Page, expect } from '@playwright/test';
+import { Page } from '@playwright/test';
+import { paceRequest, recordRateLimit } from './pacing';
 
 export const BASE = (process.env.STORE_URL ?? 'https://zerno.co').replace(/\/$/, '');
 
@@ -273,6 +274,7 @@ export async function fetchProductHandles(
   limit = 10,
 ): Promise<Array<{ handle: string; url: string }>> {
   try {
+    await paceRequest();
     const res = await fetch(`${BASE}/products.json?limit=${limit}`, {
       headers: {
         Accept: 'application/json',
@@ -280,6 +282,7 @@ export async function fetchProductHandles(
       },
       signal: AbortSignal.timeout(10_000),
     });
+    recordRateLimit(res.status, res.url, res.headers.get('retry-after'));
     if (!res.ok) return KNOWN_PRODUCTS;
     const data = (await res.json()) as { products?: Array<{ handle: string }> };
     const products = (data.products ?? []).map((p) => ({

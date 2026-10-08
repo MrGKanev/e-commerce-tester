@@ -5,7 +5,7 @@
  * bought together, upsell carousels) render correctly and contain valid links.
  * All tests soft-skip if the widget is absent — it's an optional theme feature.
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { BASE, KNOWN_PRODUCT, KNOWN_PRODUCTS, fetchProductHandles } from './helpers';
 
 // ── Selectors ─────────────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@
  *  - Social sharing previews (og:title, og:image, og:description)
  *  - Technical SEO (canonical URLs, sitemap, robots.txt)
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { BASE, KNOWN_PRODUCT } from './helpers';
 
 // ─── Shared helpers ──────────────────────────────────────────────────────────

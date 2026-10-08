@@ -13,7 +13,7 @@
  *  5. No JS errors occur during the accept flow
  *  6. Decline button (if present) hides banner without JS errors
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { BASE, KNOWN_PRODUCT, LOCALE, TIMEZONE_ID, COOKIE_CONSENT_SEL } from './helpers';
 
 /** Selectors for the "decline / reject all" button — less standardised than accept */

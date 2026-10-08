@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { BASE, KNOWN_PRODUCT, KNOWN_PRODUCTS, ADD_TO_CART_SEL, CART_ITEMS_SEL } from './helpers';
 
 // Helper: add the known product to cart and return to the cart page

@@ -9,7 +9,7 @@
  *  - Does not expose stack traces or server paths
  *  - Custom 404 page — not the default Shopify placeholder
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { BASE } from './helpers';
 
 const NOT_FOUND_PATHS = [

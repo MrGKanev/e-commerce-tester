@@ -5,7 +5,7 @@
  * Shopify Markets or third-party currency apps are enabled.
  * Tests soft-skip if the switcher is absent (feature not enabled).
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { BASE, goto } from './helpers';
 
 // ── Selectors ─────────────────────────────────────────────────────────────────

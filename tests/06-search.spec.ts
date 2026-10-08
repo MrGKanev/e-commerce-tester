@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { faker } from '@faker-js/faker';
 import { BASE, SEARCH_TERM, goto } from './helpers';
 

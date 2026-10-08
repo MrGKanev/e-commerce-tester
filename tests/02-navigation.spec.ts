@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { BASE, goto, internalLinks, MOBILE_MENU_TOGGLE_SEL } from './helpers';
 
 // ─────────────────────────────────────────────────────────────────────────────

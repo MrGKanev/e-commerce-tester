@@ -9,9 +9,10 @@ import { request } from '@playwright/test';
 import { STORAGE_STATE } from './global-setup';
 import { BASE } from '../tests/helpers';
 import fs from 'fs';
+import { isLimited, paceAPI } from '../tests/pacing';
 
 export default async function globalTeardown(): Promise<void> {
-  if (!fs.existsSync(STORAGE_STATE)) return;
+  if (isLimited() || !fs.existsSync(STORAGE_STATE)) return;
 
   const context = await request.newContext({
     baseURL: BASE,
@@ -21,6 +22,7 @@ export default async function globalTeardown(): Promise<void> {
     },
   });
 
+  paceAPI(context);
   await context.post('/cart/clear.js').catch(() => {
     // Non-fatal — cart may already be empty or endpoint temporarily unavailable
   });

@@ -4,13 +4,12 @@ import prettierConfig from 'eslint-config-prettier';
 
 export default tseslint.config(
   {
-    files: ['tests/**/*.ts', '*.ts'],
-    extends: [
-      ...tseslint.configs.recommended,
-      playwright.configs['flat/recommended'],
-    ],
+    files: ['tests/**/*.ts', 'config/**/*.ts', '*.ts'],
+    extends: [...tseslint.configs.recommended, playwright.configs['flat/recommended']],
     rules: {
       // Playwright-specific
+      // Existing store readiness checks need a separate migration to element assertions.
+      'playwright/no-networkidle': 'warn',
       'playwright/no-wait-for-timeout': 'warn',
       'playwright/prefer-web-first-assertions': 'warn',
       'playwright/no-force-option': 'warn',

@@ -24,7 +24,7 @@
  * cause false positives.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { BASE, KNOWN_PRODUCT, goto } from './helpers';
 
 // Elements that change between runs — hide them from the snapshot

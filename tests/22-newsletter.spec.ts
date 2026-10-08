@@ -7,7 +7,7 @@
  *  - Shows validation feedback on empty / invalid submit
  *  - Does not crash with a valid email (without actually subscribing)
  */
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { BASE, goto } from './helpers';
 
 const EMAIL_INPUT_SEL = [

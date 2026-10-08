@@ -11,6 +11,8 @@
 
 import { chromium, request } from '@playwright/test';
 import path from 'path';
+import fs from 'node:fs';
+import { RATE_LIMIT_FILE, paceContext, paceAPI, assertNotLimited } from '../tests/pacing';
 import { BASE, USER_AGENT, LOCALE, TIMEZONE_ID, dismissCookieConsent } from '../tests/helpers';
 
 // storageState lives in the project root regardless of where this file is
@@ -24,6 +26,7 @@ export const STORAGE_STATE = path.join(
 );
 
 export default async function globalSetup(): Promise<void> {
+  fs.rmSync(RATE_LIMIT_FILE, { force: true });
   const browser = await chromium.launch();
   const context = await browser.newContext({
     userAgent: USER_AGENT,
@@ -32,8 +35,15 @@ export default async function globalSetup(): Promise<void> {
     viewport: { width: 1280, height: 800 },
   });
 
+  await paceContext(context);
   const page = await context.newPage();
-  await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+  try {
+    await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+    assertNotLimited();
+  } catch (error) {
+    await browser.close();
+    throw error;
+  }
 
   // Accept cookie consent once — persisted via storage state for all tests
   await dismissCookieConsent(page);
@@ -43,6 +53,7 @@ export default async function globalSetup(): Promise<void> {
 
   // Validate the saved session can reach the store before handing off to tests
   const reqCtx = await request.newContext({ baseURL: BASE, storageState: STORAGE_STATE });
+  paceAPI(reqCtx);
   try {
     const resp = await reqCtx.get('/cart.js');
     if (resp.status() !== 200) {
@@ -53,4 +64,5 @@ export default async function globalSetup(): Promise<void> {
   } finally {
     await reqCtx.dispose();
   }
+  assertNotLimited();
 }
