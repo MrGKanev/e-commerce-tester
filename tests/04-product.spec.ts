@@ -8,7 +8,7 @@ import { test, expect } from './fixtures';
 // ─────────────────────────────────────────────────────────────────────────────
 
 for (const product of KNOWN_PRODUCTS) {
-  test.describe(`04 · Product page — ${product.handle}`, () => {
+  test.describe(`04 · Product page — ${product.handle}`, { tag: ["@full"] }, () => {
 
     test.beforeEach(async ({ page }) => {
       await page.goto(product.url, { waitUntil: 'domcontentloaded' });
@@ -16,7 +16,7 @@ for (const product of KNOWN_PRODUCTS) {
 
     // ── Reachability ─────────────────────────────────────────────────────────
 
-    test('page loads (not 404)', async ({ page }) => {
+    test('page loads (not 404)', { tag: '@smoke' }, async ({ page }) => {
       const resp = await page.goto(product.url, { waitUntil: 'domcontentloaded' });
       expect(
         resp?.status(),
@@ -429,7 +429,7 @@ for (const product of KNOWN_PRODUCTS) {
 // Generic first-found product (for when the two known handles may not exist)
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('04 · Product page — first available product', () => {
+test.describe('04 · Product page — first available product', { tag: ["@full"] }, () => {
   let productUrl = '';
 
   test.beforeAll(async ({ browser }) => {

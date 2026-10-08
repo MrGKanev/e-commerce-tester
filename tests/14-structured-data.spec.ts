@@ -50,7 +50,7 @@ async function getMeta(page: AnyPage, prop: string): Promise<string | null> {
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-test.describe('14 · Structured Data & Open Graph', () => {
+test.describe('14 · Structured Data & Open Graph', { tag: ["@full"] }, () => {
 
   // ── Homepage JSON-LD ───────────────────────────────────────────────────────
 

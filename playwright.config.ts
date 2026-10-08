@@ -6,8 +6,10 @@ const runDate =
   process.env.TEST_RUN_DATE ||
   new Date().toISOString().replace('T', '_').replace(/[:.]/g, '-').replace('Z', '');
 
-const siteSlug = process.env.SITE_SLUG || '';
+const siteSlug = process.env.SITE_SLUG || new URL(BASE).hostname.replace(/[^a-z0-9-]/gi, '-');
 const reportDir = siteSlug ? `./reports/${siteSlug}/${runDate}` : `./reports/${runDate}`;
+
+process.env.PAGE_INVENTORY_FILE ||= `${reportDir}/page-inventory.json`;
 
 export default defineConfig({
   testDir: './tests',
@@ -28,6 +30,7 @@ export default defineConfig({
 
   reporter: [
     ['list'],
+    ['./config/run-metadata-reporter.ts', { outputFile: `${reportDir}/run-metadata.json` }],
     ['html', { outputFolder: `${reportDir}/html`, open: 'never' }],
     ['json', { outputFile: `${reportDir}/results.json` }],
   ],
@@ -71,6 +74,18 @@ export default defineConfig({
     {
       name: 'Desktop Safari',
       use: { ...devices['Desktop Safari'] },
+    },
+    {
+      name: 'Mobile Chrome',
+      testMatch:
+        /(?:07-mobile|10-visual|11-accessibility|24-keyboard|29-content|30-inventory-visual)\.spec\.ts/,
+      use: { ...devices['Pixel 7'] },
+    },
+    {
+      name: 'Mobile Safari',
+      testMatch:
+        /(?:07-mobile|10-visual|11-accessibility|24-keyboard|29-content|30-inventory-visual)\.spec\.ts/,
+      use: { ...devices['iPhone 13'] },
     },
   ],
 });

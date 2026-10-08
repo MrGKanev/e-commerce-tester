@@ -9,7 +9,7 @@ async function addKnownProductToCart(page: import('@playwright/test').Page) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('05 · Cart', () => {
+test.describe('05 · Cart', { tag: ["@full"] }, () => {
 
   // ── Cart page ─────────────────────────────────────────────────────────────
 
@@ -47,7 +47,7 @@ test.describe('05 · Cart', () => {
 
   // ── Add to cart ───────────────────────────────────────────────────────────
 
-  test('can add a product to cart', async ({ page }) => {
+  test('can add a product to cart', { tag: '@smoke' }, async ({ page }) => {
     const added = await addKnownProductToCart(page);
     if (!added) test.skip(true, 'Configured product is sold out');
 

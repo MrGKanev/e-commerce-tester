@@ -21,7 +21,7 @@ const NOT_FOUND_PATHS = [
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('23 · 404 page', () => {
+test.describe('23 · 404 page', { tag: ["@full"] }, () => {
 
   for (const path of NOT_FOUND_PATHS) {
     test(`${path} returns HTTP 404`, async ({ request }) => {

@@ -3,7 +3,7 @@ import { test, expect } from './fixtures';
 import { faker } from '@faker-js/faker';
 
 
-test.describe('06 · Search', () => {
+test.describe('06 · Search', { tag: ["@full"] }, () => {
 
   // ─── Search UI ─────────────────────────────────────────────────────────────
 

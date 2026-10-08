@@ -1,6 +1,6 @@
 # e-commerce-tester — Shopify Store Health Check
 
-Automated health-check suite for Shopify stores, built with [Playwright](https://playwright.dev). Point it at any Shopify store and it covers 27 test suites of store health — from broken images and Core Web Vitals to exposed API keys and GDPR consent persistence — across Chrome, Firefox, and Safari.
+Automated health-check suite for Shopify stores, built with [Playwright](https://playwright.dev). Point it at any Shopify store and it covers functional, visual, accessibility and content health of store health — from broken images and Core Web Vitals to exposed API keys and GDPR consent persistence — across Chrome, Firefox, and Safari.
 
 ## What gets tested
 
@@ -14,12 +14,12 @@ Automated health-check suite for Shopify stores, built with [Playwright](https:/
 | **Recently viewed** | localStorage tracking, widget presence across pages, history persistence |
 | **Multi-currency & i18n** | Currency/language switchers, price symbol consistency, Shopify Markets |
 | **Mobile & responsive** | Overflow at 375/390/768 px, z-index overlaps, touch targets ≥ 40 px, font sizes |
-| **Accessibility** | WCAG 2.1 AA via axe-core on all key pages |
+| **Accessibility** | WCAG 2.2 AA via axe-core on all key pages |
 | **Performance** | TTFB, Lighthouse (≥ 50/80/80/85), Core Web Vitals (LCP/CLS/INP), network throttling |
 | **Security** | HTTPS, HSTS, CSP, cookie flags, `/admin` access, **private API keys in JS bundles** |
 | **Trust & SEO** | Payment badges, policies, structured data (JSON-LD), Open Graph, sitemap, robots.txt |
 | **GDPR** | Cookie consent first-visit behaviour, persistence, localStorage validation |
-| **Dynamic coverage** | Live catalogue crawl from `/products.json` — up to 25 products automatically |
+| **Dynamic coverage** | Live catalogue crawl from `/products.json` — opt-in catalogue discovery, cached once per run |
 | **API resilience** | Shopify AJAX mocks — 422, 500, network abort, malformed JSON |
 | **Visual regression** | Pixel-level snapshots with 3 % tolerance, dynamic elements masked |
 
@@ -181,6 +181,7 @@ reports/
 └── my-store/
     └── 2024-01-15_10-30/
         ├── html/index.html          ← HTML report (open with Playwright viewer)
+        ├── run-metadata.json    ← versions, scope and execution checkpoints
         ├── results.json        ← machine-readable pass/fail data
         └── screenshots/        ← one screenshot per failed test
 ```
@@ -240,6 +241,38 @@ Reports are written to `/app/reports` inside the container, which is bind-mounte
 
 ---
 
+## Dashboard metrics and run metadata
+
+The dashboard reports two separate metrics within the selected project/tag/filter scope:
+
+- **Executed pass rate** = `(passed + flaky) / completed tests`. Flaky final successes
+  count in this rate and retain a warning status with every failed attempt.
+- **Applicable coverage** = `completed / applicable selected tests`. Only skipped
+  scenarios explicitly annotated `not-applicable` are excluded. Unknown skips and
+  `fixme` scenarios stay in the denominator; interrupted/unstarted tests are unfinished.
+- A missing denominator displays `—`, not 0% or 100%.
+
+Runs have distinct statuses: Passed, Failed, Flaky, No tests, No applicable tests,
+Interrupted, Incomplete and Global errors. Missing or corrupt final reports remain
+visible, with checkpointed results when available. The details show scenario title,
+file/line, browser project, skip reasons and retry errors.
+
+`run-metadata.json` records the project, Playwright and Node versions; observed
+browser versions; locale/timezone; selected projects, tags and grep filters; pacing;
+Git revision and working-tree state; start/end status and exit code. It is written before execution and checkpointed by
+`config/run-metadata-reporter.ts`. Legacy runs display unavailable metadata explicitly.
+
+Mark a confirmed unsupported feature before skipping it:
+
+```ts
+testInfo.annotations.push({ type: 'not-applicable', description: 'This store has no wishlist' });
+test.skip(true, 'Wishlist feature is not configured');
+```
+
+Do not apply this annotation to a failed/blocked operation or an unfinished test.
+`pnpm test:reporting` checks metadata and retry/skip behavior offline; the dashboard
+model and interruption cases are included in `pnpm test:unit`.
+
 ## GitHub Actions
 
 There are no GitHub Actions workflows that execute the project. Run tests and code
@@ -298,7 +331,7 @@ e-commerce-tester/
 │   ├── 08-pages.spec.ts            contact, about, FAQ, privacy, terms, refund, shipping
 │   ├── 09-media.spec.ts            broken images, alt text, srcset, @font-face, failed assets
 │   ├── 10-visual.spec.ts           pixel-level snapshots (3 % tolerance), masked dynamic elements
-│   ├── 11-accessibility.spec.ts    axe-core WCAG 2.1 AA on 6 key pages
+│   ├── 11-accessibility.spec.ts    axe-core WCAG 2.2 AA on 6 key pages
 │   ├── 12-performance.spec.ts      Lighthouse, CWV (LCP/CLS/INP), TTFB, network throttling
 │   ├── 13-api-mock.spec.ts         Shopify AJAX error mocks — 422, 500, abort, malformed JSON
 │   ├── 14-structured-data.spec.ts  JSON-LD (Product/WebSite/Org), Open Graph, sitemap, robots.txt

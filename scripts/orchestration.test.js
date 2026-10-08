@@ -11,8 +11,10 @@ function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'store-check-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.mkdirSync(path.join(root, 'scripts'));
+  fs.mkdirSync(path.join(root, 'config'));
+  fs.copyFileSync(path.join(__dirname, '../config/site-settings.js'), path.join(root, 'config/site-settings.js'));
   fs.mkdirSync(path.join(root, 'reports'));
-  for (const name of ['run-sites.js', 'update-history.js']) {
+  for (const name of ['run-sites.js', 'update-history.js', 'report-model.js']) {
     fs.copyFileSync(path.join(__dirname, name), path.join(root, 'scripts', name));
   }
   const bin = path.join(root, 'bin');
@@ -39,6 +41,7 @@ function report(f, slug, date, stats, errors = []) {
   const dir = path.join(f.root, 'reports', slug, date);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'results.json'), JSON.stringify({ stats, errors }));
+  fs.writeFileSync(path.join(dir, 'index.html'), '<html></html>');
 }
 
 test('loads .env, preserves environment overrides, forwards arguments and creates precise run IDs', t => {
@@ -104,7 +107,7 @@ test('empty, setup-error and flaky reports cannot appear green', t => {
   const result = run(f, 'update-history.js');
   assert.equal(result.status, 0, result.stderr);
   const html = fs.readFileSync(path.join(f.root, 'reports/dashboard.html'), 'utf8');
-  assert.ok(!html.includes('>Passing</span>'));
+  assert.ok(!html.includes('>Passed</span>'));
   assert.ok(html.includes('Errors: 1'));
   assert.ok(html.includes('Flaky: 1'));
 });
@@ -121,5 +124,63 @@ test('links to the separated HTML report while preserving legacy report links', 
   const html = fs.readFileSync(path.join(f.root, 'reports/dashboard.html'), 'utf8');
   assert.ok(html.includes('./store/2026-01-01_10-00/index.html'));
   assert.ok(html.includes('./store/2026-01-02_10-00-01-001/html/index.html'));
-  assert.ok(html.includes('>Passing</span>'));
+  assert.ok(html.includes('>Passed</span>'));
+});
+
+
+test('runner saves metadata before launch and records interruption without final results', t => {
+  const f = fixture(t);
+  sites(f, [{ url: 'https://example.test', slug: 'store' }]);
+  f.env.STUB_EXIT = '130';
+  assert.equal(run(f, 'run-sites.js', ['--grep', '@smoke', '--project=Desktop Chrome']).status, 1);
+  const call = JSON.parse(fs.readFileSync(path.join(f.root, 'invocations.jsonl'), 'utf8'));
+  const file = path.join(f.root, 'reports/store', call.run, 'run-metadata.json');
+  const metadata = JSON.parse(fs.readFileSync(file));
+  assert.equal(metadata.status, 'interrupted');
+  assert.equal(metadata.site.slug, 'store');
+  assert.ok(metadata.selection.args.includes('@smoke'));
+  const html = fs.readFileSync(path.join(f.root, 'reports/dashboard.html'), 'utf8');
+  assert.ok(html.includes('>Interrupted</span>'));
+  assert.ok(html.includes('No HTML report'));
+  assert.ok(html.includes('Metadata JSON'));
+});
+
+test('unfinished, corrupt and legacy direct runs remain visible', t => {
+  const f = fixture(t);
+  const interrupted = path.join(f.root, 'reports/store/2026-01-01_10-00');
+  fs.mkdirSync(interrupted, { recursive: true });
+  fs.writeFileSync(path.join(interrupted, 'run-metadata.json'), JSON.stringify({ phase: 'running' }));
+  const corrupt = path.join(f.root, 'reports/store/2026-01-02_10-00');
+  fs.mkdirSync(corrupt, { recursive: true });
+  fs.writeFileSync(path.join(corrupt, 'results.json'), '{');
+  const legacy = path.join(f.root, 'reports/2026-01-03_10-00');
+  fs.mkdirSync(legacy, { recursive: true });
+  fs.writeFileSync(path.join(legacy, 'results.json'), JSON.stringify({ stats: { expected: 1 } }));
+  assert.equal(run(f, 'update-history.js').status, 0);
+  const html = fs.readFileSync(path.join(f.root, 'reports/dashboard.html'), 'utf8');
+  assert.ok(html.includes('>Incomplete</span>'));
+  assert.ok(html.includes('Unreadable results.json'));
+  assert.ok(html.includes('Direct runs (legacy)'));
+  assert.ok(html.includes('Versions not recorded'));
+});
+
+
+test('dashboard escapes scenario reasons, global errors and metadata', t => {
+  const f = fixture(t);
+  const dir = path.join(f.root, 'reports/store/2026-01-01_10-00');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'results.json'), JSON.stringify({
+    errors: [{ message: '<script>global</script>' }],
+    suites: [{ title: 'Cart', specs: [{ title: 'Scenario <script>title</script>', file: 'cart.ts', tests: [{
+      projectName: 'Chrome', status: 'skipped', annotations: [{ type: 'skip', description: '<img onerror="bad">' }],
+      results: [{ status: 'skipped', workerIndex: 0 }],
+    }] }] }],
+  }));
+  fs.writeFileSync(path.join(dir, 'run-metadata.json'), JSON.stringify({ phase: 'finished', versions: { node: '<script>version</script>' } }));
+  assert.equal(run(f, 'update-history.js').status, 0);
+  const html = fs.readFileSync(path.join(f.root, 'reports/dashboard.html'), 'utf8');
+  assert.ok(html.includes('&lt;script&gt;global&lt;/script&gt;'));
+  assert.ok(html.includes('&lt;img onerror=&quot;bad&quot;&gt;'));
+  assert.ok(html.includes('&lt;script&gt;version&lt;/script&gt;'));
+  assert.ok(!html.includes('<script>global'));
 });

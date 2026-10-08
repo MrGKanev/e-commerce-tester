@@ -40,7 +40,7 @@ async function waitForBanner(page: import('@playwright/test').Page): Promise<boo
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-test.describe('15 · GDPR / Cookie Consent', () => {
+test.describe('15 · GDPR / Cookie Consent', { tag: ["@full"] }, () => {
 
   test('cookie banner appears on first visit (fresh context, no cookies)', async ({ browser }) => {
     const context = await browser.newContext({ locale: LOCALE, timezoneId: TIMEZONE_ID });

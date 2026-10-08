@@ -2,15 +2,15 @@ import { waitForContent, BASE, goto, findBrokenImages, getFixedElements } from '
 import { test, expect } from './fixtures';
 
 
-test.describe('01 · Homepage', () => {
+test.describe('01 · Homepage', { tag: ["@full"] }, () => {
   // ─── Basic load ───────────────────────────────────────────────────────────
 
-  test('returns HTTP 200', async ({ page }) => {
+  test('returns HTTP 200', { tag: '@smoke' }, async ({ page }) => {
     const resp = await page.goto(BASE, { waitUntil: 'domcontentloaded' });
     expect(resp?.status(), `Unexpected status: ${resp?.status()}`).toBeLessThan(400);
   });
 
-  test('page title is set and not a Shopify default placeholder', async ({ page }) => {
+  test('page title is set and not a Shopify default placeholder', { tag: '@smoke' }, async ({ page }) => {
     await goto(page);
     const title = await page.title();
     expect(title.trim(), 'Title is empty').not.toBe('');
@@ -38,7 +38,7 @@ test.describe('01 · Homepage', () => {
 
   // ─── Layout ───────────────────────────────────────────────────────────────
 
-  test('header is visible and non-empty', async ({ page }) => {
+  test('header is visible and non-empty', { tag: '@smoke' }, async ({ page }) => {
     await goto(page);
     const header = page.locator('header, #header, .site-header, [role="banner"]').first();
     await expect(header).toBeVisible();
@@ -46,7 +46,7 @@ test.describe('01 · Homepage', () => {
     expect(text?.trim().length, 'Header appears empty').toBeGreaterThan(0);
   });
 
-  test('main content area is visible', async ({ page }) => {
+  test('main content area is visible', { tag: '@smoke' }, async ({ page }) => {
     await goto(page);
     const main = page.locator('main, #main-content, .main-content, [role="main"]').first();
     await expect(main).toBeVisible();
@@ -79,7 +79,7 @@ test.describe('01 · Homepage', () => {
     await expect(hero).toBeVisible();
   });
 
-  test('at least one product or collection is linked from homepage', async ({ page }) => {
+  test('at least one product or collection is linked from homepage', { tag: '@smoke' }, async ({ page }) => {
     await goto(page);
     const productLink = page.locator(
       'a[href*="/products/"], a[href*="/collections/"]',

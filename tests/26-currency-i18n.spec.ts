@@ -53,7 +53,7 @@ function parseCurrencyCode(priceText: string): string {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('26 · Multi-currency & i18n', () => {
+test.describe('26 · Multi-currency & i18n', { tag: ["@full"] }, () => {
 
   // ── Switcher presence ──────────────────────────────────────────────────────
 

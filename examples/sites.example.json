@@ -5,7 +5,32 @@
     "url": "https://my-store.myshopify.com",
     "productHandle": "my-first-product",
     "productHandle2": "my-second-product",
-    "searchTerm": "product"
+    "searchTerm": "product",
+    "locale": "bg-BG",
+    "timezoneId": "Europe/Sofia",
+    "capabilities": {
+      "reviews": false
+    },
+    "inventory": {
+      "discoverProducts": false,
+      "productLimit": 5,
+      "pages": []
+    },
+    "spelling": {
+      "mode": "report",
+      "languages": [
+        "bg",
+        "en"
+      ],
+      "allowWords": [
+        "MyBrand"
+      ]
+    },
+    "thresholds": {
+      "lighthouse": {
+        "performance": 50
+      }
+    }
   },
   {
     "name": "Second Store",

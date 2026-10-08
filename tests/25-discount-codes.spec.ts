@@ -78,7 +78,7 @@ async function submitDiscount(page: Page, field: import('@playwright/test').Loca
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('25 · Discount codes & promotions', () => {
+test.describe('25 · Discount codes & promotions', { tag: ["@full"] }, () => {
 
   // ── Field presence ─────────────────────────────────────────────────────────
 

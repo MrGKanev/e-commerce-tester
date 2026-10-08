@@ -1,3 +1,8 @@
+import { configuredPages, extraInventoryPages } from './inventory';
+import { readSiteSettings } from '../config/site-settings';
+import { waitForContent } from './helpers';
+const settings = readSiteSettings();
+const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 import { test, expect } from './fixtures';
 import AxeBuilder from '@axe-core/playwright';
 import { BASE, SEARCH_TERM, goto, KNOWN_PRODUCT } from './helpers';
@@ -21,38 +26,17 @@ type Violation = {
 
 /** Format violations for readable test output */
 function formatViolations(violations: Violation[]): string {
-  return violations
-    .map(v => `[${v.impact?.toUpperCase()}] ${v.id}: ${v.description}`)
-    .join('\n  ');
+  return violations.map(v => `[${v.impact?.toUpperCase()}] ${v.id}: ${v.description}`).join('\n  ');
 }
 
-test.describe('11 · Accessibility (axe)', () => {
-
+test.describe('11 · Accessibility (axe)', { tag: ['@full'] }, () => {
   // ─── Homepage ──────────────────────────────────────────────────────────────
-
-  test('homepage — no critical or serious violations (WCAG 2.1 AA)', async ({ page }) => {
-    await goto(page);
-
-    const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-      .exclude(THIRD_PARTY_EXCLUDES)
-      .analyze();
-
-    const blockers = results.violations.filter(
-      v => v.impact === 'critical' || v.impact === 'serious',
-    );
-
-    expect(
-      blockers.length,
-      `Critical/serious violations on homepage:\n  ${formatViolations(blockers as Violation[])}`,
-    ).toBe(0);
-  });
 
   test('homepage — axe violation count stays within threshold', async ({ page }) => {
     await goto(page);
 
     const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa'])
+      .withTags(WCAG_TAGS)
       .exclude(THIRD_PARTY_EXCLUDES)
       .analyze();
 
@@ -60,75 +44,21 @@ test.describe('11 · Accessibility (axe)', () => {
     if (results.violations.length > 0) {
       console.log(
         `Axe found ${results.violations.length} violation(s) on homepage:\n  ` +
-        formatViolations(results.violations as Violation[]),
+          formatViolations(results.violations as Violation[]),
       );
     }
 
     // No more than 10 total (minor/moderate included) — acts as a ratchet
-    expect(results.violations.length).toBeLessThanOrEqual(10);
+    expect(results.violations.length).toBeLessThanOrEqual(
+      settings.thresholds.accessibility.maxViolations,
+    );
   });
 
   // ─── Product page ──────────────────────────────────────────────────────────
 
-  test('product page — no critical violations', async ({ page }) => {
-    await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
-
-    const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa'])
-      .exclude(THIRD_PARTY_EXCLUDES)
-      .analyze();
-
-    const blockers = results.violations.filter(
-      v => v.impact === 'critical' || v.impact === 'serious',
-    );
-
-    expect(
-      blockers.length,
-      `Critical/serious violations on product page:\n  ${formatViolations(blockers as Violation[])}`,
-    ).toBe(0);
-  });
-
   // ─── Search results ────────────────────────────────────────────────────────
 
-  test('search results page — no critical violations', async ({ page }) => {
-    await page.goto(`${BASE}/search?q=${SEARCH_TERM}&type=product`, {
-      waitUntil: 'domcontentloaded',
-    });
-
-    const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa'])
-      .exclude(THIRD_PARTY_EXCLUDES)
-      .analyze();
-
-    const blockers = results.violations.filter(
-      v => v.impact === 'critical' || v.impact === 'serious',
-    );
-
-    expect(
-      blockers.length,
-      `Critical/serious violations on search page:\n  ${formatViolations(blockers as Violation[])}`,
-    ).toBe(0);
-  });
-
   // ─── Collections ───────────────────────────────────────────────────────────
-
-  test('collections page — no critical violations', async ({ page }) => {
-    await page.goto(`${BASE}/collections`, { waitUntil: 'domcontentloaded' });
-
-    const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa'])
-      .exclude(THIRD_PARTY_EXCLUDES)
-      .analyze();
-
-    const blockers = results.violations.filter(
-      v => v.impact === 'critical' || v.impact === 'serious',
-    );
-
-    expect(
-      blockers.length,
-      `Critical/serious violations on collections page:\n  ${formatViolations(blockers as Violation[])}`,
-    ).toBe(0);
-  });
 
   test('collections page — product cards have accessible names', async ({ page }) => {
     await page.goto(`${BASE}/collections`, { waitUntil: 'domcontentloaded' });
@@ -146,49 +76,7 @@ test.describe('11 · Accessibility (axe)', () => {
 
   // ─── Cart ──────────────────────────────────────────────────────────────────
 
-  test('cart page — no critical violations', async ({ page }) => {
-    await page.goto(`${BASE}/cart`, { waitUntil: 'domcontentloaded' });
-
-    const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa'])
-      .exclude(THIRD_PARTY_EXCLUDES)
-      .analyze();
-
-    const blockers = results.violations.filter(
-      v => v.impact === 'critical' || v.impact === 'serious',
-    );
-
-    expect(
-      blockers.length,
-      `Critical/serious violations on cart page:\n  ${formatViolations(blockers as Violation[])}`,
-    ).toBe(0);
-  });
-
   // ─── Static page ───────────────────────────────────────────────────────────
-
-  test('contact/about page — no critical violations (if exists)', async ({ page }) => {
-    // Try /pages/contact first, fall back to /pages/about
-    for (const path of ['/pages/contact', '/pages/about', '/pages/about-us']) {
-      const resp = await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
-      if (resp?.status() === 200 && !page.url().includes('404')) {
-        const results = await new AxeBuilder({ page })
-          .withTags(['wcag2a', 'wcag2aa'])
-          .exclude(THIRD_PARTY_EXCLUDES)
-          .analyze();
-
-        const blockers = results.violations.filter(
-          v => v.impact === 'critical' || v.impact === 'serious',
-        );
-
-        expect(
-          blockers.length,
-          `Critical/serious violations on ${path}:\n  ${formatViolations(blockers as Violation[])}`,
-        ).toBe(0);
-        return; // tested one page — done
-      }
-    }
-    test.skip(true, 'No contact/about page found');
-  });
 
   // ─── Specific checks ───────────────────────────────────────────────────────
 
@@ -255,7 +143,9 @@ test.describe('11 · Accessibility (axe)', () => {
     }
 
     // Contrast is often a design decision — log but allow up to 5 instances
-    expect(results.violations.flatMap(v => v.nodes).length).toBeLessThanOrEqual(5);
+    expect(results.violations.flatMap(v => v.nodes).length).toBeLessThanOrEqual(
+      settings.thresholds.accessibility.maxContrastNodes,
+    );
   });
 
   test('product page — form controls are properly labelled', async ({ page }) => {
@@ -272,3 +162,58 @@ test.describe('11 · Accessibility (axe)', () => {
     ).toBe(0);
   });
 });
+
+for (const entry of configuredPages()) {
+  test(
+    `WCAG 2.2 AA — ${entry.type}: ${new URL(entry.url).pathname + new URL(entry.url).search}`,
+    { tag: '@full' },
+    async ({ page }, testInfo) => {
+      const response = await page.goto(entry.url, { waitUntil: 'domcontentloaded' });
+      expect(response?.status()).toBeLessThan(400);
+      await waitForContent(page);
+      let builder = new AxeBuilder({ page }).withTags(WCAG_TAGS);
+      for (const selector of THIRD_PARTY_EXCLUDES) builder = builder.exclude(selector);
+      const result = await builder.analyze();
+      await testInfo.attach('accessibility.json', {
+        body: JSON.stringify(result),
+        contentType: 'application/json',
+      });
+      if (result.violations.some(v => v.impact === 'critical' || v.impact === 'serious'))
+        testInfo.annotations.push({ type: 'failure-url', description: entry.url });
+      expect(
+        result.violations.filter(v => v.impact === 'critical' || v.impact === 'serious').length,
+      ).toBeLessThanOrEqual(settings.thresholds.accessibility.maxBlocking);
+    },
+  );
+}
+
+test(
+  'WCAG 2.2 AA — discovered inventory products',
+  { tag: '@full' },
+  async ({ page }, testInfo) => {
+    const discovered = extraInventoryPages();
+    if (!discovered.length) {
+      testInfo.annotations.push({
+        type: 'not-applicable',
+        description: 'No additional discovered products',
+      });
+      test.skip(true, 'No additional discovered products');
+    }
+    test.setTimeout(Math.max(120000, discovered.length * 60000));
+    for (const entry of discovered)
+      await test.step(entry.url, async () => {
+        await page.goto(entry.url, { waitUntil: 'domcontentloaded' });
+        await waitForContent(page);
+        const results = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
+        await testInfo.attach('accessibility.json', {
+          body: JSON.stringify(results),
+          contentType: 'application/json',
+        });
+        if (results.violations.some(v => v.impact === 'critical' || v.impact === 'serious'))
+          testInfo.annotations.push({ type: 'failure-url', description: entry.url });
+        expect(
+          results.violations.filter(v => v.impact === 'critical' || v.impact === 'serious').length,
+        ).toBeLessThanOrEqual(settings.thresholds.accessibility.maxBlocking);
+      });
+  },
+);

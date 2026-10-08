@@ -5,7 +5,7 @@ import { BASE, goto, internalLinks, MOBILE_MENU_TOGGLE_SEL } from './helpers';
 // Desktop navigation
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('02 · Desktop navigation', () => {
+test.describe('02 · Desktop navigation', { tag: ["@full"] }, () => {
   test('header contains at least 2 navigation links', async ({ page }) => {
     await goto(page);
     const links = page.locator(
@@ -139,7 +139,7 @@ test.describe('02 · Desktop navigation', () => {
 // Footer navigation
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('02 · Footer navigation', () => {
+test.describe('02 · Footer navigation', { tag: ["@full"] }, () => {
   test('footer has at least 3 links', async ({ page }) => {
     await goto(page);
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
@@ -185,7 +185,7 @@ test.describe('02 · Footer navigation', () => {
 // Mobile navigation
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('02 · Mobile navigation', () => {
+test.describe('02 · Mobile navigation', { tag: ["@full"] }, () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test('hamburger/menu toggle button is visible on mobile', async ({ page }) => {
@@ -351,7 +351,7 @@ test.describe('02 · Mobile navigation', () => {
 // Error pages
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('02 · Error pages', () => {
+test.describe('02 · Error pages', { tag: ["@full"] }, () => {
   test('404 page shows a custom message (not blank)', async ({ page }) => {
     await page.goto(`${BASE}/this-page-does-not-exist-12345`, {
       waitUntil: 'domcontentloaded',

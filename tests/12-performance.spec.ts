@@ -1,3 +1,5 @@
+import { readSiteSettings } from '../config/site-settings';
+const settings = readSiteSettings();
 import { waitForPaint, BASE, SEARCH_TERM, KNOWN_PRODUCT } from './helpers';
 import { setTimeout as observationWindow } from 'node:timers/promises';
 /**
@@ -16,19 +18,9 @@ import { runLighthouseAudit } from './lighthouse';
 
 // ─── Thresholds ──────────────────────────────────────────────────────────────
 
-const PERF = {
-  ttfb:              2_000,   // ms — Time to First Byte
-  domInteractive:    5_000,   // ms — browser parses HTML
-  domContentLoaded:  6_000,   // ms — deferred scripts done
-  loadComplete:     12_000,   // ms — images / iframes done
-};
+const PERF = settings.thresholds.performance;
 
-const LIGHTHOUSE_THRESHOLDS = {
-  performance:      50,   // 2026 target: mobile ≥ 50 (up from 30)
-  accessibility:    80,
-  'best-practices': 80,
-  seo:              85,
-};
+const LIGHTHOUSE_THRESHOLDS = settings.thresholds.lighthouse;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -114,7 +106,7 @@ async function measureINP(page: PwPage): Promise<number> {
 
 // ─── A) Performance API tests (fast, no extra setup) ─────────────────────────
 
-test.describe('12a · Performance API', () => {
+test.describe('12a · Performance API', { tag: ["@full"] }, () => {
 
   test('homepage — TTFB < 2 s', async ({ page }) => {
     await page.goto(BASE, { waitUntil: 'load' });
@@ -209,7 +201,7 @@ test.describe('12a · Performance API', () => {
 
 // ─── B) Lighthouse audit ──────────────────────────────────────────────────────
 
-test.describe('12b · Lighthouse', () => {
+test.describe('12b · Lighthouse', { tag: ["@full"] }, () => {
   test.describe.configure({ retries: 0 });
   test.skip(({ browserName }) => browserName !== 'chromium', 'Lighthouse runs only in Chromium');
 
@@ -236,7 +228,7 @@ test.describe('12b · Lighthouse', () => {
 
 // ─── C) Core Web Vitals (Google ranking signals, updated 2025+) ───────────────
 
-test.describe('12c · Core Web Vitals', () => {
+test.describe('12c · Core Web Vitals', { tag: ["@full"] }, () => {
 
   test('homepage — LCP (Largest Contentful Paint) < 2500 ms', async ({ page }) => {
     await page.goto(BASE, { waitUntil: 'load' });
@@ -295,7 +287,7 @@ test.describe('12c · Core Web Vitals', () => {
 
 // ─── D) Network Resilience ────────────────────────────────────────────────────
 
-test.describe('12d · Network Resilience', () => {
+test.describe('12d · Network Resilience', { tag: ["@full"] }, () => {
 
   test('homepage — loads within 12 s on fast-4G (10 Mbps / 20 ms RTT)', async ({ page, browserName }) => {
     test.skip(browserName !== 'chromium', 'CDP network throttling is Chromium-only');

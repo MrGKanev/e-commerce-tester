@@ -19,7 +19,14 @@ const path = require('path');
 const root        = path.join(__dirname, '..');
 const reportsDir  = path.join(root, 'reports');
 const sitesFile   = path.join(root, 'sites.json');
-const extraArgs   = process.argv.slice(2);
+const extraArgs = process.argv.slice(2);
+const { resolveSiteSettings } = require('../config/site-settings');
+const modeIndex = extraArgs.findIndex(arg => arg === '--mode' || arg.startsWith('--mode='));
+const mode = modeIndex < 0 ? 'full' : extraArgs[modeIndex].includes('=') ? extraArgs[modeIndex].split('=')[1] : extraArgs[modeIndex + 1];
+if (!['smoke', 'full', 'visual', 'content'].includes(mode)) die('Mode must be smoke, full, visual or content');
+if (modeIndex >= 0) extraArgs.splice(modeIndex, extraArgs[modeIndex].includes('=') ? 1 : 2);
+if (!extraArgs.some(arg => arg === '--grep' || arg.startsWith('--grep='))) extraArgs.push('--grep', '@' + mode);
+if (!extraArgs.some(arg => arg === '--project' || arg.startsWith('--project='))) extraArgs.push('--project=Desktop Chrome');
 
 // Native Node loader preserves explicitly provided environment variables.
 if (fs.existsSync(path.join(root, '.env'))) process.loadEnvFile(path.join(root, '.env'));
@@ -68,7 +75,11 @@ for (const site of sites) {
     die('Site slug must contain lowercase letters, digits and single hyphens');
   }
   if (seenSlugs.has(site.slug)) die(`Duplicate site slug: ${site.slug}`);
+  for (const field of ['productHandle', 'productHandle2']) {
+    if (site[field] !== undefined && (typeof site[field] !== 'string' || /[\s/?#]/.test(site[field]))) die(`${field} must be a product handle without path/query characters`);
+  }
   seenSlugs.add(site.slug);
+  try { site.settings = resolveSiteSettings(site); } catch (error) { die(`${site.slug}: ${error.message}`); }
   for (const field of ['name', 'productHandle', 'productHandle2', 'searchTerm', 'discountCode']) {
     if (site[field] !== undefined && typeof site[field] !== 'string') die(`${field} must be a string`);
   }
@@ -96,6 +107,9 @@ for (const site of sites) {
   const env = {
     ...process.env,
     STORE_URL:        site.url,
+    SITE_SETTINGS_JSON: JSON.stringify(site.settings),
+    RUN_MODE: mode,
+    PAGE_INVENTORY_FILE: path.join(reportsDir, slug, runDate, 'page-inventory.json'),
     PRODUCT_HANDLE:   site.productHandle  || process.env.PRODUCT_HANDLE || 'zerno-z1',
     PRODUCT_HANDLE_2: site.productHandle2 || process.env.PRODUCT_HANDLE_2 || 'zerno-z2',
     SEARCH_TERM:      site.searchTerm     || slug,
@@ -104,10 +118,30 @@ for (const site of sites) {
     TEST_RUN_DATE:    runDate,
   };
 
+  const runDir = path.join(reportsDir, slug, runDate);
+  fs.mkdirSync(runDir, { recursive: true });
+  const metadataFile = path.join(runDir, 'run-metadata.json');
+  // Write before spawning so setup failures and killed runs stay visible.
+  writeMetadata(metadataFile, {
+    schemaVersion: 1, phase: 'starting', startedAt: new Date().toISOString(),
+    site: { name, slug, url: site.url },
+    versions: { node: process.version },
+    selection: { args: extraArgs },
+    pacing: Object.fromEntries(Object.entries({ TEST_DELAY_MS: 5000, TEST_JITTER_MS: 3000, REQUEST_DELAY_MS: 2000, REQUEST_JITTER_MS: 2000 }).map(([key, fallback]) => [key, env[key] ?? fallback])),
+  });
+
   const result = spawnSync('pnpm', ['exec', 'playwright', 'test', ...extraArgs], {
     env,
     stdio: 'inherit',
     cwd: root,
+  });
+
+  const metadata = JSON.parse(fs.readFileSync(metadataFile, 'utf8'));
+  writeMetadata(metadataFile, {
+    ...metadata, phase: 'finished', endedAt: metadata.endedAt || new Date().toISOString(),
+    status: result.signal || [130, 143].includes(result.status) ? 'interrupted' : metadata.status || (result.status === 0 ? 'passed' : 'failed'),
+    exitCode: result.status, signal: result.signal,
+    errors: [...(metadata.errors || []), ...(result.error ? [result.error.message] : [])],
   });
 
   if (result.error) console.error(`Could not start Playwright: ${result.error.message}`);
@@ -183,4 +217,10 @@ function divider() {
 function die(msg) {
   console.error(`\nError: ${msg}\n`);
   process.exit(1);
+}
+
+
+function writeMetadata(file, metadata) {
+  fs.writeFileSync(file + '.tmp', JSON.stringify(metadata, null, 2));
+  fs.renameSync(file + '.tmp', file);
 }

@@ -64,7 +64,7 @@ async function waitForRecommendations(page: import('@playwright/test').Page): Pr
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('27 · Cross-sell & upsell', () => {
+test.describe('27 · Cross-sell & upsell', { tag: ["@full"] }, () => {
 
   // ── Related products section ───────────────────────────────────────────────
 

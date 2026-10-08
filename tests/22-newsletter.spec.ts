@@ -37,7 +37,7 @@ const NEWSLETTER_FORM_SEL = [
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('22 · Newsletter signup', () => {
+test.describe('22 · Newsletter signup', { tag: ["@full"] }, () => {
 
   test('email signup form or input exists on the homepage', async ({ page }) => {
     await goto(page);

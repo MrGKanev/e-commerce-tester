@@ -44,7 +44,7 @@ async function crawlConcurrently(
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('16 · Dynamic Product Crawling', () => {
+test.describe('16 · Dynamic Product Crawling', { tag: ["@full"] }, () => {
 
   let products: Product[] = [];
 

@@ -63,7 +63,7 @@ async function visitProduct(page: import('@playwright/test').Page, url: string):
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('28 · Recently viewed products', () => {
+test.describe('28 · Recently viewed products', { tag: ["@full"] }, () => {
 
   // ── localStorage tracking ─────────────────────────────────────────────────
 

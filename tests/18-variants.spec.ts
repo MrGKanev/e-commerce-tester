@@ -39,7 +39,7 @@ async function chooseVariant(page: import('@playwright/test').Page, action: () =
 }
 
 for (const product of KNOWN_PRODUCTS) {
-  test.describe(`18 · Variants — ${product.handle}`, () => {
+  test.describe(`18 · Variants — ${product.handle}`, { tag: ["@full"] }, () => {
 
     test.beforeEach(async ({ page }) => {
       await page.goto(product.url, { waitUntil: 'domcontentloaded' });

@@ -14,7 +14,7 @@ import { test, expect } from './fixtures';
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('21 · Trust signals', () => {
+test.describe('21 · Trust signals', { tag: ["@full"] }, () => {
 
   // ── Payment badges ────────────────────────────────────────────────────────
 

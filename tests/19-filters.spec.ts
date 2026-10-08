@@ -28,7 +28,7 @@ async function getFirstCollectionUrl(page: Page): Promise<string | null> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('19 · Filters & sorting', () => {
+test.describe('19 · Filters & sorting', { tag: ["@full"] }, () => {
 
   // ── Sort by ──────────────────────────────────────────────────────────────
 

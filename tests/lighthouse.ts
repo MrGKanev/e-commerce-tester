@@ -41,6 +41,7 @@ export async function runLighthouseAudit(
       serviceWorkers: 'block',
     });
     try {
+      testInfo.annotations.push({ type: 'browser-version', description: context.browser()!.version() });
       await paceContext(context);
       const port = await readDebugPort(profile);
       // Avoid a separate pre-audit navigation: Lighthouse loads the URL itself.

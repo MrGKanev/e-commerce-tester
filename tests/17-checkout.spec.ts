@@ -31,7 +31,7 @@ async function reachCheckout(page: Page): Promise<boolean> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('17 · Checkout flow', () => {
+test.describe('17 · Checkout flow', { tag: ["@full"] }, () => {
 
   // ── Cart → Checkout ───────────────────────────────────────────────────────
 

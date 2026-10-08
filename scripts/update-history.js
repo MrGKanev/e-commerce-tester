@@ -18,6 +18,7 @@
 
 const fs   = require('fs');
 const path = require('path');
+const { summarizeRun, percent, compareRuns } = require('./report-model');
 
 const reportsDir = path.join(__dirname, '..', 'reports');
 
@@ -54,7 +55,10 @@ function collectAllSites() {
     const runs     = collectRunsFromDir(siteDir, `${slug}/`);
     if (runs.length === 0) continue;
 
-    const m = meta[slug] || {};
+    runs.sort((a, b) => b.dir.localeCompare(a.dir));
+    runs.forEach((run, index) => { run.changes = compareRuns(run, runs[index + 1]); });
+    const latestMetadata = runs.reduce((latest, run) => !latest || run.dir > latest.dir ? run : latest, null)?.metadata.site || {};
+    const m = meta[slug] || latestMetadata;
     sites.push({
       slug,
       name: m.name || formatName(slug),
@@ -63,7 +67,20 @@ function collectAllSites() {
     });
   }
 
+  const direct = collectRunsFromDir(reportsDir, '');
+  direct.sort((a, b) => b.dir.localeCompare(a.dir));
+  direct.forEach((run, index) => { run.changes = compareRuns(run, direct[index + 1]); });
+  if (direct.length) sites.push({ slug: 'direct-runs', name: 'Direct runs (legacy)', url: '', runs: direct.sort((a, b) => b.dir.localeCompare(a.dir)) });
   return sites.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function readSpelling(file) {
+  if (!fs.existsSync(file)) return null;
+  try {
+    const report = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (!report || !Array.isArray(report.findings)) throw new Error('Invalid spelling report');
+    return report;
+  } catch (error) { return { findings: [], unsupportedLanguages: [], error: error.message }; }
 }
 
 function collectRunsFromDir(dir, relPrefix) {
@@ -72,30 +89,39 @@ function collectRunsFromDir(dir, relPrefix) {
   return fs.readdirSync(dir)
     .filter(d => /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}(?:-\d{2}-\d{3})?$/.test(d))
     .map(d => {
-      const resultsPath = path.join(dir, d, 'results.json');
-      if (!fs.existsSync(resultsPath)) return null;
-      let results;
-      try { results = JSON.parse(fs.readFileSync(resultsPath, 'utf8')); }
-      catch { return null; }
-
-      const stats    = results.stats || {};
-      const passed   = stats.expected   ?? 0;
-      const failed   = stats.unexpected ?? 0;
-      const skipped  = stats.skipped    ?? 0;
-      const flaky    = stats.flaky      ?? 0;
-      const total    = passed + failed + skipped + flaky;
-      const passRate = total > 0 ? Math.round((passed / total) * 100) : 0;
-
+      const runDir = path.join(dir, d);
+      const metadataPath = path.join(runDir, 'run-metadata.json');
+      const resultsPath = path.join(runDir, 'results.json');
+      let results = {}, metadata = {}, issue = null;
+      try {
+        if (fs.existsSync(metadataPath)) {
+          metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+          if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) throw new Error('Expected a metadata object');
+        }
+      } catch (error) { metadata = {}; issue = `Unreadable metadata: ${error.message}`; }
+      try {
+        if (fs.existsSync(resultsPath)) {
+          results = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
+          if (!results || typeof results !== 'object' || Array.isArray(results) || (results.suites && !Array.isArray(results.suites))) throw new Error('Expected a results object with a suite array');
+        }
+        else issue = 'Final results.json is missing; execution has no final report';
+      } catch (error) { results = {}; issue = `Unreadable results.json: ${error.message}`; }
+      const htmlRelative = fs.existsSync(path.join(runDir, 'html', 'index.html')) ? 'html/index.html' :
+        fs.existsSync(path.join(runDir, 'index.html')) ? 'index.html' : null;
+      const prefix = './' + [...relPrefix.split('/').filter(Boolean), d].map(encodeURIComponent).join('/') + '/';
       return {
-        dir: d,
-        date: formatDate(d),
-        passed, failed, skipped, flaky, total,
-        errors: (results.errors || []).length,
-        durationSec: Math.round((stats.duration ?? 0) / 1000),
-        allPassed:   passed > 0 && failed === 0 && flaky === 0 && (results.errors || []).length === 0,
-        passRate,
-        reportLink:  `./${relPrefix}${d}/${fs.existsSync(path.join(dir, d, 'html', 'index.html')) ? 'html/' : ''}index.html`,
-        suites:      collectSuites(results.suites || []),
+        ...summarizeRun(results, metadata, issue),
+        spelling: readSpelling(path.join(runDir, 'spelling.json')),
+        artifactLink: file => {
+          let target = path.isAbsolute(file) ? file : path.resolve(runDir, file);
+          if (!fs.existsSync(target) && results.config?.projects?.[0]?.outputDir) target = path.resolve(runDir, path.relative(path.dirname(results.config.projects[0].outputDir), file));
+          const relative = path.relative(reportsDir, target);
+          return !relative.startsWith('..') && !path.isAbsolute(relative) && fs.existsSync(target) ? './' + relative.split(path.sep).map(encodeURIComponent).join('/') : null;
+        },
+        dir: d, date: formatDate(d),
+        reportLink: htmlRelative ? prefix + htmlRelative : null,
+        metadataLink: fs.existsSync(metadataPath) ? prefix + 'run-metadata.json' : null,
+        resultsLink: fs.existsSync(resultsPath) ? prefix + 'results.json' : null,
       };
     })
     .filter(Boolean);
@@ -114,9 +140,10 @@ console.log(`✓ Dashboard updated → reports/dashboard.html (${sites.length} s
 // ── HTML builder ─────────────────────────────────────────────────────────────
 
 function buildDashboard(sites, generated) {
-  const lastStatus = sites.length > 0
-    ? sites.every(s => s.runs[0]?.allPassed) ? '#4ade80' : '#f87171'
-    : '#94a3b8';
+  const statuses = sites.map(site => site.runs[0]?.status);
+  const lastStatus = statuses.some(status => ['failed', 'global-errors'].includes(status)) ? '#f87171' :
+    statuses.length && statuses.every(status => status === 'passed') ? '#4ade80' :
+    statuses.some(status => ['flaky', 'interrupted', 'incomplete'].includes(status)) ? '#fbbf24' : '#94a3b8';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -158,6 +185,7 @@ function buildDashboard(sites, generated) {
     .tab-pip { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
     .tab-pip.ok { background: var(--green); }
     .tab-pip.ko { background: var(--red); }
+    .tab-pip.warn { background: var(--amber); }
     .tab-pip.na { background: #d1d5db; }
 
     /* ── Tab panels ── */
@@ -192,11 +220,12 @@ function buildDashboard(sites, generated) {
     .site-card-stat-lbl { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: .04em; }
 
     /* ── Trend ── */
-    .trend-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 22px; margin-bottom: 28px; }
+    .trend-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 22px; margin-bottom: 28px; }
     .trend-label { font-size: 0.78rem; color: var(--muted); margin-bottom: 10px; }
     .trend-bars { display: flex; align-items: flex-end; gap: 5px; height: 52px; }
     .trend-bar { width: 24px; flex-shrink: 0; border-radius: 4px 4px 0 0; min-height: 4px; cursor: default; transition: opacity .15s; }
     .trend-bar:hover { opacity: .75; }
+    .trend-bar.warn { background: var(--amber); } .trend-bar.na { background: #94a3b8; }
     .trend-bar.ok { background: var(--green); } .trend-bar.ko { background: var(--red); }
     .trend-dates { display: flex; gap: 5px; margin-top: 5px; border-top: 1px solid var(--border); padding-top: 5px; }
     .trend-date { width: 24px; flex-shrink: 0; font-size: 0.58rem; color: var(--muted); text-align: center; overflow: hidden; white-space: nowrap; }
@@ -211,7 +240,9 @@ function buildDashboard(sites, generated) {
     tbody tr:hover td { background: #fafbfc; }
     .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
     .badge.pass { background: var(--green-bg); color: var(--green); } .badge.fail { background: var(--red-bg); color: var(--red); }
+    .badge.warn { background: #fef3c7; color: var(--amber); } .badge.neutral { background: #e5e7eb; color: var(--muted); }
     .badge-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .badge.warn .badge-dot { background: var(--amber); } .badge.neutral .badge-dot { background: var(--muted); }
     .badge.pass .badge-dot { background: var(--green); } .badge.fail .badge-dot { background: var(--red); }
     .counts { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .cnt { font-size: 0.82rem; font-weight: 500; }
@@ -227,6 +258,11 @@ function buildDashboard(sites, generated) {
     .s-pip.ok { background: var(--green); } .s-pip.ko { background: var(--red); } .s-pip.sk { background: var(--amber); }
     .s-name { color: #374151; } .s-score { color: #9ca3af; font-size: 0.72rem; }
 
+    .metric-note { font-size: .8rem; color: var(--muted); margin: 0 0 24px; line-height: 1.6; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; background: #f8fafc; padding: 10px; margin: 8px 0; font-size: .75rem; }
+    details p { margin: 6px 0; font-size: .78rem; }
+    .scenario { margin: 8px 0; padding: 8px; border-left: 2px solid var(--border); }
+    .table-wrap { overflow-x: auto; } table { min-width: 820px; }
     a { color: var(--blue); text-decoration: none; font-weight: 500; }
     a:hover { text-decoration: underline; }
     .empty-state { text-align: center; padding: 64px 32px; color: var(--muted); }
@@ -258,8 +294,9 @@ function buildDashboard(sites, generated) {
   </button>
   ${sites.map(s => {
     const last = s.runs[0];
-    const pip  = !last ? 'na' : last.allPassed ? 'ok' : 'ko';
-    return `<button class="tab-btn" data-tab="${escHtml(s.slug)}" onclick="showTab('${escHtml(s.slug)}')">
+    const color = statusInfo(last)[1];
+    const pip = color === 'pass' ? 'ok' : color === 'fail' ? 'ko' : color === 'warn' ? 'warn' : 'na';
+    return `<button class="tab-btn" data-tab="${escHtml(s.slug)}" onclick="showTab(this.dataset.tab)">
     <span class="tab-pip ${pip}"></span>${escHtml(s.name)}
   </button>`;
   }).join('\n  ')}
@@ -304,167 +341,140 @@ ${sites.map(s => `
 
 // ── Overview panel (All Sites tab) ───────────────────────────────────────────
 
+function statusInfo(run) {
+  return {
+    passed: ['Passed', 'pass'], failed: ['Failed', 'fail'], flaky: ['Flaky', 'warn'],
+    empty: ['No tests', 'neutral'], interrupted: ['Interrupted', 'warn'],
+    'global-errors': ['Global errors', 'fail'], incomplete: ['Incomplete', 'warn'],
+    'not-applicable': ['No applicable tests', 'neutral'],
+  }[run?.status] || ['Unknown', 'neutral'];
+}
+
+function statusBadge(run) {
+  const [label, color] = statusInfo(run);
+  return `<span class="badge ${color}"><span class="badge-dot"></span>${label}</span>`;
+}
+
+function metricValue(value) { return value === null ? '—' : `${value}%`; }
+
+function metricCard(value, label, detail) {
+  return `<div class="card"><div class="card-value c-blue">${escHtml(value)}</div><div class="card-label">${label}</div><div class="card-sub">${detail}</div></div>`;
+}
+
 function buildOverviewCards(sites) {
-  const totalRuns   = sites.reduce((s, x) => s + x.runs.length, 0);
-  const allLastPass = sites.filter(s => s.runs[0]?.allPassed).length;
-  const overallRate = sites.length > 0
-    ? Math.round(sites.reduce((s, x) => {
-        const r = x.runs[0]; return s + (r ? r.passRate : 0);
-      }, 0) / sites.length)
-    : 0;
-
-  const rateColor = overallRate >= 90 ? 'c-green' : overallRate >= 70 ? 'c-amber' : 'c-red';
-  const rateBar   = overallRate >= 90 ? 'green'   : overallRate >= 70 ? 'amber'   : 'red';
-
-  return `
-    <div class="section-label">Overview</div>
-    <div class="cards">
-      <div class="card">
-        <div class="card-value c-blue">${sites.length}</div>
-        <div class="card-label">Sites</div>
-        <div class="card-sub">${totalRuns} total run${totalRuns !== 1 ? 's' : ''}</div>
-      </div>
-      <div class="card">
-        <div class="card-value ${allLastPass === sites.length ? 'c-green' : 'c-red'}">${allLastPass} / ${sites.length}</div>
-        <div class="card-label">Passing Now</div>
-        <div class="card-sub">last run status</div>
-      </div>
-      <div class="card">
-        <div class="card-value ${rateColor}">${overallRate}<span style="font-size:1.1rem;font-weight:500">%</span></div>
-        <div class="card-label">Avg Pass Rate</div>
-        <div class="rate-bar-wrap"><div class="rate-bar ${rateBar}" style="width:${overallRate}%"></div></div>
-      </div>
-    </div>`;
+  const last = sites.map(s => s.runs[0]).filter(Boolean);
+  const executed = last.reduce((sum, run) => sum + run.executed, 0);
+  const applicable = last.reduce((sum, run) => sum + run.applicable, 0);
+  const successful = last.reduce((sum, run) => sum + run.passed + run.flaky, 0);
+  return `<div class="section-label">Latest runs</div><div class="cards">
+    ${metricCard(sites.length, 'Sites', `${sites.reduce((sum, site) => sum + site.runs.length, 0)} total runs`)}
+    ${metricCard(last.filter(r => r.allPassed).length + ' / ' + sites.length, 'Clean runs', 'No failures, flaky tests, global errors or uncovered applicable tests')}
+    ${metricCard(metricValue(percent(successful, executed)), 'Executed pass rate', `${successful} successful final outcomes / ${executed} completed tests`)}
+    ${metricCard(metricValue(percent(executed, applicable)), 'Applicable coverage', `${executed} completed / ${applicable} applicable selected tests`)}
+  </div>`;
 }
 
 function buildSiteCard(site) {
-  const last    = site.runs[0];
-  const status  = !last ? null : last.allPassed;
-  const badgeCls = status === null ? '' : status ? 'pass' : 'fail';
-  const badgeTxt = status === null ? '—' : status ? 'Passing' : 'Failed';
-
-  return `<div class="site-card" onclick="showTab('${escHtml(site.slug)}')">
-      <div class="site-card-header">
-        <span class="site-card-name">${escHtml(site.name)}</span>
-        ${status !== null ? `<span class="badge ${badgeCls}"><span class="badge-dot"></span>${badgeTxt}</span>` : ''}
-      </div>
-      ${site.url ? `<div class="site-card-url">${escHtml(site.url)}</div>` : ''}
-      <div class="site-card-stats">
-        <div class="site-card-stat">
-          <span class="site-card-stat-val">${site.runs.length}</span>
-          <span class="site-card-stat-lbl">Runs</span>
-        </div>
-        ${last ? `
-        <div class="site-card-stat">
-          <span class="site-card-stat-val ${last.passRate >= 90 ? 'c-green' : last.passRate >= 70 ? 'c-amber' : 'c-red'}">${last.passRate}%</span>
-          <span class="site-card-stat-lbl">Last pass rate</span>
-        </div>
-        <div class="site-card-stat">
-          <span class="site-card-stat-val" style="color:var(--muted)">${last.date}</span>
-          <span class="site-card-stat-lbl">Last run</span>
-        </div>` : ''}
-      </div>
-    </div>`;
+  const last = site.runs[0];
+  return `<div class="site-card" data-tab="${escHtml(site.slug)}" onclick="showTab(this.dataset.tab)">
+    <div class="site-card-header"><span class="site-card-name">${escHtml(site.name)}</span>${statusBadge(last)}</div>
+    ${site.url ? `<div class="site-card-url">${escHtml(site.url)}</div>` : ''}
+    ${last.spelling ? `<p class="c-amber">${last.spelling.error ? 'Spelling report unavailable' : 'Spelling review: ' + last.spelling.findings.filter(f => !f.accepted).length + ' · unchecked languages: ' + (last.spelling.unsupportedLanguages || []).length}</p>` : ''}
+    <div class="site-card-stats">
+      <div class="site-card-stat"><span class="site-card-stat-val">${metricValue(last.passRate)}</span><span class="site-card-stat-lbl">Executed pass rate</span></div>
+      <div class="site-card-stat"><span class="site-card-stat-val">${metricValue(last.coverage)}</span><span class="site-card-stat-lbl">Applicable coverage</span></div>
+      <div class="site-card-stat"><span class="site-card-stat-val">${site.runs.length}</span><span class="site-card-stat-lbl">Runs</span></div>
+    </div>
+  </div>`;
 }
 
-// ── Per-site panel ────────────────────────────────────────────────────────────
+function renderMetadata(run) {
+  const metadata = run.metadata;
+  const projects = metadata.projects || [];
+  return `<details><summary>Run metadata</summary>
+    ${metadata.versions ? `<p>Versions: project ${escHtml(metadata.versions.project ?? 'unknown')} · Playwright ${escHtml(metadata.versions.playwright ?? 'unknown')} · Node ${escHtml(metadata.versions.node ?? 'unknown')}</p>` : '<p>Versions not recorded in this legacy run.</p>'}
+    ${projects.map(project => `<p>${escHtml(project.name)}: ${escHtml(project.browser)} ${escHtml(metadata.browserVersions?.[project.name] || '(version not observed)')} · locale ${escHtml(project.locale)} · timezone ${escHtml(project.timezone || 'default')} · retries ${escHtml(project.retries)} · repeat ${escHtml(project.repeatEach)}</p>`).join('')}
+    ${metadata.configuration ? `<p>Site configuration:</p><pre>${escHtml(JSON.stringify(metadata.configuration, null, 2))}</pre>` : ''}
+    ${metadata.source ? `<p>Source: ${escHtml(metadata.source.commit || 'unknown')} · working tree ${typeof metadata.source.dirty !== 'boolean' ? 'unknown' : metadata.source.dirty ? 'modified' : 'clean'}</p>` : ''}
+    ${metadata.selection ? `<p>Selection and tags:</p><pre>${escHtml(JSON.stringify(metadata.selection, null, 2))}</pre>` : '<p>Selection/tags were not recorded.</p>'}
+    ${metadata.site ? `<p>Site: ${escHtml(metadata.site.name)} · ${escHtml(metadata.site.url)}</p>` : ''}
+    <p>${escHtml(metadata.phase || 'Legacy final JSON')} · status ${escHtml(metadata.status || 'not recorded')} · exit ${escHtml(metadata.exitCode ?? 'not recorded')}${metadata.signal ? ` · signal ${escHtml(metadata.signal)}` : ''}</p>
+    ${metadata.pacing ? `<p>Request pacing:</p><pre>${escHtml(JSON.stringify(metadata.pacing, null, 2))}</pre>` : ''}
+    ${run.metadataLink ? `<a href="${run.metadataLink}" target="_blank">Metadata JSON →</a>` : ''}
+  </details>`;
+}
+
+function renderDiagnostics(run) {
+  const relevant = run.scenarios.filter(s => s.outcome !== 'passed');
+  return `${!run.scopeKnown ? '<p>Scenario inventory was not recorded; selected scope is unknown.</p>' : run.total === 0 ? '<p>No tests selected or discovered.</p>' : ''}
+    ${run.reportIssue ? `<p class="c-amber">${escHtml(run.reportIssue)}</p>` : ''}
+    ${run.globalErrors.length ? `<details><summary>Global errors (${run.globalErrors.length})</summary>${run.globalErrors.map(error => `<pre>${escHtml(error)}</pre>`).join('')}</details>` : ''}
+    <details><summary>Scenarios (${relevant.length} need attention / ${run.total} selected)</summary>
+      ${relevant.length ? relevant.map(scenario => `<details class="scenario">
+        <summary>${escHtml(scenario.title)} · ${escHtml(scenario.project)} · ${escHtml(scenario.outcome)}${scenario.change ? ' · ' + scenario.change : ''}${scenario.notApplicable ? ' · not applicable' : ''}</summary>
+        <p>${escHtml(scenario.file)}${scenario.line ? ':' + scenario.line : ''}${scenario.tags?.length ? ' · ' + escHtml(scenario.tags.join(' ')) : ''}</p>
+        ${(scenario.urls || []).map(url => `<p>URL: ${escHtml(url)}</p>`).join('')}
+        ${(scenario.artifacts || []).map(artifact => { const href = run.artifactLink(artifact.path); return href ? `<p><a href="${href}" target="_blank">${escHtml(artifact.name === 'trace' ? 'Trace ZIP' : 'Screenshot: ' + artifact.name)} →</a></p>` : ''; }).join('')}
+        ${(scenario.reasons || []).map(reason => `<p>${escHtml(reason)}</p>`).join('')}
+        ${['not-run', 'interrupted', 'unfinished'].includes(scenario.outcome) ? '<p>Execution did not complete; this test remains in the coverage denominator.</p>' : ''}
+        ${scenario.activeRetry !== undefined ? `<p>Was active at last checkpoint: attempt ${scenario.activeRetry + 1}</p>` : ''}
+        ${(scenario.attempts || []).map(attempt => `<p>Attempt ${attempt.retry + 1}: ${escHtml(attempt.status)}</p>${attempt.errors.map(error => `<pre>${escHtml(error)}</pre>`).join('')}`).join('')}
+      </details>`).join('') : '<p>No per-scenario diagnostics recorded.</p>'}
+    </details>${run.spelling ? `<details><summary>Spelling (${run.spelling.findings.length} unique findings)</summary>${run.spelling.error ? `<p class="c-red">Spelling report unreadable: ${escHtml(run.spelling.error)}</p>` : ''}${run.spelling.findings.map(finding => `<p><strong>${escHtml(finding.word)}</strong> · ${escHtml(finding.language)} · ${escHtml(finding.component)} · ${escHtml(finding.source)}${finding.accepted ? ' · accepted' : ''}</p><p>${escHtml(finding.text)}</p><p>${escHtml(finding.urls.join(', '))}</p>${run.scenarios.filter(s => (s.urls || []).some(url => finding.urls.includes(url))).map(s => { const image = (s.artifacts || []).find(a => a.name === 'spelling-context'); const href = image && run.artifactLink(image.path); return href ? `<p><a href="${href}" target="_blank">${escHtml(s.name || s.title)} · spelling screenshot →</a></p>` : ''; }).join('')}<p>Suggestions: ${escHtml(finding.suggestions.join(', '))}</p><pre>${escHtml(JSON.stringify(finding.locations, null, 2))}</pre>`).join('')}<p>Unchecked languages: ${escHtml((run.spelling.unsupportedLanguages || []).join(', ') || 'none')}</p></details>` : ''}${renderMetadata(run)}`;
+}
+
+function buildTrend(runs, metric, label) {
+  const recent = runs.slice(0, 20).reverse();
+  return `<div class="trend-wrap"><div class="trend-label">${label} · latest ${recent.length} runs</div><div class="trend-bars">
+    ${recent.map(run => {
+      const color = statusInfo(run)[1];
+      const css = color === 'pass' ? 'ok' : color === 'fail' ? 'ko' : color === 'warn' ? 'warn' : 'na';
+      const height = Math.max(4, Math.round((run[metric] || 0) * 0.52));
+      return `<div class="trend-bar ${css}" style="height:${height}px" title="${run.date} · ${metricValue(run[metric])} · ${statusInfo(run)[0]}"></div>`;
+    }).join('')}
+    </div><div class="trend-dates">${recent.map(run => `<div class="trend-date">${run.date.slice(0, 5)}</div>`).join('')}</div></div>`;
+}
 
 function buildSitePanel(site) {
-  const runs        = site.runs;
-  const totalRuns   = runs.length;
-  const passedRuns  = runs.filter(r => r.allPassed).length;
-  const overallRate = totalRuns > 0 ? Math.round((passedRuns / totalRuns) * 100) : 0;
-  const avgDuration = totalRuns > 0 ? Math.round(runs.reduce((s, r) => s + r.durationSec, 0) / totalRuns) : 0;
-  let streak = 0;
-  for (const r of runs) { if (r.allPassed) streak++; else break; }
-
-  const rateColor = overallRate >= 90 ? 'c-green' : overallRate >= 70 ? 'c-amber' : 'c-red';
-  const rateBar   = overallRate >= 90 ? 'green'   : overallRate >= 70 ? 'amber'   : 'red';
-  const trendRuns = [...runs].reverse().slice(-20);
-
-  return `
-    ${site.url ? `<p style="font-size:.8rem;color:var(--muted);margin-bottom:20px">${escHtml(site.url)}</p>` : ''}
-
-    <div class="section-label">Overview</div>
-    <div class="cards">
-      <div class="card">
-        <div class="card-value c-blue">${totalRuns}</div>
-        <div class="card-label">Total Runs</div>
-        <div class="card-sub">${streak > 0 ? `${streak}-run passing streak` : passedRuns < totalRuns ? `${totalRuns - passedRuns} with failures` : ''}</div>
-      </div>
-      <div class="card">
-        <div class="card-value ${rateColor}">${overallRate}<span style="font-size:1.1rem;font-weight:500">%</span></div>
-        <div class="card-label">Pass Rate</div>
-        <div class="rate-bar-wrap"><div class="rate-bar ${rateBar}" style="width:${overallRate}%"></div></div>
-      </div>
-      <div class="card">
-        <div class="card-value ${runs[0]?.allPassed ? 'c-green' : 'c-red'}">${runs[0]?.allPassed ? '✓' : runs[0] ? '✗' : '—'}</div>
-        <div class="card-label">Last Run</div>
-        <div class="card-sub">${runs[0]?.date ?? '—'}</div>
-      </div>
-      <div class="card">
-        <div class="card-value c-muted">${formatDuration(avgDuration)}</div>
-        <div class="card-label">Avg Duration</div>
-        <div class="card-sub">${totalRuns > 0 ? `across ${totalRuns} run${totalRuns !== 1 ? 's' : ''}` : ''}</div>
-      </div>
+  const runs = site.runs;
+  const last = runs[0];
+  return `${site.url ? `<p class="site-card-url">${escHtml(site.url)}</p>` : ''}
+    <div class="section-label">Latest run</div><div class="cards">
+      ${metricCard(statusInfo(last)[0], 'Status', last.date)}
+      ${metricCard(metricValue(last.passRate), 'Executed pass rate', `${last.passed + last.flaky} successful final outcomes / ${last.executed} completed`)}
+      ${metricCard(metricValue(last.coverage), 'Applicable coverage', `${last.executed} completed / ${last.applicable} applicable selected`)}
+      ${metricCard(runs.filter(r => r.allPassed).length + ' / ' + runs.length, 'Clean runs', 'Across this site’s history')}
     </div>
-
-    <div class="section-label">Last ${trendRuns.length} Run${trendRuns.length !== 1 ? 's' : ''}</div>
-    <div class="trend-wrap">
-      ${trendRuns.length === 0
-        ? `<div class="trend-empty">No runs yet.</div>`
-        : `<div class="trend-label">Pass rate per run — hover a bar for details</div>
-      <div class="trend-bars">
-        ${trendRuns.map(r => {
-          const h = Math.max(4, Math.round((r.passRate / 100) * 52));
-          return `<div class="trend-bar ${r.allPassed ? 'ok' : 'ko'}" style="height:${h}px" title="${r.date} · ${r.passRate}% (${r.passed}/${r.total})"></div>`;
-        }).join('')}
-      </div>
-      <div class="trend-dates">
-        ${trendRuns.map(r => `<div class="trend-date">${r.date.slice(0, 5)}</div>`).join('')}
-      </div>`}
-    </div>
-
-    <div class="section-label">Run History</div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr>
-          <th>Date &amp; Time</th><th>Status</th><th>Results</th>
-          <th>Duration</th><th>Suites</th><th>Report</th>
-        </tr></thead>
-        <tbody>
-          ${runs.length === 0
-            ? `<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:40px;font-size:.9rem">No runs yet.</td></tr>`
-            : runs.map(r => `
-          <tr>
-            <td style="white-space:nowrap"><strong>${r.date}</strong></td>
-            <td><span class="badge ${r.allPassed ? 'pass' : 'fail'}"><span class="badge-dot"></span>${r.allPassed ? 'Passed' : 'Failed'}</span></td>
-            <td><div class="counts">
-              <span class="cnt p">✓ ${r.passed}</span>
-              ${r.failed  > 0 ? `<span class="cnt f">✗ ${r.failed}</span>`  : ''}
-              ${r.errors > 0 ? `<span class="cnt f">Errors: ${r.errors}</span>` : ''}
-              ${r.flaky > 0 ? `<span class="cnt s">Flaky: ${r.flaky}</span>` : ''}
-              ${r.skipped > 0 ? `<span class="cnt s">⊘ ${r.skipped}</span>` : ''}
-              <span class="cnt t">/ ${r.total}</span>
-            </div></td>
-            <td style="white-space:nowrap;color:var(--muted)">${formatDuration(r.durationSec)}</td>
-            <td>${r.suites.length > 0 ? `
-              <details>
-                <summary>${r.suites.length} suite${r.suites.length !== 1 ? 's' : ''}</summary>
-                <div class="suite-list">
-                  ${r.suites.map(s => `
-                  <div class="suite-row">
-                    <span class="s-pip ${s.failed > 0 ? 'ko' : s.flaky > 0 || s.skipped === s.total ? 'sk' : 'ok'}"></span>
-                    <span class="s-name">${escHtml(s.title)}</span>
-                    <span class="s-score">${s.passed}/${s.total}</span>
-                  </div>`).join('')}
-                </div>
-              </details>` : '<span style="color:#d1d5db">—</span>'}</td>
-            <td><a href="${r.reportLink}" target="_blank">Open →</a></td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`;
+    <p class="metric-note">Pass rate = (passed + flaky) / completed. Coverage = completed / applicable selected tests.
+      Only explicit <code>not-applicable</code> annotations are excluded; unclassified skipped tests remain in coverage.
+      Interrupted and unstarted tests are not completed. Filters/tags define the selected scope. “—” means no denominator.</p>
+    ${buildTrend(runs, 'passRate', 'Executed pass rate')}
+    ${buildTrend(runs, 'coverage', 'Applicable coverage')}
+    <div class="section-label">Run history</div><div class="table-wrap"><table>
+      <thead><tr><th>Date &amp; Time</th><th>Status</th><th>Results &amp; Scope</th><th>Details</th><th>Report</th></tr></thead>
+      <tbody>${runs.map(run => `<tr>
+        <td>${run.date}<br><span class="c-muted">${formatDuration(run.durationSec)}</span></td>
+        <td>${statusBadge(run)}</td>
+        <td>
+          <p data-metric="pass-rate">Pass rate: <strong>${metricValue(run.passRate)}</strong> (${run.passed + run.flaky}/${run.executed})</p>
+          <p data-metric="coverage">Coverage: <strong>${metricValue(run.coverage)}</strong> (${run.executed}/${run.applicable})</p>
+          ${run.changes?.available ? `<p>New: ${run.changes.new} · Recurring: ${run.changes.recurring} · Resolved: ${run.changes.resolved} · Unverified: ${run.changes.unverified}</p>` : '<p class="c-muted">Change baseline unavailable</p>'}
+          ${run.spelling ? `<p class="c-amber">${run.spelling.error ? 'Spelling report unavailable' : 'Spelling review: ' + run.spelling.findings.filter(f => !f.accepted).length + ' · unchecked languages: ' + (run.spelling.unsupportedLanguages || []).length}</p>` : ''}
+          <div class="counts"><span class="cnt p">✓ ${run.passed}</span><span class="cnt f">✗ ${run.failed}</span>
+            ${run.errors ? `<span class="cnt f">Errors: ${run.errors}</span>` : ''}
+            ${run.flaky ? `<span class="cnt s">Flaky: ${run.flaky}</span>` : ''}
+            ${run.skipped ? `<span class="cnt s">Skipped: ${run.skipped}</span>` : ''}
+            ${run.notRun ? `<span class="cnt s">Not run: ${run.notRun}</span>` : ''}
+            ${run.unfinished ? `<span class="cnt s">Unfinished: ${run.unfinished}</span>` : ''}
+            ${run.interrupted ? `<span class="cnt s">Interrupted: ${run.interrupted}</span>` : ''}
+          </div>
+          <p class="c-muted">${run.scopeKnown ? run.total + ' selected' : 'Selection unknown'} · ${run.notApplicable} not applicable · ${run.unclassifiedSkipped} unclassified skips</p>
+        </td>
+        <td>${renderDiagnostics(run)}</td>
+        <td>${run.reportLink ? `<a href="${run.reportLink}" target="_blank">Open →</a>` : 'No HTML report'}
+          ${run.resultsLink ? `<br><a href="${run.resultsLink}" target="_blank">Results JSON →</a>` : ''}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -490,32 +500,4 @@ function formatName(slug) {
 function escHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function collectSuites(suites, depth = 0) {
-  const result = [];
-  for (const suite of suites) {
-    if (!suite) continue;
-    const hasDescribeChildren  = (suite.suites || []).some(s => s.title);
-    const isDescribeBlock      = depth === 2 && suite.title;
-    const isTopLevelNoDescribe = depth === 1 && suite.title && !hasDescribeChildren;
-    if (isDescribeBlock || isTopLevelNoDescribe) {
-      let passed = 0, failed = 0, skipped = 0, flaky = 0;
-      const countSpecs = s => {
-        for (const spec of s.specs || [])
-          for (const test of spec.tests || []) {
-            const st = test.status || test.results?.[0]?.status;
-            if (st === 'passed' || st === 'expected')       passed++;
-            else if (st === 'failed' || st === 'unexpected') failed++;
-            else if (st === 'flaky') flaky++;
-            else skipped++;
-          }
-        for (const child of s.suites || []) countSpecs(child);
-      };
-      countSpecs(suite);
-      result.push({ title: suite.title, passed, failed, skipped, flaky, total: passed + failed + skipped + flaky });
-    }
-    result.push(...collectSuites(suite.suites || [], depth + 1));
-  }
-  return result;
 }

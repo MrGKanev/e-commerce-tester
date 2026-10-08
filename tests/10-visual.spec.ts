@@ -1,3 +1,5 @@
+import { auditSpelling } from './spelling';
+import { readSiteSettings } from '../config/site-settings';
 import { clearCart, waitForVisualReady, BASE, KNOWN_PRODUCT, goto } from './helpers';
 
 /**
@@ -42,7 +44,7 @@ const DYNAMIC_MASKS = [
 ].join(', ');
 
 const SNAP_OPTS = {
-  maxDiffPixelRatio: 0.03,
+  maxDiffPixelRatio: readSiteSettings().thresholds.visual.maxDiffPixelRatio,
   animations: 'disabled',
 } as const;
 
@@ -52,13 +54,14 @@ async function maskDynamic(page: import('@playwright/test').Page) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('10 · Visual regression', () => {
+test.describe('10 · Visual regression', { tag: ["@full", "@visual"] }, () => {
 
   // ── Homepage ───────────────────────────────────────────────────────────────
 
-  test('homepage — above the fold', async ({ page }) => {
+  test('homepage — above the fold', async ({ page }, testInfo) => {
     await goto(page);
     await waitForVisualReady(page);
+    await auditSpelling(page, testInfo);
 
     // Clip to viewport so scroll position is irrelevant
     await expect(page).toHaveScreenshot('homepage-fold.png', {
@@ -68,11 +71,12 @@ test.describe('10 · Visual regression', () => {
     });
   });
 
-  test('homepage — header / navigation', async ({ page }) => {
+  test('homepage — header / navigation', async ({ page }, testInfo) => {
     await goto(page);
     const header = page.locator('header, #header, .site-header, [role="banner"]').first();
     await expect(header).toBeVisible();
     await waitForVisualReady(page);
+    await auditSpelling(page, testInfo);
 
     await expect(header).toHaveScreenshot('header.png', {
       ...SNAP_OPTS,
@@ -82,9 +86,10 @@ test.describe('10 · Visual regression', () => {
 
   // ── Product page ──────────────────────────────────────────────────────────
 
-  test('product page — hero (image + title + price + ATC)', async ({ page }) => {
+  test('product page — hero (image + title + price + ATC)', async ({ page }, testInfo) => {
     await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
     await waitForVisualReady(page);
+    await auditSpelling(page, testInfo);
 
     // Mask the price in case it changes (sale, currency rounding)
     const priceMask = page.locator(
@@ -104,11 +109,12 @@ test.describe('10 · Visual regression', () => {
 
   // ── Cart page ─────────────────────────────────────────────────────────────
 
-  test('cart page — empty state', async ({ page }) => {
+  test('cart page — empty state', async ({ page }, testInfo) => {
     // Ensure cart is empty before snapping
     await clearCart(page);
     await page.goto(`${BASE}/cart`, { waitUntil: 'domcontentloaded' });
     await waitForVisualReady(page);
+    await auditSpelling(page, testInfo);
 
     await expect(page).toHaveScreenshot('cart-empty.png', {
       ...SNAP_OPTS,
@@ -119,10 +125,11 @@ test.describe('10 · Visual regression', () => {
 
   // ── Mobile ────────────────────────────────────────────────────────────────
 
-  test('homepage — mobile viewport (390 px)', async ({ page }) => {
+  test('homepage — mobile viewport (390 px)', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await goto(page);
     await waitForVisualReady(page);
+    await auditSpelling(page, testInfo);
 
     await expect(page).toHaveScreenshot('homepage-mobile.png', {
       ...SNAP_OPTS,
@@ -131,10 +138,11 @@ test.describe('10 · Visual regression', () => {
     });
   });
 
-  test('product page — mobile viewport (390 px)', async ({ page }) => {
+  test('product page — mobile viewport (390 px)', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
     await waitForVisualReady(page);
+    await auditSpelling(page, testInfo);
 
     const priceMask = page.locator('span.money, [data-product-price], .price-item--regular');
 

@@ -1,5 +1,7 @@
+import { readSiteSettings } from '../config/site-settings';
+import { pageInventory } from './inventory';
+const settings = readSiteSettings();
 import { Page, Locator, expect, errors } from '@playwright/test';
-import { paceRequest, recordRateLimit } from './pacing';
 
 export const BASE = (process.env.STORE_URL ?? 'https://zerno.co').replace(/\/$/, '');
 
@@ -7,8 +9,8 @@ export const USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36';
 
-export const LOCALE = 'bg-BG';
-export const TIMEZONE_ID = 'Europe/Sofia';
+export const LOCALE = settings.locale;
+export const TIMEZONE_ID = settings.timezoneId;
 
 /** Search term used by search-related tests — configurable via .env */
 export const SEARCH_TERM = process.env.SEARCH_TERM ?? 'zerno';
@@ -18,14 +20,14 @@ const _handle1 = process.env.PRODUCT_HANDLE ?? 'zerno-z1';
 const _handle2 = process.env.PRODUCT_HANDLE_2 ?? 'zerno-z2';
 
 export const KNOWN_PRODUCTS = [
-  { handle: _handle1, url: `${BASE}/products/${_handle1}` },
-  { handle: _handle2, url: `${BASE}/products/${_handle2}` },
+  { handle: _handle1, url: `${BASE}/products/${encodeURIComponent(_handle1)}` },
+  { handle: _handle2, url: `${BASE}/products/${encodeURIComponent(_handle2)}` },
 ];
 /** Backwards-compat shorthand */
 export const KNOWN_PRODUCT = KNOWN_PRODUCTS[0].url;
 
 /** Shopify add-to-cart button selectors — covers Dawn, Debut, Empire, and custom themes */
-export const ADD_TO_CART_SEL = [
+export const ADD_TO_CART_SEL = settings.selectors.addToCart || [
   'form[action*="/cart/add"] button[type="submit"]',
   'button[name="add"]',
   '#AddToCart',
@@ -39,7 +41,7 @@ export const ADD_TO_CART_SEL = [
   'button:has-text("Купи")',
 ].join(', ');
 
-export const PRODUCT_TITLE_SEL = [
+export const PRODUCT_TITLE_SEL = settings.selectors.productTitle || [
   '.product__title h1',
   '.product__title',
   'h1.product-single__title',
@@ -48,7 +50,7 @@ export const PRODUCT_TITLE_SEL = [
   'h1',
 ].join(', ');
 
-export const PRICE_SEL = [
+export const PRICE_SEL = settings.selectors.price || [
   '.price__regular .price-item',
   '.price__regular',
   '.product__price',
@@ -58,7 +60,7 @@ export const PRICE_SEL = [
   'span.money',
 ].join(', ');
 
-export const CART_COUNT_SEL = [
+export const CART_COUNT_SEL = settings.selectors.cartCount || [
   '#cart-icon-bubble',
   '[data-cart-count]',
   '.cart-count',
@@ -67,7 +69,7 @@ export const CART_COUNT_SEL = [
   '.cart__count',
 ].join(', ');
 
-export const CART_ITEMS_SEL = [
+export const CART_ITEMS_SEL = settings.selectors.cartItems || [
   '.cart__item',
   '.cart-item',
   'tr.cart__row',
@@ -76,7 +78,7 @@ export const CART_ITEMS_SEL = [
   '.cart-items > *',
 ].join(', ');
 
-export const MOBILE_MENU_TOGGLE_SEL = [
+export const MOBILE_MENU_TOGGLE_SEL = settings.selectors.mobileMenuToggle || [
   'summary[aria-controls="menu-drawer"]',
   'button[aria-controls="mobile-menu"]',
   '.header__icon--menu',
@@ -101,7 +103,7 @@ export const MOBILE_MENU_OPEN_SEL = [
 ].join(', ');
 
 /** Cookie consent accept button selectors — covers common Shopify/EU consent tools */
-export const COOKIE_CONSENT_SEL = [
+export const COOKIE_CONSENT_SEL = settings.selectors.consentAccept || [
   '#onetrust-accept-btn-handler',
   '#accept-cookies',
   '#cookie-accept',
@@ -145,7 +147,7 @@ export async function dismissCookieConsent(page: Page, appearanceTimeout = 0): P
 }
 
 export async function waitForContent(page: Page): Promise<void> {
-  const main = page.locator('main, #main-content, [role="main"]').first();
+  const main = page.locator(settings.selectors.main || 'main, #main-content, [role="main"]').first();
   const content = (await main.count()) > 0 ? main : page.locator('body');
   await expect(content).toBeVisible();
   await expect(content).toContainText(/\S/);
@@ -360,26 +362,8 @@ export async function findBrokenImages(page: Page): Promise<string[]> {
 export async function fetchProductHandles(
   limit = 10,
 ): Promise<Array<{ handle: string; url: string }>> {
-  try {
-    await paceRequest();
-    const res = await fetch(`${BASE}/products.json?limit=${limit}`, {
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': 'Mozilla/5.0 (compatible; health-check/1.0)',
-      },
-      signal: AbortSignal.timeout(10_000),
-    });
-    recordRateLimit(res.status, res.url, res.headers.get('retry-after'));
-    if (!res.ok) return KNOWN_PRODUCTS;
-    const data = (await res.json()) as { products?: Array<{ handle: string }> };
-    const products = (data.products ?? []).map(p => ({
-      handle: p.handle,
-      url: `${BASE}/products/${p.handle}`,
-    }));
-    return products.length > 0 ? products : KNOWN_PRODUCTS;
-  } catch {
-    return KNOWN_PRODUCTS;
-  }
+  return pageInventory().filter(page => page.type === 'product' && page.handle)
+    .slice(0, limit).map(page => ({ handle: page.handle!, url: page.url }));
 }
 
 /** Flush a paint after DOM/scroll changes before synchronous geometry inspection. */

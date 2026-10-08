@@ -1,3 +1,5 @@
+import { readSiteSettings } from './site-settings';
+import { prepareInventory } from '../tests/inventory';
 /**
  * Global setup — runs once before all tests.
  *
@@ -35,6 +37,7 @@ export default async function globalSetup(): Promise<void> {
     });
     await paceContext(context);
     const page = await context.newPage();
+    await page.evaluate(selectors => { for (const selector of selectors) document.querySelector(selector); }, [...Object.values(readSiteSettings().selectors), ...readSiteSettings().spelling.excludeSelectors]);
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
     assertNotLimited();
     // Only fresh setup waits for a banner; returning sessions probe immediately.
@@ -48,14 +51,15 @@ export default async function globalSetup(): Promise<void> {
   const reqCtx = await request.newContext({ baseURL: BASE, storageState: STORAGE_STATE });
   paceAPI(reqCtx);
   try {
+    await prepareInventory(reqCtx);
     const resp = await reqCtx.get('/cart.js');
     if (resp.status() !== 200) {
       console.warn(
         `[setup] Session health-check: /cart.js returned HTTP ${resp.status()} — tests may behave unexpectedly`,
       );
     }
-  } catch {
-    console.warn('[setup] Session health-check failed — store may be unreachable');
+  } catch (error) {
+    throw error;
   } finally {
     await reqCtx.dispose();
   }

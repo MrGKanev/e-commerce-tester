@@ -20,7 +20,7 @@ import { test, expect } from './fixtures';
 
 // ─── Cart API mocks ───────────────────────────────────────────────────────────
 
-test.describe('13 · API Mocks — Cart', () => {
+test.describe('13 · API Mocks — Cart', { tag: ["@full"] }, () => {
 
   test('store does not crash when cart/add.js returns 422 (out of stock)', async ({ page }) => {
     const jsErrors: string[] = [];
@@ -137,7 +137,7 @@ test.describe('13 · API Mocks — Cart', () => {
 
 // ─── Search API mocks ─────────────────────────────────────────────────────────
 
-test.describe('13 · API Mocks — Search', () => {
+test.describe('13 · API Mocks — Search', { tag: ["@full"] }, () => {
 
   test('predictive search renders correctly when suggest API returns empty', async ({ page }) => {
     const jsErrors: string[] = [];
@@ -232,7 +232,7 @@ test.describe('13 · API Mocks — Search', () => {
 
 // ─── Product API mocks ────────────────────────────────────────────────────────
 
-test.describe('13 · API Mocks — Product', () => {
+test.describe('13 · API Mocks — Product', { tag: ["@full"] }, () => {
 
   test('product page handles malformed product JSON gracefully', async ({ page }) => {
     const jsErrors: string[] = [];

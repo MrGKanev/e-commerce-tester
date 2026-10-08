@@ -24,7 +24,7 @@ async function fetchHeaders(request: import('@playwright/test').APIRequestContex
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('20 · Security headers', () => {
+test.describe('20 · Security headers', { tag: ["@full"] }, () => {
 
   // ── HTTPS enforcement ─────────────────────────────────────────────────────
 
@@ -211,7 +211,7 @@ test.describe('20 · Security headers', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('20b · Exposed API keys in JavaScript bundles', () => {
+test.describe('20b · Exposed API keys in JavaScript bundles', { tag: ["@full"] }, () => {
 
   /**
    * Patterns that should NEVER appear in client-side JavaScript:

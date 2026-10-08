@@ -14,7 +14,7 @@ const PAGES_TO_CHECK = [
   ...KNOWN_PRODUCTS.map((p) => ({ label: `Product ${p.handle}`, url: p.url })),
 ];
 
-test.describe('09 · Media & assets', () => {
+test.describe('09 · Media & assets', { tag: ["@full"] }, () => {
 
   // ── Broken images ──────────────────────────────────────────────────────────
 

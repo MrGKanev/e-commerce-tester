@@ -40,7 +40,7 @@ const KEY_PAGES = [
 // Horizontal overflow — every key page, every viewport
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('07 · Mobile — horizontal overflow', () => {
+test.describe('07 · Mobile — horizontal overflow', { tag: ["@full"] }, () => {
   for (const vp of VIEWPORTS) {
     for (const pg of KEY_PAGES) {
       test(`${pg.label} has no horizontal scroll at ${vp.name} (${vp.width}px)`, async ({ page }) => {
@@ -83,7 +83,7 @@ test.describe('07 · Mobile — horizontal overflow', () => {
 // Element overlap / z-index audit
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('07 · Mobile — element overlap & z-index audit', () => {
+test.describe('07 · Mobile — element overlap & z-index audit', { tag: ["@full"] }, () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   /**
@@ -258,7 +258,7 @@ test.describe('07 · Mobile — element overlap & z-index audit', () => {
 // Font sizes — prevent iOS auto-zoom on inputs
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('07 · Mobile — font sizes', () => {
+test.describe('07 · Mobile — font sizes', { tag: ["@full"] }, () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test('body text font-size is at least 14px', async ({ page }) => {
@@ -310,7 +310,7 @@ test.describe('07 · Mobile — font sizes', () => {
 // Touch target sizes
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('07 · Mobile — touch targets', () => {
+test.describe('07 · Mobile — touch targets', { tag: ["@full"] }, () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test('cart icon touch target is ≥44x44px', async ({ page }) => {
@@ -348,7 +348,7 @@ test.describe('07 · Mobile — touch targets', () => {
 // Images on mobile
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('07 · Mobile — images', () => {
+test.describe('07 · Mobile — images', { tag: ["@full"] }, () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test('product images do not exceed viewport width', async ({ page }) => {
@@ -397,7 +397,7 @@ test.describe('07 · Mobile — images', () => {
 // Sticky header behaviour on scroll
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('07 · Mobile — sticky header', () => {
+test.describe('07 · Mobile — sticky header', { tag: ["@full"] }, () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test('header is visible after scrolling down 500px', async ({ page }) => {
@@ -444,7 +444,7 @@ test.describe('07 · Mobile — sticky header', () => {
 // iPad / tablet
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('07 · Tablet (768px)', () => {
+test.describe('07 · Tablet (768px)', { tag: ["@full"] }, () => {
   test.use({ viewport: { width: 768, height: 1024 } });
 
   test('homepage has no horizontal overflow at 768px', async ({ page }) => {

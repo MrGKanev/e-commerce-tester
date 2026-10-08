@@ -11,7 +11,7 @@ const STATIC_PAGES = [
   { label: 'Shipping Policy', paths: ['/policies/shipping-policy'] },
 ];
 
-test.describe('08 · Static pages', () => {
+test.describe('08 · Static pages', { tag: ["@full"] }, () => {
 
   for (const { label, paths } of STATIC_PAGES) {
     test(`${label} page is reachable`, async ({ request, page }) => {
