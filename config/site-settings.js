@@ -1,8 +1,9 @@
 'use strict';
 
 const DEFAULTS = {
-  locale: 'bg-BG', timezoneId: 'Europe/Sofia', capabilities: {}, selectors: {},
+  locale: 'bg-BG', timezoneId: 'Europe/Sofia', performanceMetrics: { enabled: true, mode: 'report', afterDomMs: 5000, maxPaintMs: 15000, minPaintMs: 500, maxEventMs: 120000 }, capabilities: {}, selectors: {},
   thresholds: {
+    webVitals: { lcp: 2500, cls: 0.1, interactionLatency: 200 },
     performance: { ttfb: 2000, domInteractive: 5000, domContentLoaded: 6000, loadComplete: 12000 },
     lighthouse: { performance: 50, accessibility: 80, 'best-practices': 80, seo: 85 },
     accessibility: { maxBlocking: 0, maxViolations: 10, maxContrastNodes: 5 },
@@ -31,6 +32,12 @@ function resolveSiteSettings(input = {}) {
   result.timezoneId = input.timezoneId ?? result.timezoneId;
   if (typeof result.locale !== 'string' || Intl.getCanonicalLocales(result.locale).length !== 1) throw new Error('Invalid locale');
   new Intl.DateTimeFormat(result.locale, { timeZone: result.timezoneId });
+  if (input.performanceMetrics !== undefined) {
+    keys(input.performanceMetrics, Object.keys(DEFAULTS.performanceMetrics), 'performanceMetrics');
+    Object.assign(result.performanceMetrics, input.performanceMetrics);
+  }
+  const metrics = result.performanceMetrics;
+  if (typeof metrics.enabled !== 'boolean' || !['report', 'strict'].includes(metrics.mode) || ['afterDomMs', 'maxPaintMs', 'minPaintMs', 'maxEventMs'].some(key => !Number.isFinite(metrics[key]) || metrics[key] < 0) || metrics.minPaintMs > metrics.afterDomMs || metrics.afterDomMs > metrics.maxPaintMs || metrics.maxEventMs < metrics.maxPaintMs) throw new Error('Invalid performanceMetrics observation settings');
   if (input.capabilities !== undefined) {
     keys(input.capabilities, CAPABILITIES, 'capabilities');
     for (const [key, value] of Object.entries(input.capabilities)) {

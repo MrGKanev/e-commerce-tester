@@ -1,3 +1,4 @@
+import { measureInteraction } from './web-vitals';
 import { waitForImages, KNOWN_PRODUCTS, PRICE_SEL } from './helpers';
 /**
  * 18 · Product variants — deep tests
@@ -34,8 +35,10 @@ async function chooseVariant(page: import('@playwright/test').Page, action: () =
   const variant = page.locator('form[action*="/cart/add"] input[name="id"], form[action*="/cart/add"] select[name="id"]').first();
   const readVariant = async () => (await variant.count()) > 0 ? variant.inputValue() : new URL(page.url()).searchParams.get('variant');
   const before = await readVariant();
+  await measureInteraction(page, 'variant selection', async () => {
   await action();
   await expect.poll(readVariant, { message: 'Selected variant did not update' }).not.toBe(before);
+  });
 }
 
 for (const product of KNOWN_PRODUCTS) {
@@ -239,7 +242,12 @@ for (const product of KNOWN_PRODUCTS) {
       const secondOption = (await select.locator('option').nth(1).getAttribute('value')) ?? '';
       if (!secondOption) return;
 
-      await chooseVariant(page, () => select.selectOption(secondOption));
+      await chooseVariant(page, async () => {
+        await select.focus();
+        const direction = await select.evaluate((element: HTMLSelectElement) => element.selectedIndex < element.options.length - 1 ? 'ArrowDown' : 'ArrowUp');
+        await select.press(direction);
+        await select.press('Enter');
+      });
 
       const price = page.locator(PRICE_SEL).first();
       await expect(price).toBeVisible();

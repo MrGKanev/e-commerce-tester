@@ -1,7 +1,10 @@
 import { test, expect } from '../tests/fixtures';
 
 test('records actual browser @smoke', async ({ page }) => {
-  await page.setContent('<main>Offline report check</main>');
+  await page.route('http://127.0.0.1:45982/**', route =>
+    route.fulfill({ contentType: 'text/html', body: '<main>Offline report check</main>' }),
+  );
+  await page.goto('http://127.0.0.1:45982/');
   await expect(page.locator('main')).toBeVisible();
 });
 

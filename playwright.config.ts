@@ -78,13 +78,13 @@ export default defineConfig({
     {
       name: 'Mobile Chrome',
       testMatch:
-        /(?:07-mobile|10-visual|11-accessibility|24-keyboard|29-content|30-inventory-visual)\.spec\.ts/,
+        /(?:07-mobile|10-visual|11-accessibility|24-keyboard|29-content|30-inventory-visual|32-shared-pages)\.spec\.ts/,
       use: { ...devices['Pixel 7'] },
     },
     {
       name: 'Mobile Safari',
       testMatch:
-        /(?:07-mobile|10-visual|11-accessibility|24-keyboard|29-content|30-inventory-visual)\.spec\.ts/,
+        /(?:07-mobile|10-visual|11-accessibility|24-keyboard|29-content|30-inventory-visual|32-shared-pages)\.spec\.ts/,
       use: { ...devices['iPhone 13'] },
     },
   ],

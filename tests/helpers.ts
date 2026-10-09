@@ -1,3 +1,4 @@
+import { measureInteraction } from './web-vitals';
 import { readSiteSettings } from '../config/site-settings';
 import { pageInventory } from './inventory';
 const settings = readSiteSettings();
@@ -233,19 +234,21 @@ export async function goto(page: Page, path = '/'): Promise<void> {
 
 /** Register response before the action to catch even immediate AJAX/form responses. */
 export async function cartAction(page: Page, action: () => Promise<unknown>): Promise<void> {
-  const [response] = await Promise.all([
-    page.waitForResponse(response => {
-      const url = new URL(response.url());
-      return (
-        /\/cart(?:\/(?:add|change|update|clear))?(?:\.js)?\/?$/.test(url.pathname) &&
-        (response.request().method() === 'POST' ||
-          (response.request().isNavigationRequest() &&
-            /\/cart\/(?:add|change|update|clear)/.test(url.pathname)))
-      );
-    }),
-    action(),
-  ]);
-  expect(response.status(), 'Cart operation failed').toBeLessThan(400);
+  await measureInteraction(page, 'cart mutation', async () => {
+    const [response] = await Promise.all([
+      page.waitForResponse(response => {
+        const url = new URL(response.url());
+        return (
+          /\/cart(?:\/(?:add|change|update|clear))?(?:\.js)?\/?$/.test(url.pathname) &&
+          (response.request().method() === 'POST' ||
+            (response.request().isNavigationRequest() &&
+              /\/cart\/(?:add|change|update|clear)/.test(url.pathname)))
+        );
+      }),
+      action(),
+    ]);
+    expect(response.status(), 'Cart operation failed').toBeLessThan(400);
+  });
 }
 
 export async function clearCart(page: Page): Promise<void> {

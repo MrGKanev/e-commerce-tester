@@ -32,6 +32,12 @@ try {
   assert.equal(run.flaky, 1);
   assert.ok(run.scenarios.find(s => s.outcome === 'flaky').attempts[0].errors[0].includes('Price update'));
   assert.equal(run.notApplicable, 1);
+  const vitals = JSON.parse(fs.readFileSync(path.join(dir, 'web-vitals.json')));
+  assert.equal(vitals.documents.length, 1);
+  assert.equal(vitals.documents[0].synthetic, true);
+  assert.equal(vitals.documents[0].activeObservers, 0);
+  assert.equal(vitals.documents[0].metrics.cls.status, 'unmeasured');
+  assert.equal(vitals.documents[0].metrics.cls.value, null);
   console.log('Offline reporting acceptance checks passed: metadata, real browser version, tags, applicability and flaky diagnostics.');
 } finally {
   fs.rmSync(dir, { recursive: true, force: true });

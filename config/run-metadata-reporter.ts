@@ -1,3 +1,4 @@
+import type { VitalDocument } from '../tests/web-vitals';
 import { readSiteSettings } from './site-settings';
 import { mergeFindings, type Finding } from '../scripts/spelling-model';
 import fs from 'node:fs';
@@ -55,6 +56,8 @@ export default class RunMetadataReporter implements Reporter {
   private scenarios = new Map<string, Scenario>();
   private errors: string[] = [];
   private findings: Finding[] = [];
+  private vitalChecks: Record<string, unknown>[] = [];
+  private vitalDocuments = new Map<string, VitalDocument>();
   private ocrTotals = { imagesChecked: 0, wordsRecognized: 0, lowConfidenceSkipped: 0 };
   private ocrEnabled = false;
   private ocrEngines = new Set<string>();
@@ -205,6 +208,28 @@ export default class RunMetadataReporter implements Reporter {
         path: path.relative(path.dirname(this.file), a.path!),
         contentType: a.contentType,
       }));
+    for (const attachment of result.attachments.filter(a => a.name === 'web-vitals.json')) {
+      const report = JSON.parse(
+        attachment.body ? attachment.body.toString() : fs.readFileSync(attachment.path!, 'utf8'),
+      ) as { documents: VitalDocument[]; checks: Record<string, unknown>[] };
+      this.vitalChecks.push(...report.checks);
+      for (const document of report.documents) this.vitalDocuments.set(document.id, document);
+      const file = path.join(path.dirname(this.file), 'web-vitals.json');
+      fs.writeFileSync(
+        file + '.tmp',
+        JSON.stringify(
+          {
+            schemaVersion: 1,
+            synthetic: true,
+            documents: [...this.vitalDocuments.values()],
+            checks: this.vitalChecks,
+          },
+          null,
+          2,
+        ),
+      );
+      fs.renameSync(file + '.tmp', file);
+    }
     for (const attachment of result.attachments.filter(a => a.name === 'spelling.json')) {
       const report = JSON.parse(
         attachment.body ? attachment.body.toString() : fs.readFileSync(attachment.path!, 'utf8'),

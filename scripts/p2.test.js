@@ -39,3 +39,9 @@ test('failure comparisons distinguish new, recurring, resolved and unchecked reg
   assert.equal(current.scenarios[0].change, 'recurring');
   assert.equal(compareRuns(current, { scenarios: [] }).available, false);
 });
+
+
+test('performance observation settings reject invalid windows', () => {
+  assert.throws(() => resolveSiteSettings({ performanceMetrics: { minPaintMs: 8000, afterDomMs: 500 } }));
+  assert.throws(() => resolveSiteSettings({ performanceMetrics: { maxEventMs: 100 } }));
+});

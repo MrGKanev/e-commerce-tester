@@ -23,7 +23,7 @@ const extraArgs = process.argv.slice(2);
 const { resolveSiteSettings } = require('../config/site-settings');
 const modeIndex = extraArgs.findIndex(arg => arg === '--mode' || arg.startsWith('--mode='));
 const mode = modeIndex < 0 ? 'full' : extraArgs[modeIndex].includes('=') ? extraArgs[modeIndex].split('=')[1] : extraArgs[modeIndex + 1];
-if (!['smoke', 'full', 'visual', 'content'].includes(mode)) die('Mode must be smoke, full, visual or content');
+if (!['smoke', 'full', 'visual', 'content', 'audit', 'pages'].includes(mode)) die('Mode must be smoke, full, visual, content, audit or pages');
 if (modeIndex >= 0) extraArgs.splice(modeIndex, extraArgs[modeIndex].includes('=') ? 1 : 2);
 if (!extraArgs.some(arg => arg === '--grep' || arg.startsWith('--grep='))) extraArgs.push('--grep', '@' + mode);
 if (!extraArgs.some(arg => arg === '--project' || arg.startsWith('--project='))) extraArgs.push('--project=Desktop Chrome');

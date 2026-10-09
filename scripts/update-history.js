@@ -74,6 +74,33 @@ function collectAllSites() {
   return sites.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+function readVitals(file) {
+  if (!fs.existsSync(file)) return null;
+  try {
+    const result = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (!Array.isArray(result.documents)) throw new Error('Invalid metrics document list');
+    return result;
+  } catch (error) { return { documents: [], error: error.message }; }
+}
+
+function renderVitals(run) {
+  if (!run.vitals) return '';
+  const documents = run.vitals.documents;
+  const values = documents.flatMap(doc => Object.values(doc.metrics));
+  const measured = values.filter(metric => metric.status === 'measured').length;
+  return `<details><summary>Synthetic performance (${measured}/${values.length} measurements available)</summary>
+    <p>Bounded observations from existing visits. Event latency is not field INP. Loading and ready-state timings may include injected pacing.</p>
+    ${run.vitals.error ? `<p>${escHtml(run.vitals.error)}</p>` : ''}
+    ${documents.map(doc => `<details><summary>${escHtml(doc.project || 'unknown browser')} · ${escHtml(doc.scenario || '')} · ${escHtml(doc.url)} · ${doc.window.durationMs} ms observed</summary>
+      <p>Window: ${escHtml(doc.window.reason)} · paint ended: ${escHtml(doc.window.paintWindowEnded)} · ${doc.activeObservers} observers active at snapshot</p>
+      ${(run.vitals.checks || []).filter(check => check.documentId === doc.id).map(check => `<p class="${check.assessment === 'within-budget' ? '' : 'c-amber'}">${escHtml(check.metric)}: ${escHtml(check.assessment)}</p>`).join('')}
+      ${Object.entries(doc.metrics).map(([name, metric]) => `<p class="${metric.status === 'unmeasured' ? 'c-amber' : ''}">${escHtml(name)}: ${metric.status === 'measured' ? escHtml(metric.value) : 'Unmeasured — ' + escHtml(metric.reason)}</p>`).join('')}
+      ${doc.actions.map(action => `<p>${escHtml(action.label)}: ${action.latency.status === 'measured' ? action.latency.value + ' ms event latency' : 'Unmeasured — ' + escHtml(action.latency.reason)} · operation ${escHtml(action.outcome)} · ready-state ${escHtml(action.readyElapsedMs)} ms</p>`).join('')}
+      <pre>${escHtml(JSON.stringify(doc.entries, null, 2))}</pre>
+    </details>`).join('')}
+  </details>`;
+}
+
 function readSpelling(file) {
   if (!fs.existsSync(file)) return null;
   try {
@@ -111,6 +138,7 @@ function collectRunsFromDir(dir, relPrefix) {
       const prefix = './' + [...relPrefix.split('/').filter(Boolean), d].map(encodeURIComponent).join('/') + '/';
       return {
         ...summarizeRun(results, metadata, issue),
+        vitals: readVitals(path.join(runDir, 'web-vitals.json')),
         spelling: readSpelling(path.join(runDir, 'spelling.json')),
         artifactLink: file => {
           let target = path.isAbsolute(file) ? file : path.resolve(runDir, file);
@@ -406,7 +434,7 @@ function renderMetadata(run) {
 
 function renderDiagnostics(run) {
   const relevant = run.scenarios.filter(s => s.outcome !== 'passed');
-  return `${!run.scopeKnown ? '<p>Scenario inventory was not recorded; selected scope is unknown.</p>' : run.total === 0 ? '<p>No tests selected or discovered.</p>' : ''}
+  return `${renderVitals(run)}${!run.scopeKnown ? '<p>Scenario inventory was not recorded; selected scope is unknown.</p>' : run.total === 0 ? '<p>No tests selected or discovered.</p>' : ''}
     ${run.reportIssue ? `<p class="c-amber">${escHtml(run.reportIssue)}</p>` : ''}
     ${run.globalErrors.length ? `<details><summary>Global errors (${run.globalErrors.length})</summary>${run.globalErrors.map(error => `<pre>${escHtml(error)}</pre>`).join('')}</details>` : ''}
     <details><summary>Scenarios (${relevant.length} need attention / ${run.total} selected)</summary>

@@ -30,7 +30,11 @@
     "test:visual": "bash run.sh --mode visual",
     "test:content": "bash run.sh --mode content",
     "check:toolchain": "node scripts/check-toolchain.js",
-    "test:p2:local": "node scripts/check-p2.js"
+    "test:p2:local": "node scripts/check-p2.js",
+    "test:audit": "bash run.sh --mode audit",
+    "test:vitals:local": "playwright test --config=checks/vitals.config.ts",
+    "test:pages": "bash run.sh --mode pages",
+    "test:pages:local": "STORE_URL=http://127.0.0.1:45986 TEST_DELAY_MS=0 TEST_JITTER_MS=0 REQUEST_DELAY_MS=0 REQUEST_JITTER_MS=0 playwright test --config=checks/shared-pages.config.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

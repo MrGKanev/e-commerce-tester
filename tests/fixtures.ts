@@ -1,3 +1,5 @@
+import { installWebVitals, attachWebVitals, type VitalsSession } from './web-vitals';
+let vitalSessions: VitalsSession[] = [];
 import path from 'node:path';
 import { readSiteSettings, type Capability } from '../config/site-settings';
 const settings = readSiteSettings();
@@ -16,6 +18,7 @@ function paceBrowser(browser: Browser): Browser {
   browser.newContext = async options => {
     const context = await newContext({ ...options, serviceWorkers: 'block' });
     await paceContext(context);
+    vitalSessions.push(await installWebVitals(context));
     context.on('page', page =>
       page.on('framenavigated', frame => {
         if (frame === page.mainFrame() && /^https?:/.test(frame.url()))
@@ -47,6 +50,7 @@ export const test = base.extend<{ politeRun: void }>({
   politeRun: [
     async ({}, use, testInfo) => {
       visitedUrls = new Set();
+      vitalSessions = [];
       const file = path.basename(testInfo.file);
       if (file === '29-content.spec.ts' && settings.spelling.mode === 'off') {
         testInfo.annotations.push({
@@ -83,6 +87,7 @@ export const test = base.extend<{ politeRun: void }>({
       try {
         await use();
       } finally {
+        await attachWebVitals(vitalSessions, testInfo);
         for (const url of visitedUrls) testInfo.annotations.push({ type: 'url', description: url });
         if (actualBrowserVersion)
           testInfo.annotations.push({ type: 'browser-version', description: actualBrowserVersion });

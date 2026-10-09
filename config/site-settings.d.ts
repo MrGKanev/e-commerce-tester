@@ -11,6 +11,14 @@ export type Capability =
   | 'variants'
   | 'mobileMenu';
 export interface SiteSettings {
+  performanceMetrics: {
+    enabled: boolean;
+    mode: 'report' | 'strict';
+    afterDomMs: number;
+    maxPaintMs: number;
+    minPaintMs: number;
+    maxEventMs: number;
+  };
   locale: string;
   timezoneId: string;
   capabilities: Partial<Record<Capability, boolean>>;
@@ -28,6 +36,7 @@ export interface SiteSettings {
     >
   >;
   thresholds: {
+    webVitals: { lcp: number; cls: number; interactionLatency: number };
     performance: {
       ttfb: number;
       domInteractive: number;

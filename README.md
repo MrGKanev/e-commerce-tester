@@ -1,395 +1,89 @@
-# e-commerce-tester — Shopify Store Health Check
+# e-commerce-tester
 
-Automated health-check suite for Shopify stores, built with [Playwright](https://playwright.dev). Point it at any Shopify store and it covers functional, visual, accessibility and content health of store health — from broken images and Core Web Vitals to exposed API keys and GDPR consent persistence — across Chrome, Firefox, and Safari.
+A local [Playwright](https://playwright.dev) health-check suite for Shopify stores. It checks storefront functionality, visual changes, accessibility, content, security signals and synthetic performance, with reports grouped by store and run.
 
-## What gets tested
-
-| Area | What's covered |
-|------|----------------|
-| **Core functionality** | Homepage, navigation, collections, product pages, cart, search, static pages, media |
-| **Checkout** | Cart → checkout redirect, HTTPS enforcement, form fields, express checkout (Apple Pay, Shop Pay) |
-| **Product features** | Variants (sold-out indicators, URL updates, image swaps), filters, sorting, pagination |
-| **Discount codes** | Cart discount field, invalid-code error handling, valid-code price reduction |
-| **Cross-sell & upsell** | Related products, Shopify Recommendations API, "Frequently bought together", cart upsell |
-| **Recently viewed** | localStorage tracking, widget presence across pages, history persistence |
-| **Multi-currency & i18n** | Currency/language switchers, price symbol consistency, Shopify Markets |
-| **Mobile & responsive** | Overflow at 375/390/768 px, z-index overlaps, touch targets ≥ 40 px, font sizes |
-| **Accessibility** | WCAG 2.2 AA via axe-core on all key pages |
-| **Performance** | TTFB, Lighthouse (≥ 50/80/80/85), Core Web Vitals (LCP/CLS/INP), network throttling |
-| **Security** | HTTPS, HSTS, CSP, cookie flags, `/admin` access, **private API keys in JS bundles** |
-| **Trust & SEO** | Payment badges, policies, structured data (JSON-LD), Open Graph, sitemap, robots.txt |
-| **GDPR** | Cookie consent first-visit behaviour, persistence, localStorage validation |
-| **Dynamic coverage** | Live catalogue crawl from `/products.json` — opt-in catalogue discovery, cached once per run |
-| **API resilience** | Shopify AJAX mocks — 422, 500, network abort, malformed JSON |
-| **Visual regression** | Pixel-level snapshots with 3 % tolerance, dynamic elements masked |
-
-Full test case reference: [docs/TESTS.md](docs/TESTS.md)
-
----
-
-## How it works
-
-### Global setup & teardown
-
-Before any test runs, `config/global-setup.ts` launches a Chromium browser, navigates to the store, and accepts any cookie consent banner — saving the resulting browser state (cookies, localStorage) to `storageState.json` in the project root. Every subsequent test loads this snapshot instead of starting from a blank context, which means:
-
-- Cookie banners don't interrupt individual tests
-- Shopify sees a consistent returning visitor rather than a new bot on every request
-- Rate-limit and bot-detection risk is significantly reduced
-
-After all tests finish, `config/global-teardown.ts` clears the cart so the next run starts clean.
-
-### Request pacing
-
-Live checks run sequentially, with 5–8 seconds before each test and 2–4 seconds
-before store document navigations and browser/API requests. Static assets load
-normally; this is not a cap on every image, script or CSS request. Automatic test
-retries are disabled. Browser service workers are blocked so navigation requests
-pass through the pacing layer.
-
-HTTP 429 creates a local `.rate-limit.<site>.json` marker, stops further store
-requests and skips remaining tests for that store. Teardown avoids the store too.
-The response's `Retry-After` is recorded; a new run must be started manually later.
-This reduces request pressure; it cannot guarantee a store will never block traffic.
-
-Optional environment settings (milliseconds): `TEST_DELAY_MS=5000`,
-`TEST_JITTER_MS=3000`, `REQUEST_DELAY_MS=2000`, `REQUEST_JITTER_MS=2000`.
-Use zero only for local fixtures. Large suites will take substantially longer.
-The delays affect synthetic performance timings; account for pacing when reviewing
-load-time budgets and Lighthouse network measurements.
-
-### Content readiness
-
-`goto()` waits for visible, non-empty page content. Returning sessions only probe
-for an already-visible consent button; they do not wait five seconds on every
-navigation. Only global setup and fresh-context GDPR tests wait for a banner to
-appear. A visible banner that cannot be dismissed fails the operation.
-
-Specs use locator assertions, state polling or response listeners registered
-before the action. Visual checks wait for fonts and viewport images; image audits
-explicitly scroll lazy images into view. Optional widgets use bounded discovery,
-which only treats a timeout as absence and propagates page/action errors.
-`networkidle` and `page.waitForTimeout()` are lint errors. Request pacing remains
-unchanged. The Event Timing measurement retains a documented observation window.
-
-`pnpm test:readiness` checks these behaviors with intercepted loopback routes,
-without store requests.
-
-### Soft-skip pattern
-
-Tests that depend on optional store features (discount codes, currency switchers, recently-viewed widgets, etc.) use `test.skip(true, reason)` when the relevant element isn't found. This means a run against a store without a wishlist widget doesn't produce a failure — it produces a skipped test with a clear reason. Only genuinely broken things fail.
-
-### Multi-site orchestration
-
-`scripts/run-sites.js` reads `sites.json` and runs the full test suite sequentially for each store, setting `STORE_URL`, `SITE_SLUG`, and related env vars before each run. Reports land in `reports/<slug>/YYYY-MM-DD_HH-MM/` with millisecond timestamps so results from consecutive runs do not overwrite each other.
-
-### Reports & dashboard
-
-Each run writes an HTML report, a JSON results file, and failure screenshots under `reports/`. After every run, `scripts/update-history.js` reads all `results.json` files and regenerates `reports/dashboard.html` — a cumulative pass/fail history across all sites and runs.
-
----
-
-## Requirements
-
-| Tool | Version |
-|------|---------|
-| Node.js | 22.13 + (24 LTS recommended; `.nvmrc`) |
-| pnpm | 11 + |
-| Docker (optional) | any recent version |
-
----
+The suite supports desktop Chromium, Firefox and WebKit, plus selected mobile scenarios. The runner defaults to **Desktop Chrome** and runs stores and tests sequentially. Live tests can change the session cart and exercise storefront forms; checkout checks stop before placing an order.
 
 ## Quick start
 
-```bash
-# 1. Install dependencies
-pnpm install
+Requires Node.js **22.13+** (see `.nvmrc`) and pnpm **11+**. Docker is an alternative to installing browsers locally.
 
-# 2. Install browsers (Chromium, Firefox, WebKit)
+```bash
+git clone https://github.com/MrGKanev/e-commerce-tester.git
+cd e-commerce-tester
+pnpm install --frozen-lockfile
 pnpm run install:browsers
-
-# 3. Configure your store(s)
 cp examples/sites.example.json sites.json
-# Edit sites.json — see Configuration below
 ```
 
----
-
-## Configuration
-
-### Multi-store (recommended)
-
-`sites.json` — one object per store. The file is gitignored so store URLs stay out of version control.
-
-```json
-[
-  {
-    "name":           "My Store",
-    "slug":           "my-store",
-    "url":            "https://my-store.myshopify.com",
-    "productHandle":  "some-product",
-    "productHandle2": "another-product",
-    "searchTerm":     "keyword"
-  }
-]
-```
-
-### Single-store / `.env` fallback
-
-If `sites.json` is absent the runner reads environment variables instead. Copy `examples/.env.example` to `.env` and fill in:
-
-```env
-STORE_URL=https://my-store.myshopify.com
-PRODUCT_HANDLE=some-product
-PRODUCT_HANDLE_2=another-product
-SEARCH_TERM=keyword
-
-# Optional — enables the valid-code test in suite 25
-DISCOUNT_CODE=YOURCODE
-```
-
----
-
-## Running tests
-
-`pnpm dashboard:preview` opens an offline dashboard demo with clearly marked sample
-results. It does not contact any store or mix demo results with real reports.
-
+Edit `sites.json` with your store URL, two product handles and a search term that returns products. Remove unused example stores, then run:
 
 ```bash
-# Headless local run
-pnpm test
-
-# Watch the browser execute tests
-pnpm run test:headed
-
-# Step-through debugger — pause on failures
-pnpm run test:debug
+pnpm test:smoke
+pnpm dashboard
 ```
 
-The `pnpm test` command runs `run.sh`, which:
-1. Loads `.env` (explicit environment variables take precedence), validates configuration, and iterates over every site in `sites.json`
-2. Runs the full Playwright suite for each site
-3. Prunes old reports — keeps the last 30 runs per site
-4. Updates `reports/dashboard.html` with the remaining results
+`sites.json`, `.env`, browser storage and generated reports are local files excluded from version control. Configure your own store before running: the code retains legacy store defaults when configuration is omitted.
 
-### Output structure
+## Run modes
 
-```
-reports/
-├── dashboard.html              ← cumulative history across all runs
-└── my-store/
-    └── 2024-01-15_10-30/
-        ├── html/index.html          ← HTML report (open with Playwright viewer)
-        ├── run-metadata.json    ← versions, scope and execution checkpoints
-        ├── results.json        ← machine-readable pass/fail data
-        └── screenshots/        ← one screenshot per failed test
-```
-
-Open a report interactively:
-```bash
-pnpm exec playwright show-report reports/my-store/2024-01-15_10-30/html
-```
-
----
-
-## Lighthouse reports
-
-Each of the four audit URLs runs only in the first Chromium project, with retries
-disabled. Firefox and Safari skip this suite. Chromium chooses a dynamic debug
-port (`--remote-debugging-port=0`) in an isolated temporary profile for each audit.
-
-HTML and JSON reports are stored under the test's directory in
-`reports/<site>/<run>/screenshots/<test>/lighthouse/` and attached to the Playwright
-report, including when a score threshold fails. The shared `reports/lighthouse`
-directory is no longer used. Store request pacing is retained; Lighthouse itself
-can perform several page loads internally during one audit.
-
-`pnpm test:lighthouse:local` verifies the real Lighthouse suite against loopback
-pages for two sample stores, with no requests to a live store.
-
-## Visual baselines
-
-Snapshots are now separated by store, browser project and operating system. Existing
-snapshots in the old layout are not reused automatically. Generate and review the
-new baselines on the same platform used for comparisons:
+| Command                        | Scope                                                                                   |
+| ------------------------------ | --------------------------------------------------------------------------------------- |
+| `pnpm test:smoke`              | Nine core homepage, product, cart and keyboard checks                                   |
+| `pnpm test` / `pnpm test:full` | All `@full` scenarios                                                                   |
+| `pnpm test:pages`              | Shared metadata, media, accessibility, spelling and screenshot checks per inventory URL |
+| `pnpm test:content`            | Dictionary spelling checks across the inventory                                         |
+| `pnpm test:visual`             | Visual snapshot comparisons and inventory snapshots                                     |
+| `pnpm test:audit`              | Opt-in Lighthouse and throttled network checks                                          |
 
 ```bash
-pnpm test --project="Desktop Chrome" tests/10-visual.spec.ts --update-snapshots
+pnpm test:full --project="Desktop Firefox" --project="Desktop Safari"
+pnpm test:pages --project="Mobile Chrome"
+pnpm test:headed
+pnpm test:debug
+pnpm dashboard:preview
 ```
 
-Review every intentional snapshot update. Playwright is pinned to
-1.63.0 to match the Docker browser image; update both together. TypeScript stays on
-6.0.3 because the current TypeScript ESLint parser does not support TypeScript 7.
+The dashboard preview uses offline sample data. Live runs use request pacing, no automatic retries and one worker. Optional features may be skipped; review coverage and skip reasons alongside pass rate.
 
-## Docker
+## Coverage
 
-Run the full suite in a container — no local Node.js or browser installation required:
+| Area               | Examples                                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------- |
+| Storefront         | Navigation, collections, products, variants, cart, search, static pages and media                       |
+| Commerce           | Checkout redirect, discounts, currency/language switching, recommendations and recently viewed products |
+| Quality            | Responsive layout, keyboard interaction, axe WCAG 2.2 AA checks and visual regression                   |
+| Content            | Local Bulgarian/English dictionary checks, optional OCR and opt-in catalogue discovery                  |
+| Performance        | Passive navigation/LCP/CLS observations and named interactions; separate Lighthouse audits              |
+| Security and trust | Headers, cookies, exposed-key patterns, structured data, policy links and consent behavior              |
 
-```bash
-# Build the image and run once
-docker compose run e2e
+These are automated checks of selected scenarios. Dictionary checks do not establish grammatical correctness, axe does not establish full accessibility compliance, and local performance measurements are synthetic rather than field Core Web Vitals.
 
-# Or build manually and pass env vars
-docker build -t e2e .
-docker run --rm -v $(pwd)/reports:/app/reports --env-file .env e2e
+## Documentation
+
+- [Configuration](docs/CONFIGURATION.md): stores, environment variables, capabilities, selectors and thresholds.
+- [Running tests](docs/RUNNING.md): modes, browsers, pacing, visual baselines and Docker.
+- [Reports](docs/REPORTS.md): artifacts, dashboard metrics, coverage and comparisons.
+- [Content checks](docs/CONTENT.md): inventory, spelling, accepted findings and OCR.
+- [Performance](docs/PERFORMANCE.md): passive measurements, missing data and Lighthouse.
+- [Test reference](docs/TESTS.md): scenario coverage by spec.
+- [Contributing](docs/CONTRIBUTING.md): development workflow and offline validation.
+
+## Project layout
+
+```text
+tests/                 Storefront specs, browser fixtures and shared helpers
+checks/                Offline browser fixtures and acceptance checks
+config/                Settings, lifecycle hooks and metadata reporter
+scripts/               Multi-store runner, dashboard and local validation
+examples/              Store and environment templates
+docs/                  User and contributor guides
+playwright.config.ts   Projects, artifacts and snapshot paths
+run.sh                 Entry point for the multi-store runner
 ```
 
-The `mcr.microsoft.com/playwright` base image already contains Chromium, Firefox, and WebKit with all system dependencies. The `Dockerfile` only installs pnpm and your npm dependencies on top of it.
-
-Reports are written to `/app/reports` inside the container, which is bind-mounted to `./reports` on the host — so results persist after the container exits.
-
----
-
-## Dashboard metrics and run metadata
-
-The dashboard reports two separate metrics within the selected project/tag/filter scope:
-
-- **Executed pass rate** = `(passed + flaky) / completed tests`. Flaky final successes
-  count in this rate and retain a warning status with every failed attempt.
-- **Applicable coverage** = `completed / applicable selected tests`. Only skipped
-  scenarios explicitly annotated `not-applicable` are excluded. Unknown skips and
-  `fixme` scenarios stay in the denominator; interrupted/unstarted tests are unfinished.
-- A missing denominator displays `—`, not 0% or 100%.
-
-Runs have distinct statuses: Passed, Failed, Flaky, No tests, No applicable tests,
-Interrupted, Incomplete and Global errors. Missing or corrupt final reports remain
-visible, with checkpointed results when available. The details show scenario title,
-file/line, browser project, skip reasons and retry errors.
-
-`run-metadata.json` records the project, Playwright and Node versions; observed
-browser versions; locale/timezone; selected projects, tags and grep filters; pacing;
-Git revision and working-tree state; start/end status and exit code. It is written before execution and checkpointed by
-`config/run-metadata-reporter.ts`. Legacy runs display unavailable metadata explicitly.
-
-Mark a confirmed unsupported feature before skipping it:
-
-```ts
-testInfo.annotations.push({ type: 'not-applicable', description: 'This store has no wishlist' });
-test.skip(true, 'Wishlist feature is not configured');
-```
-
-Do not apply this annotation to a failed/blocked operation or an unfinished test.
-`pnpm test:reporting` checks metadata and retry/skip behavior offline; the dashboard
-model and interruption cases are included in `pnpm test:unit`.
-
-## GitHub Actions
-
-There are no GitHub Actions workflows that execute the project. Run tests and code
-quality checks locally. Dependabot remains enabled for weekly dependency update
-PRs. Updates can also be reviewed and installed manually with `pnpm outdated` and `pnpm update`; keep Docker and Playwright versions aligned.
-
----
-
-## Code quality
-
-### Linting (ESLint + eslint-plugin-playwright)
-
-```bash
-pnpm lint          # check for issues
-pnpm lint:fix      # auto-fix what's possible
-```
-
-`eslint.config.mjs` uses the flat-config format with:
-- **`typescript-eslint`** — type-aware TypeScript rules
-- **`eslint-plugin-playwright`** — Playwright-specific rules (`no-wait-for-timeout`, `prefer-web-first-assertions`, `no-force-option`)
-- **`eslint-config-prettier`** — disables formatting rules that conflict with Prettier
-
-### Formatting (Prettier)
-
-```bash
-pnpm format          # format all TypeScript files in-place
-pnpm format:check    # verify formatting without writing changes
-```
-
-`.prettierrc` enforces: single quotes, trailing commas, 100-character line width.
-
-### Type checking
-
-```bash
-pnpm run type-check   # tsc --noEmit — catches type errors without running tests
-pnpm run test:unit    # offline runner/dashboard regression checks
-pnpm run check        # type-check, lint and offline tests
-```
-
----
-
-## Project structure
-
-```
-e-commerce-tester/
-│
-├── tests/                          all Playwright spec files + shared helpers
-│   ├── helpers.ts                  BASE URL, selectors, goto(), fetchProductHandles()
-│   ├── 01-homepage.spec.ts         HTTP 200, title, meta, canonical, header/footer, JS errors
-│   ├── 02-navigation.spec.ts       desktop nav, dropdown, footer links, mobile hamburger
-│   ├── 03-collections.spec.ts      product grid, card structure, alt text, overflow
-│   ├── 04-product.spec.ts          title, price, JSON-LD, images, variants, breadcrumbs
-│   ├── 05-cart.spec.ts             add/remove, quantity, checkout button, mobile
-│   ├── 06-search.spec.ts           icon, input, submission, results, predictive suggestions
-│   ├── 07-mobile.spec.ts           overflow, z-index, touch targets, font sizes, sticky header
-│   ├── 08-pages.spec.ts            contact, about, FAQ, privacy, terms, refund, shipping
-│   ├── 09-media.spec.ts            broken images, alt text, srcset, @font-face, failed assets
-│   ├── 10-visual.spec.ts           pixel-level snapshots (3 % tolerance), masked dynamic elements
-│   ├── 11-accessibility.spec.ts    axe-core WCAG 2.2 AA on 6 key pages
-│   ├── 12-performance.spec.ts      Lighthouse, CWV (LCP/CLS/INP), TTFB, network throttling
-│   ├── 13-api-mock.spec.ts         Shopify AJAX error mocks — 422, 500, abort, malformed JSON
-│   ├── 14-structured-data.spec.ts  JSON-LD (Product/WebSite/Org), Open Graph, sitemap, robots.txt
-│   ├── 15-gdpr.spec.ts             cookie banner, persistence, localStorage, decline button
-│   ├── 16-dynamic-products.spec.ts live /products.json crawl — up to 25 products
-│   ├── 17-checkout.spec.ts         cart → checkout, HTTPS, form fields, express checkout
-│   ├── 18-variants.spec.ts         sold-out indicators, ?variant= URL, image swap, keyboard a11y
-│   ├── 19-filters.spec.ts          sort params, tag filters, pagination, URL persistence
-│   ├── 20-security.spec.ts         headers, HTTPS/HSTS, cookies, /admin, API keys in JS bundles
-│   ├── 21-trust.spec.ts            payment badges, policies, contact info, reviews
-│   ├── 22-newsletter.spec.ts       email input, validation, GDPR notice
-│   ├── 23-404.spec.ts              HTTP 404, custom page, navigation, no stack trace
-│   ├── 25-discount-codes.spec.ts   cart discount field, invalid/empty/valid code handling
-│   ├── 26-currency-i18n.spec.ts    currency/language switchers, price consistency, Markets API
-│   ├── 27-cross-sell.spec.ts       related products, Recommendations API, FBT, cart upsell
-│   └── 28-recently-viewed.spec.ts  localStorage tracking, widget presence, history persistence
-│
-├── config/                         Playwright lifecycle hooks
-│   ├── global-setup.ts             accepts cookie consent, saves storageState.json to project root
-│   └── global-teardown.ts          clears cart via POST /cart/clear.js after each run
-│
-├── scripts/                        Node.js orchestration scripts
-│   ├── run-sites.js                iterates sites.json, runs tests per site, sets env vars
-│   └── update-history.js           reads results.json files → regenerates dashboard.html
-│
-├── docs/                           project documentation
-│   ├── TESTS.md                    full test case reference table
-│   └── CONTRIBUTING.md             contribution guide
-│
-├── examples/                       template files — copy and customise
-│   ├── sites.example.json          multi-store config template → copy to sites.json in root
-│   └── .env.example                single-store env template → copy to .env in root
-│
-├── Dockerfile                      playwright base image + pnpm + dependencies
-├── docker-compose.yml              bind-mounts ./reports, reads .env
-├── eslint.config.mjs               ESLint flat config — TypeScript + Playwright rules + Prettier
-├── playwright.config.ts            Chrome + Firefox + Safari, sequential, 60 s timeout
-├── run.sh                          entry point — delegates to scripts/run-sites.js
-├── .prettierrc                     Prettier config
-├── tsconfig.json
-└── package.json
-```
-
----
-
-## Environment variables reference
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `STORE_URL` | yes (if no sites.json) | Full URL of the store, e.g. `https://example.myshopify.com` |
-| `PRODUCT_HANDLE` | yes | Handle of a known in-stock product |
-| `PRODUCT_HANDLE_2` | yes | Handle of a second known product |
-| `SEARCH_TERM` | yes | Term that returns results in the store's search |
-| `DISCOUNT_CODE` | no | Valid discount code — enables the passing-code assertion in suite 25 |
-| `SITE_SLUG` | set by run-sites.js | Used to namespace report output directories |
-
----
+There are no GitHub Actions workflows that execute the suite or quality checks. Run them locally; Dependabot provides dependency update PRs.
 
 ## License
 
-[MIT](LICENSE) © Gabriel Kanev
+[MIT](LICENSE) © Gabriel Kanev. Bundled dependencies and dictionaries retain their own licenses; see [Content checks](docs/CONTENT.md#licenses).

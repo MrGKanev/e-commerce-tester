@@ -1,3 +1,4 @@
+import { measureInteraction } from './web-vitals';
 import { test, expect } from './fixtures';
 import { goto, MOBILE_MENU_TOGGLE_SEL, optionalVisible } from './helpers';
 
@@ -37,14 +38,18 @@ test(
       });
       test.skip(true, 'No mobile menu toggle at this viewport');
     }
-    if (testInfo.project.use.hasTouch) await toggle.tap();
-    else await toggle.click();
     const drawer = page
       .locator('#menu-drawer, #mobile-menu, .mobile-nav, [class*="nav-drawer"]')
       .first();
-    await expect(drawer).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(drawer).toBeHidden();
-    await expect(toggle).toBeFocused();
+    await measureInteraction(page, 'menu open', async () => {
+      if (testInfo.project.use.hasTouch) await toggle.tap();
+      else await toggle.click();
+      await expect(drawer).toBeVisible();
+    });
+    await measureInteraction(page, 'menu close', async () => {
+      await page.keyboard.press('Escape');
+      await expect(drawer).toBeHidden();
+      await expect(toggle).toBeFocused();
+    });
   },
 );

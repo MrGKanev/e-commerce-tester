@@ -1,69 +1,70 @@
 # Contributing
 
-Thank you for your interest in contributing. This project is a Playwright-based health-check suite for Shopify stores. Contributions that improve test coverage, portability, or reliability are very welcome.
+[Back to README](../README.md)
 
-## Getting started
+Contributions that improve coverage, portability and reliability are welcome. See [Configuration](CONFIGURATION.md) and [Running tests](RUNNING.md) to prepare a store for live checks.
+
+## Development setup
 
 ```bash
 git clone https://github.com/MrGKanev/e-commerce-tester.git
 cd e-commerce-tester
-pnpm install
-pnpm run install:browsers   # installs Chromium, Firefox, and WebKit
-cp examples/sites.example.json sites.json
-# Edit sites.json with your store URL and product handles
+pnpm install --frozen-lockfile
+pnpm run install:browsers
 ```
 
-**Requirements:** Node.js 22.13+ and pnpm 11+.
+Use Node.js 22.13+ and pnpm 11+. Keep the pinned Playwright dependency and Docker image version aligned. TypeScript is pinned for compatibility with the installed ESLint parser.
 
-## Running the tests
+## Validation
 
 ```bash
-pnpm test              # headless, all browsers
-pnpm run test:headed   # watch the browser
-pnpm run test:debug    # step-through debugger
-pnpm run type-check    # TypeScript check without running tests
+pnpm check
+pnpm format:check
 ```
 
-## Code quality
+`pnpm check` runs TypeScript, ESLint, offline unit tests and the Docker/Playwright toolchain check. Formatting is a separate command. There is no GitHub Actions pipeline executing these checks or live tests; run relevant checks locally before opening a PR.
 
-Before pushing, run:
+Additional loopback acceptance checks:
 
-```bash
-pnpm lint              # ESLint — Playwright + TypeScript rules
-pnpm format:check      # Prettier formatting check
-pnpm run type-check    # tsc --noEmit
-```
+| Command                      | Covers                                                                                              |
+| ---------------------------- | --------------------------------------------------------------------------------------------------- |
+| `pnpm test:pacing`           | Request pacing and rate-limit behavior                                                              |
+| `pnpm test:readiness`        | Content readiness and consent handling                                                              |
+| `pnpm test:reporting`        | Metadata, coverage, skips and retries                                                               |
+| `pnpm test:p2:local`         | DOM spelling, strict/report, accepted findings, inventory, OCR pipeline and touch/keyboard contexts |
+| `pnpm test:vitals:local`     | Passive performance collection                                                                      |
+| `pnpm test:pages:local`      | Shared document checks and request counts                                                           |
+| `pnpm test:lighthouse:local` | Real Lighthouse integration against local pages                                                     |
 
-Auto-fix lint and formatting issues:
+The historical `test:p2:local` script name is retained as a command, not a documentation phase. Its OCR pipeline uses a fixture executable; a native OCR check additionally runs when Tesseract and its English model are installed.
 
 ```bash
 pnpm lint:fix
 pnpm format
 ```
 
-The CI pipeline checks all three. PRs with lint or type errors will fail.
+These commands modify files. Keep formatting changes scoped to your contribution.
 
-## Adding a test
+## Adding or changing tests
 
-1. Pick the spec file that best matches the area (navigation, cart, security, etc.) or create `tests/28-yourfeature.spec.ts` with the next available number.
-2. Import shared selectors and helpers from `tests/helpers.ts` — avoid hardcoding URLs or selectors that already exist there.
-3. Use condition-based waits (`waitFor`, `waitForLoadState`, `waitForResponse`) instead of fixed `waitForTimeout` delays.
-4. Keep tests independent — each `test()` should set up its own state and not rely on execution order or shared mutable variables.
-5. For optional features (widgets, apps, multi-currency), use `test.skip(true, reason)` when the element isn't found instead of failing.
-6. If your test uses a Chrome-only API (e.g. `newCDPSession`), add `test.skip(browserName !== 'chromium', '...')` so Firefox and Safari skip it gracefully.
-7. Add a corresponding entry to `docs/TESTS.md`.
+1. Use the matching spec or the next available number. Import `test` and `expect` from `tests/fixtures.ts` to retain pacing, capability handling and performance collection.
+2. Reuse `tests/helpers.ts` and site settings instead of duplicating URLs/selectors. Tag scenarios for the intended run mode. Add new mobile specs to the project's `testMatch` when appropriate.
+3. Use locator assertions, state polling and response listeners registered before actions. Avoid `networkidle` and `waitForTimeout`; both are lint errors.
+4. Keep scenarios independent and establish their own state. Respect the shared inventory and opt-in product discovery.
+5. Skip optional features with a clear reason. Mark a skip `not-applicable` only when the feature is confirmed unsupported; do not use it for a blocked/failed operation or an unfinished test.
+6. Guard browser-specific APIs with an explicit skip. Do not add retries or extra live requests to hide instability.
+7. Update [TESTS.md](TESTS.md) and the relevant user guide when behavior changes. Prefer deterministic loopback fixtures for regression checks.
 
-## Commit style
+```ts
+testInfo.annotations.push({
+  type: 'not-applicable',
+  description: 'This store has no wishlist',
+});
+test.skip(true, 'Wishlist feature is not configured');
+```
 
-Use conventional commits: `feat:`, `fix:`, `test:`, `docs:`, `chore:`. One logical change per commit.
+## Pull requests and issues
 
-## Pull requests
+Use conventional commit prefixes (`feat:`, `fix:`, `test:`, `docs:`, `chore:`) and keep one logical change per commit. Target the repository's default branch. Describe the concrete behavior change and validation performed; note any checks not run.
 
-- Target the `master` branch.
-- Include a short description of what changed and why.
-- Run `pnpm lint && pnpm format:check && pnpm run type-check` before pushing.
-- CI runs the full test suite on every PR via GitHub Actions.
-
-## Reporting issues
-
-Open an issue on GitHub. Include the store URL (if public), the failing test name, and the Playwright report output.
+For issues, include the failing scenario, selected project/mode, relevant version information and sanitized report evidence. Include a store URL only if it is public and appropriate to share. Do not commit local store configuration, session state or generated reports.
