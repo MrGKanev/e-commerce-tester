@@ -132,3 +132,36 @@ test('import validation normalizes missing slugs without saving or launching che
   assert.equal((await response.json()).sites[0].slug, 'example-test');
   assert.equal(fs.existsSync(f.configFile), false);
 });
+
+test('report catalog lists newest runs, supports legacy HTML and remains embeddable', async t => {
+  const f = await fixture(t);
+  const root = path.join(f.directory, 'reports');
+  for (const date of ['2026-10-09_09-00-00-001', '2026-10-09_10-00-00-001']) {
+    const dir = path.join(root, 'shop', date, 'html');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'index.html'), '<html><body>Saved report</body></html>');
+    fs.writeFileSync(path.join(dir, '../results.json'), JSON.stringify({ stats: { expected: 1 } }));
+    fs.writeFileSync(
+      path.join(dir, '../run-metadata.json'),
+      JSON.stringify({ phase: 'finished', site: { name: 'Example Shop' }, mode: 'smoke' }),
+    );
+  }
+  const legacy = path.join(root, '2026-10-08_10-00');
+  fs.mkdirSync(legacy);
+  fs.writeFileSync(path.join(legacy, 'index.html'), '<html>Legacy</html>');
+  fs.writeFileSync(path.join(legacy, 'results.json'), 'null');
+  fs.symlinkSync(f.directory, path.join(root, 'outside'));
+  const { groups } = await (await fetch(f.origin + '/api/reports')).json();
+  assert.equal(groups.length, 2);
+  const shop = groups.find(group => group.id === 'site:shop');
+  assert.equal(shop.name, 'Example Shop');
+  assert.equal(shop.runs[0].id, '2026-10-09_10-00-00-001');
+  assert.equal(shop.runs[0].mode, 'smoke');
+  const report = await fetch(f.origin + shop.runs[0].reportUrl + '?embedded=1');
+  assert.equal(report.headers.get('x-frame-options'), 'SAMEORIGIN');
+  assert.match(await report.text(), /Saved report/);
+  assert.equal((await fetch(f.origin)).headers.get('x-frame-options'), 'DENY');
+  const direct = groups.find(group => group.id === 'legacy-direct');
+  assert.equal(direct.runs[0].status, 'incomplete');
+  assert.match(direct.runs[0].reportUrl, /index.html$/);
+});

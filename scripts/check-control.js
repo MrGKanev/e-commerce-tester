@@ -99,20 +99,16 @@ const { createControlServer } = require('./control-server');
     await expect(page.getByLabel('Enable scheduled checks for this store')).not.toBeChecked();
     await page.getByText('Import existing configuration', { exact: true }).click();
     const imported = JSON.parse(fs.readFileSync(configFile));
-    await page
-      .locator('#import-sites')
-      .setInputFiles({
-        name: 'sites.json',
-        mimeType: 'application/json',
-        buffer: Buffer.from(JSON.stringify(imported.sites)),
-      });
-    await page
-      .locator('#import-scheduler')
-      .setInputFiles({
-        name: 'scheduler.json',
-        mimeType: 'application/json',
-        buffer: Buffer.from(JSON.stringify(imported.scheduler)),
-      });
+    await page.locator('#import-sites').setInputFiles({
+      name: 'sites.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(imported.sites)),
+    });
+    await page.locator('#import-scheduler').setInputFiles({
+      name: 'scheduler.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(imported.scheduler)),
+    });
     await page.getByRole('button', { name: 'Load files into editor', exact: true }).click();
     await expect(page.getByRole('status')).toContainText('Configuration loaded into the editor');
     await page.getByRole('button', { name: 'Save changes', exact: true }).click();
@@ -120,6 +116,54 @@ const { createControlServer } = require('./control-server');
     assert.deepEqual(JSON.parse(fs.readFileSync(configFile)).sites[0].spelling.acceptedFindings, [
       'reviewed-id',
     ]);
+    // Reports stay within the current browser tab and settings keep unsaved edits.
+    const reportRoot = path.join(directory, 'reports');
+    for (const [date, content] of [
+      ['2026-10-09_09-00-00-001', 'Older report'],
+      ['2026-10-09_10-00-00-001', 'Latest report'],
+    ]) {
+      const reportDir = path.join(reportRoot, storeId, date, 'html');
+      fs.mkdirSync(reportDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(reportDir, 'index.html'),
+        '<html lang="en"><title>Fixture report</title><body><h1>' + content + '</h1></body></html>',
+      );
+      fs.writeFileSync(
+        path.join(reportDir, '../results.json'),
+        JSON.stringify({ stats: { expected: 1 } }),
+      );
+      fs.writeFileSync(
+        path.join(reportDir, '../run-metadata.json'),
+        JSON.stringify({ phase: 'finished', mode: 'smoke' }),
+      );
+    }
+    await page.getByLabel('Store name', { exact: true }).fill('Unsaved store edit');
+    await page.getByRole('button', { name: 'Reports', exact: true }).click();
+    await expect(page.locator('#reports-submenu')).toBeVisible();
+    await page
+      .locator('#reports-submenu')
+      .getByRole('button', { name: /Updated Shop/ })
+      .click();
+    await expect(page.locator('#report-list').getByRole('button')).toHaveCount(2);
+    await expect(
+      page
+        .frameLocator('#report-frame')
+        .getByRole('heading', { name: 'Latest report', exact: true }),
+    ).toBeVisible();
+    await page.locator('#report-list').getByRole('button').nth(1).click();
+    await expect(
+      page
+        .frameLocator('#report-frame')
+        .getByRole('heading', { name: 'Older report', exact: true }),
+    ).toBeVisible();
+    assert.equal(context.pages().length, 1, 'Reports must not open another tab');
+    assert.equal(
+      await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+      false,
+    );
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await expect(page.getByLabel('Store name', { exact: true })).toHaveValue('Unsaved store edit');
+    await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeEnabled();
     assert.deepEqual(errors, []);
     console.log(
       'Control panel browser checks passed: onboarding, schedule/window edits, save/reload, advanced setting preservation, pause, mobile layout and axe. No store requests made.',

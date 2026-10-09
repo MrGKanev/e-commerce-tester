@@ -11,49 +11,78 @@
     <header>
       <a class="brand" href="/">● Store Health</a>
       <nav>
-        <a href="/reports/dashboard.html" target="_blank" rel="noopener">Reports ↗</a
-        ><button id="reload" class="quiet">Reload settings</button>
+        <button id="settings-tab" class="nav-tab active" aria-pressed="true">Settings</button>
+        <button
+          id="reports-tab"
+          class="nav-tab"
+          aria-pressed="false"
+          aria-controls="reports-submenu"
+        >
+          Reports
+        </button>
+        <button id="reload" class="quiet">Reload settings</button>
       </nav>
     </header>
+    <nav id="reports-submenu" class="report-submenu" aria-label="Report stores" hidden></nav>
     <main>
-      <div class="heading">
-        <div>
-          <p class="eyebrow">CONTROL PANEL</p>
-          <h1>Stores & schedules</h1>
-          <p class="muted">Choose what to check and when. Changes apply after the current run.</p>
-        </div>
-        <button id="save" disabled>Save changes</button>
-      </div>
-      <p id="message" role="status" aria-live="polite"></p>
-      <section class="status-strip" aria-label="Scheduler status">
-        <span id="worker">Connecting…</span><span id="active">No active check</span>
-      </section>
-      <div class="layout">
-        <aside>
-          <div class="list-heading">
-            <h2>Stores</h2>
-            <button id="add-store" class="quiet">+ Add</button>
+      <div id="settings-view">
+        <div class="heading">
+          <div>
+            <p class="eyebrow">CONTROL PANEL</p>
+            <h1>Stores & schedules</h1>
+            <p class="muted">Choose what to check and when. Changes apply after the current run.</p>
           </div>
-          <div id="store-list"></div>
-          <button id="general" class="general quiet">Scheduling & pauses</button>
-          <details class="import">
-            <summary>Import existing configuration</summary>
-            <p class="muted">Optional: choose your existing store and scheduler files.</p>
-            <label
-              >Store file<input
-                id="import-sites"
-                type="file"
-                accept=".json,application/json" /></label
-            ><label
-              >Scheduler file<input
-                id="import-scheduler"
-                type="file"
-                accept=".json,application/json" /></label
-            ><button id="import" class="quiet">Load files into editor</button>
-          </details>
-        </aside>
-        <section id="editor" class="panel" aria-label="Settings editor"></section>
+          <button id="save" disabled>Save changes</button>
+        </div>
+        <p id="message" role="status" aria-live="polite"></p>
+        <section class="status-strip" aria-label="Scheduler status">
+          <span id="worker">Connecting…</span><span id="active">No active check</span>
+        </section>
+        <div class="layout">
+          <aside>
+            <div class="list-heading">
+              <h2>Stores</h2>
+              <button id="add-store" class="quiet">+ Add</button>
+            </div>
+            <div id="store-list"></div>
+            <button id="general" class="general quiet">Scheduling & pauses</button>
+            <details class="import">
+              <summary>Import existing configuration</summary>
+              <p class="muted">Optional: choose your existing store and scheduler files.</p>
+              <label
+                >Store file<input
+                  id="import-sites"
+                  type="file"
+                  accept=".json,application/json" /></label
+              ><label
+                >Scheduler file<input
+                  id="import-scheduler"
+                  type="file"
+                  accept=".json,application/json" /></label
+              ><button id="import" class="quiet">Load files into editor</button>
+            </details>
+          </aside>
+          <section id="editor" class="panel" aria-label="Settings editor"></section>
+        </div>
       </div>
+      <section id="reports-view" hidden aria-label="Reports">
+        <div class="heading">
+          <div>
+            <p class="eyebrow">REPORTS</p>
+            <h1 id="reports-title">Run history</h1>
+            <p class="muted">Choose a store above and a report below.</p>
+          </div>
+          <button id="refresh-reports" class="quiet">Refresh reports</button>
+        </div>
+        <p id="reports-message" role="status"></p>
+        <div class="report-layout">
+          <aside id="report-list" aria-label="Available reports"></aside>
+          <section class="report-viewer">
+            <p id="report-empty" class="welcome">Choose a report to preview.</p>
+            <iframe id="report-frame" title="Report preview" hidden></iframe>
+          </section>
+        </div>
+      </section>
       <footer class="project-footer">
         Built by Gabriel Kanev ·
         <a

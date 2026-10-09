@@ -396,3 +396,95 @@ window.addEventListener('beforeunload', event => {
 });
 load().catch(error => message(error.message, true));
 setInterval(refreshStatus, 10000);
+
+let reportGroups = [],
+  reportStore = 'overview',
+  reportRun = null;
+function showSection(section) {
+  const reports = section === 'reports';
+  $('#settings-view').hidden = reports;
+  $('#reports-view').hidden = !reports;
+  $('#reports-submenu').hidden = !reports;
+  $('#settings-tab').classList.toggle('active', !reports);
+  $('#reports-tab').classList.toggle('active', reports);
+  $('#settings-tab').setAttribute('aria-pressed', String(!reports));
+  $('#reports-tab').setAttribute('aria-pressed', String(reports));
+  $('#reload').hidden = reports;
+  if (reports) refreshReports();
+}
+function displayReport(url, title) {
+  const frame = $('#report-frame');
+  $('#report-empty').hidden = Boolean(url);
+  frame.hidden = !url;
+  frame.title = title || 'Report preview';
+  if (url) {
+    const target = new URL(url, location.origin);
+    target.searchParams.set('embedded', '1');
+    if (frame.getAttribute('src') !== target.pathname + target.search)
+      frame.src = target.pathname + target.search;
+  } else {
+    frame.removeAttribute('src');
+    $('#report-empty').textContent =
+      'This run has no HTML report. It may have stopped before reporting completed.';
+  }
+}
+function renderReports() {
+  $('#reports-submenu').innerHTML =
+    `<button data-report-store="overview" class="${reportStore === 'overview' ? 'active' : ''}" aria-pressed="${reportStore === 'overview'}">Overview</button>` +
+    reportGroups
+      .map(
+        group =>
+          `<button data-report-store="${escapeHTML(group.id)}" class="${reportStore === group.id ? 'active' : ''}" aria-pressed="${reportStore === group.id}">${escapeHTML(group.name)} <span class="badge">${group.runs.length}</span></button>`,
+      )
+      .join('');
+  const group = reportGroups.find(group => group.id === reportStore);
+  $('#reports-title').textContent = group ? group.name + ' reports' : 'All stores · run history';
+  if (!group) {
+    $('#report-list').innerHTML =
+      '<h2>Summary</h2><p class="help">Select a store in the submenu to browse its individual runs.</p>';
+    $('#reports-message').textContent = reportGroups.length
+      ? `${reportGroups.length} stores with saved reports.`
+      : 'No reports yet. They will appear here after the first check.';
+    displayReport('/reports/dashboard.html', 'Report overview');
+    return;
+  }
+  if (!group.runs.some(run => run.id === reportRun)) reportRun = group.runs[0]?.id ?? null;
+  $('#reports-message').textContent = `${group.runs.length} saved runs · newest first`;
+  $('#report-list').innerHTML = group.runs
+    .map(
+      run =>
+        `<button class="report-choice ${reportRun === run.id ? 'active' : ''}" data-report-run="${escapeHTML(run.id)}" aria-pressed="${reportRun === run.id}">${escapeHTML(run.id.replace('_', ' · ').replace(/-(\d{2})-(\d{2})-(\d{3})$/, ':$1:$2.$3'))}<small>${escapeHTML(run.status.replaceAll('-', ' '))}${run.mode ? ' · ' + escapeHTML(run.mode) : ''}<br>${run.passed} passed · ${run.failed} failed${run.reportUrl ? '' : ' · No HTML report'}</small></button>`,
+    )
+    .join('');
+  const run = group.runs.find(run => run.id === reportRun);
+  displayReport(run?.reportUrl, group.name + ' · ' + (run?.id || 'report'));
+}
+async function refreshReports() {
+  try {
+    const result = await api('/api/reports');
+    reportGroups = result.groups;
+    if (reportStore !== 'overview' && !reportGroups.some(group => group.id === reportStore))
+      reportStore = 'overview';
+    renderReports();
+  } catch (error) {
+    $('#reports-message').textContent = error.message;
+  }
+}
+$('#reports-tab').addEventListener('click', () => showSection('reports'));
+$('#settings-tab').addEventListener('click', () => showSection('settings'));
+$('#refresh-reports').addEventListener('click', refreshReports);
+$('#reports-submenu').addEventListener('click', event => {
+  const button = event.target.closest('[data-report-store]');
+  if (button) {
+    reportStore = button.dataset.reportStore;
+    reportRun = null;
+    renderReports();
+  }
+});
+$('#report-list').addEventListener('click', event => {
+  const button = event.target.closest('[data-report-run]');
+  if (button) {
+    reportRun = button.dataset.reportRun;
+    renderReports();
+  }
+});

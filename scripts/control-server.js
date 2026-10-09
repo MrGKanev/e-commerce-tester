@@ -8,6 +8,7 @@ const { spawn } = require('node:child_process');
 const { readConfiguration, validateConfiguration } = require('./managed-config');
 const { atomicWrite, loadState } = require('./scheduler');
 const model = require('./scheduler-model');
+const { catalog } = require('./report-catalog');
 const root = path.join(__dirname, '..');
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -73,7 +74,10 @@ function createControlServer({
   const token = randomBytes(32).toString('hex');
   return http.createServer(async (request, response) => {
     try {
-      response.setHeader('X-Frame-Options', 'DENY');
+      response.setHeader(
+        'X-Frame-Options',
+        request.url.startsWith('/reports/') ? 'SAMEORIGIN' : 'DENY',
+      );
       response.setHeader('Referrer-Policy', 'same-origin');
       const url = new URL(request.url, 'http://localhost');
       if (request.method === 'GET' && url.pathname === '/api/config') {
@@ -109,6 +113,10 @@ function createControlServer({
         atomicWrite(configFile, data);
         return json(response, 200, { revision: readConfiguration(configFile).revision });
       }
+      if (request.method === 'GET' && url.pathname === '/api/reports')
+        return json(response, 200, {
+          groups: catalog(reportsDir, readConfiguration(configFile).sites),
+        });
       if (request.method === 'GET' && url.pathname === '/api/status') {
         const { config } = readConfiguration(configFile);
         const state = loadState(path.join(stateDir, 'schedule.json'));
@@ -154,12 +162,11 @@ function createControlServer({
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'no-store',
         });
-        response.end(
-          content.replace(
-            '</body>',
-            '<a href="/settings" style="position:fixed;bottom:20px;right:20px;background:#2563eb;color:white;padding:12px 18px;border-radius:8px;text-decoration:none;font:14px system-ui;z-index:1000">Manage stores & schedules</a></body>',
-          ),
-        );
+        const embedded = url.searchParams.get('embedded') === '1';
+        const navigation = embedded
+          ? `<script>document.addEventListener('click',function(event){const link=event.target.closest('a');if(!link)return;const url=new URL(link.href,location.href);if(url.origin===location.origin && url.pathname.startsWith('/reports/') && url.pathname.endsWith('.html')){link.target='_self';}});</script>`
+          : '<a href="/settings" style="position:fixed;bottom:20px;right:20px;background:#2563eb;color:white;padding:12px 18px;border-radius:8px;text-decoration:none;font:14px system-ui;z-index:1000">Manage stores & schedules</a>';
+        response.end(content.replace('</body>', navigation + '</body>'));
         return;
       }
       if (decoded.startsWith('/reports/'))

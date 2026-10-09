@@ -21,7 +21,7 @@ The page includes:
 - Shared startup spreading, watchdog and cooldown settings.
 - Shared/per-store request pacing and basic spelling settings.
 - Current run, next eligible checks and last outcomes.
-- Links to reports, and a settings link from the served report dashboard.
+- A Reports section with a submenu by store, a list of saved runs and an embedded preview in the same page. Switching sections preserves unsaved settings.
 
 Use **Save changes** to apply edits. The scheduler reloads validated settings within roughly five seconds while idle, or after the active run finishes. Pausing/removing a store prevents subsequent runs; it does not abort a run already in progress. Removing a store retains its existing reports.
 
