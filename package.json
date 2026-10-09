@@ -43,7 +43,7 @@
     "@axe-core/playwright": "^4.13.0",
     "@faker-js/faker": "^10.6.0",
     "@playwright/test": "1.63.0",
-    "@types/node": "^24.19.1",
+    "@types/node": "^26.6.4",
     "@types/nspell": "2.1.6",
     "dictionary-bg": "2.0.0",
     "dictionary-en": "4.0.0",
