@@ -10,3 +10,5 @@ scheduler.json
 scheduler-state
 storageState.*.json
 .rate-limit.*.json
+
+managed-config/

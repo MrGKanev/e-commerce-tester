@@ -76,6 +76,7 @@ for (const site of sites) {
     STORE_URL:        site.url,
     SITE_SETTINGS_JSON: JSON.stringify(site.settings),
     RUN_MODE: mode,
+    SITES_FILE: sitesFile,
     PAGE_INVENTORY_FILE: path.join(reportsDir, slug, runDate, 'page-inventory.json'),
     PRODUCT_HANDLE:   site.productHandle  || process.env.PRODUCT_HANDLE || 'zerno-z1',
     PRODUCT_HANDLE_2: site.productHandle2 || process.env.PRODUCT_HANDLE_2 || 'zerno-z2',
@@ -142,7 +143,7 @@ console.log('');
 divider();
 console.log('  Updating dashboard...');
 try {
-  execSync('node scripts/update-history.js', { cwd: root, stdio: 'inherit' });
+  execSync('node scripts/update-history.js', { cwd: root, stdio: 'inherit', env: { ...process.env, SITES_FILE: sitesFile } });
 } catch {
   console.log('  ⚠  Could not update dashboard (non-fatal)');
 }

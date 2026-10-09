@@ -7,6 +7,7 @@ const { randomUUID } = require('node:crypto');
 const { spawn } = require('node:child_process');
 const { loadSites } = require('./site-config');
 const model = require('./scheduler-model');
+const { readConfiguration } = require('./managed-config');
 const root = path.join(__dirname, '..');
 function atomicWrite(file, value) {
   const temporary = `${file}.${process.pid}.tmp`;
@@ -76,7 +77,12 @@ function options(args) {
     check: false,
     status: false,
   };
-  const names = { '--config': 'config', '--sites-file': 'sitesFile', '--state-dir': 'stateDir' };
+  const names = {
+    '--config': 'config',
+    '--sites-file': 'sitesFile',
+    '--state-dir': 'stateDir',
+    '--managed-config': 'managedConfig',
+  };
   for (let i = 0; i < args.length; i++) {
     const [name, ...parts] = args[i].split('=');
     if (name === '--check' || name === '--status') {
@@ -149,11 +155,13 @@ async function runChild(job, settings, control) {
 async function main(args = process.argv.slice(2)) {
   if (fs.existsSync(path.join(root, '.env'))) process.loadEnvFile(path.join(root, '.env'));
   const settings = options(args);
-  const sites = loadSites(settings.sitesFile, process.env, {
-    requireFile: true,
-    requireHandles: true,
-  });
-  const config = model.resolveSchedule(JSON.parse(fs.readFileSync(settings.config, 'utf8')), sites);
+  let managed = settings.managedConfig ? readConfiguration(settings.managedConfig) : null;
+  let sites = managed
+    ? managed.sites
+    : loadSites(settings.sitesFile, process.env, { requireFile: true, requireHandles: true });
+  let config = managed
+    ? managed.config
+    : model.resolveSchedule(JSON.parse(fs.readFileSync(settings.config, 'utf8')), sites);
   const stateFile = path.join(settings.stateDir, 'schedule.json');
   let state = loadState(stateFile);
   if (settings.check) {
@@ -254,12 +262,55 @@ async function main(args = process.argv.slice(2)) {
       `[scheduler] Started ${config.jobs.length} jobs across ${sites.length} stores; one run at a time. State: ${settings.stateDir}`,
     );
     while (!control.stopping) {
+      if (settings.managedConfig) {
+        try {
+          const next = readConfiguration(settings.managedConfig);
+          if (next.revision !== managed.revision) {
+            managed = next;
+            sites = next.sites;
+            config = next.config;
+            model.initialize(state, config, Date.now());
+            save();
+            console.log(
+              `[scheduler] Applied configuration ${managed.revision.slice(0, 12)}: ${config.jobs.length} jobs`,
+            );
+          }
+        } catch (error) {
+          // Refuse new jobs while an externally edited configuration is invalid.
+          console.error(`[scheduler] Configuration unavailable: ${error.message}`);
+          await new Promise(resolve => {
+            const timer = setTimeout(done, 5000);
+            function done() {
+              clearTimeout(timer);
+              control.wake = null;
+              resolve();
+            }
+            control.wake = done;
+          });
+          continue;
+        }
+      }
+      if (!config.jobs.length) {
+        await new Promise(resolve => {
+          const timer = setTimeout(done, 5000);
+          function done() {
+            clearTimeout(timer);
+            control.wake = null;
+            resolve();
+          }
+          control.wake = done;
+        });
+        continue;
+      }
       ingestLimits();
       const job = model.nextJob(state, config, Date.now());
       const due = model.readyAt(state, job, Date.now());
       if (due > Date.now()) {
         await new Promise(resolve => {
-          const timer = setTimeout(done, Math.min(due - Date.now(), 30000));
+          const timer = setTimeout(
+            done,
+            Math.min(due - Date.now(), settings.managedConfig ? 5000 : 30000),
+          );
           function done() {
             clearTimeout(timer);
             control.wake = null;
@@ -273,7 +324,16 @@ async function main(args = process.argv.slice(2)) {
       save();
       console.log(`[scheduler] ${job.key}: starting ${job.mode}`);
       const before = state.origins[job.origin].marker;
-      const outcome = await runChild(job, settings, control);
+      let runSettings = settings;
+      if (settings.managedConfig) {
+        const snapshot = path.join(settings.stateDir, 'run-sites.json');
+        atomicWrite(
+          snapshot,
+          sites.map(({ settings: ignored, ...site }) => site),
+        );
+        runSettings = { ...settings, sitesFile: snapshot };
+      }
+      const outcome = await runChild(job, runSettings, control);
       ingestLimits();
       const rateLimited = before !== state.origins[job.origin].marker;
       model.finish(state, job, config, Date.now(), outcome, rateLimited);

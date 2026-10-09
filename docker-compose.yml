@@ -39,3 +39,31 @@ services:
       timeout: 5s
       start_period: 30s
       retries: 3
+
+  control:
+    profiles: [managed]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: [node, scripts/control-server.js]
+    init: true
+    environment:
+      CI: 'true'
+      CONTROL_HOST: '0.0.0.0'
+      CONTROL_CONFIG_FILE: /app/managed-config/configuration.json
+      SCHEDULER_STATE_DIR: /app/scheduler-state
+    ports:
+      - '${CONTROL_BIND_ADDRESS:-127.0.0.1}:${CONTROL_PORT:-8080}:8080'
+    volumes:
+      - ./managed-config:/app/managed-config
+      - ./reports:/app/reports
+      - ./scheduler-state:/app/scheduler-state
+    shm_size: '1gb'
+    restart: unless-stopped
+    stop_grace_period: 45s
+    healthcheck:
+      test: [CMD, node, scripts/control-healthcheck.js]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3

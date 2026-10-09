@@ -2,6 +2,8 @@
 
 [Back to README](../README.md) · [Configuration](CONFIGURATION.md) · [Running tests](RUNNING.md)
 
+Prefer a browser editor? See [Browser control panel](CONTROL-PANEL.md). The instructions below describe the file-based scheduler.
+
 Run this service on a separate machine to check multiple stores over time. You choose the modes, browser projects, interval ranges and optional local start windows. It requires explicit store and scheduler files; there is no implicit live schedule.
 
 The scheduler runs **one job at a time across all stores**. It uses the existing runner, request pacing and reports. Random intervals distribute useful checks; the service does not generate extra traffic to disguise automation. Randomization cannot guarantee a store will not rate-limit or block requests.

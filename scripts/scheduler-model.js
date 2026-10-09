@@ -91,7 +91,7 @@ function nextWindowTime(time, window) {
   }
   throw new Error('No eligible start in the configured window');
 }
-function resolveSchedule(input, sites) {
+function resolveSchedule(input, sites, { allowEmpty = false } = {}) {
   object(
     input,
     [
@@ -193,7 +193,7 @@ function resolveSchedule(input, sites) {
       });
     }
   }
-  if (!config.jobs.length) throw new Error('Scheduler has no enabled jobs');
+  if (!config.jobs.length && !allowEmpty) throw new Error('Scheduler has no enabled jobs');
   return config;
 }
 function randomDelay(bounds, random = Math.random) {

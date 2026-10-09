@@ -130,7 +130,7 @@ function runtimeFixture(t, behavior = 'success') {
   const root = temporary(t);
   fs.mkdirSync(path.join(root, 'scripts'));
   fs.mkdirSync(path.join(root, 'config'));
-  for (const file of ['scheduler.js', 'scheduler-model.js', 'site-config.js'])
+  for (const file of ['scheduler.js', 'scheduler-model.js', 'site-config.js', 'managed-config.js'])
     fs.copyFileSync(path.join(__dirname, file), path.join(root, 'scripts', file));
   fs.copyFileSync(
     path.join(__dirname, '../config/site-settings.js'),
@@ -168,8 +168,8 @@ async function waitUntil(predicate, maxMs = 8000) {
   }
   throw new Error('Timed out waiting for fixture');
 }
-async function startRuntime(t, root, extraEnv = {}) {
-  const child = spawn(process.execPath, ['scripts/scheduler.js'], {
+async function startRuntime(t, root, extraEnv = {}, args = []) {
+  const child = spawn(process.execPath, ['scripts/scheduler.js', ...args], {
     cwd: root,
     env: { ...process.env, ...extraEnv },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -338,4 +338,35 @@ test('watchdog terminates a hung runner and records a timeout with a future sche
   const state = JSON.parse(fs.readFileSync(stateFile));
   assert.ok(state.jobs['a/smoke'].nextAt > Date.now());
   assert.equal(state.origins['https://a.test'].reason, 'timeout');
+});
+
+test('managed scheduler starts empty, reloads saved stores, and applies pause without restart', async t => {
+  const root = runtimeFixture(t);
+  const file = path.join(root, 'managed.json');
+  const { emptyConfiguration } = require('./managed-config');
+  const initial = emptyConfiguration();
+  initial.scheduler.startupSpreadMinutes = 0;
+  initial.scheduler.minGapMinutes = 0;
+  fs.writeFileSync(file, JSON.stringify(initial));
+  const runtime = await startRuntime(t, root, {}, ['--managed-config', file]);
+  await waitUntil(() => runtime.output().includes('Started 0 jobs'));
+  assert.equal(fs.existsSync(path.join(root, 'calls.jsonl')), false);
+  const store = { slug: 'a', url: 'https://a.test', productHandle: 'one', productHandle2: 'two' };
+  initial.sites.push(store);
+  initial.scheduler.sites.a = {
+    enabled: true,
+    jobs: [{ id: 'smoke', mode: 'smoke', intervalMinutes: [60, 120] }],
+  };
+  const { atomicWrite } = require('./scheduler');
+  atomicWrite(file, initial);
+  await waitUntil(() => fs.existsSync(path.join(root, 'calls.jsonl')), 12000);
+  initial.scheduler.sites.a.enabled = false;
+  atomicWrite(file, initial);
+  await waitUntil(() => /Applied configuration .*: 0 jobs/.test(runtime.output()), 12000);
+  runtime.child.kill('SIGTERM');
+  assert.equal((await runtime.exit).code, 0, runtime.output());
+  assert.equal(
+    fs.readFileSync(path.join(root, 'calls.jsonl'), 'utf8').trim().split('\n').length,
+    1,
+  );
 });

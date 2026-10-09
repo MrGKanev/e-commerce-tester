@@ -30,6 +30,9 @@ function loadSites(file, env = process.env, { requireFile = false, requireHandle
       },
     ];
   }
+  return validateSites(sites, env, { requireHandles });
+}
+function validateSites(sites, env = process.env, { requireHandles = false } = {}) {
   if (!Array.isArray(sites) || !sites.length)
     throw new Error('sites.json must be a non-empty array');
   const seen = new Set();
@@ -76,4 +79,4 @@ function loadSites(file, env = process.env, { requireFile = false, requireHandle
     return site;
   });
 }
-module.exports = { loadSites, slugify };
+module.exports = { loadSites, validateSites, slugify };

@@ -30,6 +30,7 @@ Additional loopback acceptance checks:
 
 | Command                      | Covers                                                                                              |
 | ---------------------------- | --------------------------------------------------------------------------------------------------- |
+| `pnpm test:control:local`    | Browser forms, persistence, pause, mobile layout and axe                                            |
 | `pnpm test:pacing`           | Request pacing and rate-limit behavior                                                              |
 | `pnpm test:readiness`        | Content readiness and consent handling                                                              |
 | `pnpm test:reporting`        | Metadata, coverage, skips and retries                                                               |

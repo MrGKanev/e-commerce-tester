@@ -25,6 +25,16 @@ pnpm dashboard
 
 `sites.json`, `.env`, browser storage and generated reports are local files excluded from version control. Configure your own store before running: the code retains legacy store defaults when configuration is omitted.
 
+## Browser management
+
+For unattended checks managed through forms, run:
+
+```bash
+docker compose --profile managed up -d --build control
+```
+
+Open **http://localhost:8080** to add stores, choose checks and schedules, pause stores and view reports. No configuration files need editing. The service starts empty and has no password/login; see [Browser control panel](docs/CONTROL-PANEL.md) for local hosting and domains.
+
 ## Run modes
 
 | Command                        | Scope                                                                                   |
@@ -61,6 +71,7 @@ These are automated checks of selected scenarios. Dictionary checks do not estab
 
 ## Documentation
 
+- [Browser control panel](docs/CONTROL-PANEL.md): manage stores and schedules without editing files.
 - [Docker scheduler](docs/SCHEDULER.md): unattended multi-store checks, random intervals, start windows and persistent cooldowns.
 - [Configuration](docs/CONFIGURATION.md): stores, environment variables, capabilities, selectors and thresholds.
 - [Running tests](docs/RUNNING.md): modes, browsers, pacing, visual baselines and Docker.

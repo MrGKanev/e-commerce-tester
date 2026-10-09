@@ -25,7 +25,7 @@ const reportsDir = path.join(__dirname, '..', 'reports');
 // ── Load site metadata from sites.json (for name / URL display) ──────────────
 
 function loadSiteMeta() {
-  const sitesFile = path.join(__dirname, '..', 'sites.json');
+  const sitesFile = process.env.SITES_FILE || path.join(__dirname, '..', 'sites.json');
   if (!fs.existsSync(sitesFile)) return {};
   try {
     const arr = JSON.parse(fs.readFileSync(sitesFile, 'utf8'));
