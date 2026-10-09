@@ -1,0 +1,46 @@
+{
+  "startupSpreadMinutes": 120,
+  "minGapMinutes": 5,
+  "maxRunMinutes": 120,
+  "cooldown": {
+    "rateLimitMinutes": 360,
+    "maxRateLimitMinutes": 10080,
+    "failureMinutes": 30,
+    "maxFailureMinutes": 1440
+  },
+  "pacing": {
+    "testDelayMs": 5000,
+    "testJitterMs": 3000,
+    "requestDelayMs": 2000,
+    "requestJitterMs": 2000
+  },
+  "defaults": {
+    "jobs": [
+      {
+        "id": "smoke",
+        "mode": "smoke",
+        "intervalMinutes": [360, 720],
+        "projects": ["Desktop Chrome"]
+      }
+    ]
+  },
+  "sites": {
+    "my-store": {
+      "jobs": [
+        {
+          "id": "smoke",
+          "mode": "smoke",
+          "intervalMinutes": [120, 240],
+          "projects": ["Desktop Chrome"]
+        },
+        {
+          "id": "pages",
+          "mode": "pages",
+          "intervalMinutes": [1440, 1800],
+          "projects": ["Desktop Chrome"]
+        }
+      ]
+    },
+    "second-store": { "enabled": false }
+  }
+}

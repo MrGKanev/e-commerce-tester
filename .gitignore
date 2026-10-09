@@ -12,3 +12,6 @@ package-lock.json
 .env
 
 .rate-limit.*.json
+
+scheduler.json
+scheduler-state/

@@ -18,9 +18,21 @@ const path = require('path');
 
 const root        = path.join(__dirname, '..');
 const reportsDir  = path.join(root, 'reports');
-const sitesFile   = path.join(root, 'sites.json');
+let sitesFile = path.join(root, 'sites.json');
 const extraArgs = process.argv.slice(2);
-const { resolveSiteSettings } = require('../config/site-settings');
+const { loadSites } = require('./site-config');
+function takeOption(name) {
+  const index = extraArgs.findIndex(arg => arg === name || arg.startsWith(name + '='));
+  if (index < 0) return undefined;
+  const inline = extraArgs[index].includes('=');
+  const value = inline ? extraArgs[index].slice(name.length + 1) : extraArgs[index + 1];
+  if (!value || value.startsWith('--')) die(`${name} requires a value`);
+  extraArgs.splice(index, inline ? 1 : 2);
+  return value;
+}
+const selectedSite = takeOption('--site');
+const configuredFile = takeOption('--sites-file');
+if (configuredFile) sitesFile = path.resolve(configuredFile);
 const modeIndex = extraArgs.findIndex(arg => arg === '--mode' || arg.startsWith('--mode='));
 const mode = modeIndex < 0 ? 'full' : extraArgs[modeIndex].includes('=') ? extraArgs[modeIndex].split('=')[1] : extraArgs[modeIndex + 1];
 if (!['smoke', 'full', 'visual', 'content', 'audit', 'pages'].includes(mode)) die('Mode must be smoke, full, visual, content, audit or pages');
@@ -34,55 +46,10 @@ if (fs.existsSync(path.join(root, '.env'))) process.loadEnvFile(path.join(root, 
 // ── Load sites ───────────────────────────────────────────────────────────────
 
 let sites;
-
-if (fs.existsSync(sitesFile)) {
-  try {
-    sites = JSON.parse(fs.readFileSync(sitesFile, 'utf8'));
-  } catch (err) {
-    die(`sites.json is not valid JSON: ${err.message}`);
-  }
-} else {
-  // Backwards-compat: fall back to .env / environment variables
-  const url  = process.env.STORE_URL || 'https://zerno.co';
-  const slug = slugify(url.replace(/https?:\/\//, '').split('/')[0]);
-  sites = [{
-    name:          slug,
-    slug,
-    url,
-    productHandle:  process.env.PRODUCT_HANDLE  || 'zerno-z1',
-    productHandle2: process.env.PRODUCT_HANDLE_2 || 'zerno-z2',
-    searchTerm:     process.env.SEARCH_TERM      || slug,
-  }];
-  console.log('ℹ  sites.json not found — using STORE_URL env var');
-}
-
-if (!Array.isArray(sites) || sites.length === 0) die('sites.json must be a non-empty array');
-
-const seenSlugs = new Set();
-for (const site of sites) {
-  if (!site || typeof site !== 'object' || typeof site.url !== 'string') {
-    die('Each site must be an object with a URL');
-  }
-  let url;
-  try { url = new URL(site.url); } catch { die(`Invalid site URL: ${site.url}`); }
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password ||
-      url.pathname !== '/' || url.search || url.hash) {
-    die('Site URLs must be HTTP(S) origins without credentials, paths, query strings or fragments');
-  }
-  site.url = url.origin;
-  site.slug = site.slug ?? slugify(url.hostname);
-  if (typeof site.slug !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(site.slug)) {
-    die('Site slug must contain lowercase letters, digits and single hyphens');
-  }
-  if (seenSlugs.has(site.slug)) die(`Duplicate site slug: ${site.slug}`);
-  for (const field of ['productHandle', 'productHandle2']) {
-    if (site[field] !== undefined && (typeof site[field] !== 'string' || /[\s/?#]/.test(site[field]))) die(`${field} must be a product handle without path/query characters`);
-  }
-  seenSlugs.add(site.slug);
-  try { site.settings = resolveSiteSettings({ locale: process.env.STORE_LOCALE || 'bg-BG', timezoneId: process.env.STORE_TIMEZONE || 'Europe/Sofia', ...site }); } catch (error) { die(`${site.slug}: ${error.message}`); }
-  for (const field of ['name', 'productHandle', 'productHandle2', 'searchTerm', 'discountCode']) {
-    if (site[field] !== undefined && typeof site[field] !== 'string') die(`${field} must be a string`);
-  }
+try { sites = loadSites(sitesFile); } catch (error) { die(error.message); }
+if (selectedSite) {
+  sites = sites.filter(site => site.slug === selectedSite);
+  if (!sites.length) die(`Unknown site slug: ${selectedSite}`);
 }
 
 // ── Run each site ────────────────────────────────────────────────────────────

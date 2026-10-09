@@ -4,3 +4,9 @@ reports
 storageState.json
 *.local
 .env
+
+sites.json
+scheduler.json
+scheduler-state
+storageState.*.json
+.rate-limit.*.json

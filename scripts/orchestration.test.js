@@ -14,7 +14,7 @@ function fixture(t) {
   fs.mkdirSync(path.join(root, 'config'));
   fs.copyFileSync(path.join(__dirname, '../config/site-settings.js'), path.join(root, 'config/site-settings.js'));
   fs.mkdirSync(path.join(root, 'reports'));
-  for (const name of ['run-sites.js', 'update-history.js', 'report-model.js']) {
+  for (const name of ['run-sites.js', 'site-config.js', 'update-history.js', 'report-model.js']) {
     fs.copyFileSync(path.join(__dirname, name), path.join(root, 'scripts', name));
   }
   const bin = path.join(root, 'bin');
@@ -183,4 +183,18 @@ test('dashboard escapes scenario reasons, global errors and metadata', t => {
   assert.ok(html.includes('&lt;img onerror=&quot;bad&quot;&gt;'));
   assert.ok(html.includes('&lt;script&gt;version&lt;/script&gt;'));
   assert.ok(!html.includes('<script>global'));
+});
+
+
+test('selects one store and consumes scheduler options instead of forwarding them to Playwright', t => {
+  const f = fixture(t);
+  sites(f, [{ url: 'https://a.test', slug: 'a' }, { url: 'https://b.test', slug: 'b' }]);
+  const result = run(f, 'run-sites.js', ['--sites-file', 'sites.json', '--site=b', '--mode=smoke']);
+  assert.equal(result.status, 0, result.stderr);
+  const calls = fs.readFileSync(path.join(f.root, 'invocations.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].slug, 'b');
+  assert.ok(calls[0].args.includes('@smoke'));
+  assert.ok(!calls[0].args.some(arg => arg.startsWith('--site')));
+  assert.equal(run(f, 'run-sites.js', ['--site', 'missing']).status, 1);
 });

@@ -55,6 +55,8 @@ When `sites.json` is absent, the runner uses environment variables. Copy `exampl
 | `TEST_DELAY_MS`, `TEST_JITTER_MS`       | Base delay and random additional delay before tests; defaults 5000/3000          |
 | `REQUEST_DELAY_MS`, `REQUEST_JITTER_MS` | Base delay and random additional delay before paced requests; defaults 2000/2000 |
 
+`RATE_LIMIT_DIR` optionally relocates rate-limit markers; the scheduler supplies it under its persistent state directory. `SCHEDULER_STATE_DIR` sets the scheduler state location outside Compose (or use `--state-dir`).
+
 Per-site values override the corresponding environment defaults. `SITE_SLUG`, `TEST_RUN_DATE`, `RUN_MODE`, `PAGE_INVENTORY_FILE` and `SITE_SETTINGS_JSON` are normally supplied by the runner; direct Playwright invocations bypass that orchestration.
 
 ## Capabilities and selectors
@@ -89,3 +91,7 @@ Partial objects inherit the remaining defaults. Timing values are milliseconds, 
 Threshold use depends on the scenario; defining a budget does not create additional measurements. See [Performance](PERFORMANCE.md) for observation settings and strict behavior, and [Content checks](CONTENT.md) for inventory/spelling options.
 
 The complete settings schema is in [`config/site-settings.d.ts`](../config/site-settings.d.ts), with validation and defaults in [`config/site-settings.js`](../config/site-settings.js).
+
+## Unattended runs
+
+Scheduling is configured separately in `scheduler.json`, referencing the slugs in `sites.json`. See [Docker scheduler](SCHEDULER.md) for per-store job lists, interval ranges, start windows and cooldowns.

@@ -19,13 +19,16 @@ The runner defaults to `full` mode and `Desktop Chrome`. It selects the matching
 pnpm test:full --project="Desktop Chrome" --project="Desktop Firefox" --project="Desktop Safari"
 pnpm test:full --project="Mobile Chrome" --project="Mobile Safari"
 pnpm test:full --grep="@content"
+pnpm test:smoke --site=my-store
 pnpm test:headed
 pnpm test:debug
 ```
 
+`--site=<slug>` selects one configured store. `--sites-file=<path>` selects a different store file; both options are consumed by the runner.
+
 Desktop projects cover the full suite. Mobile Chrome (Pixel 7) and Mobile Safari (iPhone 13) select mobile, visual, accessibility, keyboard, content, inventory visual and shared-page specs. Desktop specs that resize the viewport are distinct from these touch/device projects.
 
-Lighthouse runs only in the first selected Chromium project. Firefox and WebKit skip it. No active scheduler is included; schedule these commands locally if needed.
+Lighthouse runs only in the first selected Chromium project. Firefox and WebKit skip it. For unattended execution with configurable per-store intervals, use the [long-running Docker scheduler](SCHEDULER.md).
 
 ## Lifecycle and request pacing
 
@@ -60,6 +63,8 @@ pnpm test:visual tests/10-visual.spec.ts --project="Desktop Chrome" --update-sna
 The default pixel difference ratio is 0.03, configurable per store. Dynamic elements are masked by the spec. Spelling evidence is a separate screenshot and does not annotate the visual baseline.
 
 ## Docker
+
+The commands below run once. For a persistent service, see [Docker scheduler](SCHEDULER.md).
 
 ```bash
 cp examples/.env.example .env

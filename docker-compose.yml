@@ -7,8 +7,35 @@ services:
       - path: .env
         required: false
     environment:
-      CI: "true"
+      CI: 'true'
     volumes:
       # Reports are written here so they survive container exit
       - ./reports:/app/reports
-    restart: "no"
+    restart: 'no'
+
+  scheduler:
+    profiles: [scheduled]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: [node, scripts/scheduler.js, --state-dir, /app/scheduler-state]
+    init: true
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      CI: 'true'
+    volumes:
+      - ./sites.json:/app/sites.json:ro
+      - ./scheduler.json:/app/scheduler.json:ro
+      - ./reports:/app/reports
+      - ./scheduler-state:/app/scheduler-state
+    shm_size: '1gb'
+    restart: unless-stopped
+    stop_grace_period: 45s
+    healthcheck:
+      test: [CMD, node, scripts/scheduler-healthcheck.js]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3

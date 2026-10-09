@@ -24,6 +24,8 @@ pnpm format:check
 
 `pnpm check` runs TypeScript, ESLint, offline unit tests and the Docker/Playwright toolchain check. Formatting is a separate command. There is no GitHub Actions pipeline executing these checks or live tests; run relevant checks locally before opening a PR.
 
+Unit tests also exercise the scheduler with stub runners: interval bounds, cooldowns, restart recovery, process shutdown, exclusive locks and start windows.
+
 Additional loopback acceptance checks:
 
 | Command                      | Covers                                                                                              |

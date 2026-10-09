@@ -5,6 +5,7 @@ import type { APIRequestContext, BrowserContext } from '@playwright/test';
 
 const origin = new URL(process.env.STORE_URL || 'https://zerno.co').origin;
 export const RATE_LIMIT_FILE = path.resolve(
+  process.env.RATE_LIMIT_DIR || '.',
   `.rate-limit.${process.env.SITE_SLUG || new URL(origin).hostname}.json`,
 );
 

@@ -44,7 +44,7 @@ pnpm test:debug
 pnpm dashboard:preview
 ```
 
-The dashboard preview uses offline sample data. Live runs use request pacing, no automatic retries and one worker. Optional features may be skipped; review coverage and skip reasons alongside pass rate.
+The dashboard preview uses offline sample data. Live runs use request pacing, no automatic retries and one worker. For unattended checks across multiple stores, use the [long-running Docker scheduler](docs/SCHEDULER.md) with configurable intervals and cooldowns. Optional features may be skipped; review coverage and skip reasons alongside pass rate.
 
 ## Coverage
 
@@ -61,6 +61,7 @@ These are automated checks of selected scenarios. Dictionary checks do not estab
 
 ## Documentation
 
+- [Docker scheduler](docs/SCHEDULER.md): unattended multi-store checks, random intervals, start windows and persistent cooldowns.
 - [Configuration](docs/CONFIGURATION.md): stores, environment variables, capabilities, selectors and thresholds.
 - [Running tests](docs/RUNNING.md): modes, browsers, pacing, visual baselines and Docker.
 - [Reports](docs/REPORTS.md): artifacts, dashboard metrics, coverage and comparisons.
@@ -82,7 +83,7 @@ playwright.config.ts   Projects, artifacts and snapshot paths
 run.sh                 Entry point for the multi-store runner
 ```
 
-There are no GitHub Actions workflows that execute the suite or quality checks. Run them locally; Dependabot provides dependency update PRs.
+There are no GitHub Actions workflows that execute the suite or quality checks. Run them locally or through Docker; Dependabot provides dependency update PRs.
 
 ## License
 
