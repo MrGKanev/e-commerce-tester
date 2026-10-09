@@ -7,6 +7,19 @@
   --border: #e4e7ec;
   --blue: #2563eb;
 }
+.project-footer {
+  margin-top: 28px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+.project-footer a {
+  color: var(--blue);
+  text-decoration: none;
+}
+.project-footer a:hover {
+  text-decoration: underline;
+}
 * {
   box-sizing: border-box;
 }
