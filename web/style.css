@@ -498,3 +498,36 @@ details button {
     height: 700px;
   }
 }
+/* Visual approval stays usable on narrow screens and preserves image proportions. */
+.visual-card {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+}
+.visual-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.visual-grid figure {
+  margin: 0;
+  min-width: 0;
+}
+.visual-grid img {
+  width: 100%;
+  height: auto;
+  border: 1px solid #d1d5db;
+}
+.visual-grid figcaption {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+#visual-review {
+  padding: 16px;
+}
+@media (max-width: 700px) {
+  .visual-grid {
+    grid-template-columns: 1fr;
+  }
+}

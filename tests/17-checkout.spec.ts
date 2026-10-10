@@ -1,132 +1,110 @@
 import { addProductToCart } from './helpers';
 import { test, expect, type Page } from './fixtures';
+import type { TestInfo } from '@playwright/test';
+import { readSiteSettings } from '../config/site-settings';
+import { CommerceUnverified } from '../scripts/storefront-model';
+import {
+  assertCheckoutField,
+  CheckNotApplicable,
+  reachCheckoutFromCart,
+} from './storefront-assertions';
 
-
-const CHECKOUT_BTN_SEL = [
-  'button[name="checkout"]',
-  'input[name="checkout"]',
-  'a[href*="/checkout"]',
-  'button:has-text("Checkout")',
-  'button:has-text("Check out")',
-  'button:has-text("Продължи към плащане")',
-  'button:has-text("Плащане")',
-  'button:has-text("Поръчай")',
-  '.cart__checkout-button',
-  '#checkout',
-].join(', ');
-
-async function addToCartAndGoToCartPage(page: Page): Promise<boolean> {
-  return addProductToCart(page);
+const settings = readSiteSettings();
+const CHECKOUT_BTN_SEL =
+  settings.selectors.checkoutButton ||
+  [
+    'button[name="checkout"]',
+    'input[name="checkout"]',
+    'a[href*="/checkout"]',
+    '.cart__checkout-button',
+    '#checkout',
+    'button:has-text("Checkout")',
+    'button:has-text("Check out")',
+    'button:has-text("Продължи към плащане")',
+    'button:has-text("Плащане")',
+    'button:has-text("Поръчай")',
+  ].join(', ');
+async function checkout(page: Page, beforeNavigation?: () => void) {
+  const added = await addProductToCart(page);
+  if (!added) throw new CommerceUnverified('No available configured checkout product');
+  beforeNavigation?.();
+  await reachCheckoutFromCart(page, settings);
 }
 
-async function reachCheckout(page: Page): Promise<boolean> {
-  if (!(await addToCartAndGoToCartPage(page))) return false;
-  const checkoutBtn = page.locator(CHECKOUT_BTN_SEL).first();
-  await expect(checkoutBtn, 'Checkout control is missing').toBeVisible();
-  await checkoutBtn.click();
-  await expect(page).toHaveURL(/checkout/);
-  await page.waitForLoadState('domcontentloaded');
-  return true;
+async function classified(info: TestInfo, action: () => Promise<void>) {
+  try {
+    await action();
+  } catch (error) {
+    if (error instanceof CheckNotApplicable) {
+      info.annotations.push({ type: 'not-applicable', description: error.message });
+      test.skip(true, error.message);
+    }
+    if (!(error instanceof CommerceUnverified)) throw error;
+    info.annotations.push({ type: 'checkout-unverified', description: error.message });
+    test.skip(true, error.message);
+  }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-test.describe('17 · Checkout flow', { tag: ["@full"] }, () => {
-
-  // ── Cart → Checkout ───────────────────────────────────────────────────────
-
+test.describe('17 · Checkout flow', { tag: '@full' }, () => {
   test('cart page shows a checkout button', async ({ page }) => {
-    const added = await addToCartAndGoToCartPage(page);
-    if (!added) test.skip(true, 'Configured product is sold out');
-
-    const btn = page.locator(CHECKOUT_BTN_SEL).first();
-    await expect(btn).toBeVisible({ timeout: 10_000 });
+    await addProductToCart(page);
+    await expect(
+      page.locator(CHECKOUT_BTN_SEL).filter({ visible: true }),
+      'Expected checkout button missing or ambiguous',
+    ).toHaveCount(1);
   });
-
-  test('checkout button navigates to a checkout URL', async ({ page }) => {
-    const reached = await reachCheckout(page);
-    if (!reached) test.skip(true, 'Configured product is sold out');
-
-    expect(page.url()).toMatch(/checkout/i);
+  test('checkout button reaches a checkout route with readable content and no HTTP error', async ({
+    page,
+  }, info) => {
+    await classified(info, () => checkout(page));
   });
-
-  test('checkout URL is HTTPS', async ({ page }) => {
-    const reached = await reachCheckout(page);
-    if (!reached) test.skip(true, 'Configured product is sold out');
-
-    expect(page.url(), 'Checkout is not served over HTTPS').toMatch(/^https:\/\//);
+  test('checkout URL is HTTPS', async ({ page }, info) => {
+    await classified(info, async () => {
+      await checkout(page);
+      expect(new URL(page.url()).protocol, 'Checkout is not served over HTTPS').toBe('https:');
+    });
   });
-
-  test('checkout page loads without JS errors', async ({ page }) => {
-    const jsErrors: string[] = [];
-    page.on('pageerror', err => jsErrors.push(err.message));
-
-    const reached = await reachCheckout(page);
-    if (!reached) test.skip(true, 'Configured product is sold out');
-
-    const critical = jsErrors.filter(e =>
-      !e.includes('cross-origin') &&
-      !e.includes('ResizeObserver') &&
-      !e.includes('Non-Error promise rejection'),
-    );
-    expect(critical, `JS errors on checkout page:\n${critical.join('\n')}`).toHaveLength(0);
+  test('checkout navigation has no critical JS errors', async ({ page }, info) => {
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await classified(info, async () => {
+      await checkout(page, () => {
+        errors.length = 0;
+      });
+      expect(
+        errors.filter(
+          error => !/cross-origin|ResizeObserver|Non-Error promise rejection/.test(error),
+        ),
+        'Checkout JavaScript errors',
+      ).toEqual([]);
+    });
   });
-
-  // ── Checkout form fields ──────────────────────────────────────────────────
-
-  test('checkout page has a contact / email field', async ({ page }) => {
-    const reached = await reachCheckout(page);
-    if (!reached) test.skip(true, 'Configured product is sold out');
-
-    const emailSel = 'input[type="email"], input[name="email"], #email, [autocomplete="email"]';
-    const field = page.locator(emailSel).first();
-    if ((await field.count()) === 0) {
-      // One-page checkout or login-gated — just confirm we're on a checkout URL
-      expect(page.url()).toMatch(/checkout/i);
-      return;
-    }
-    await expect(field).toBeVisible();
+  test('expected checkout contact field is visible and editable', async ({ page }, info) => {
+    await classified(info, async () => {
+      await checkout(page);
+      await assertCheckoutField(page, info, 'contact');
+    });
   });
-
-  test('checkout page has shipping address fields', async ({ page }) => {
-    const reached = await reachCheckout(page);
-    if (!reached) test.skip(true, 'Configured product is sold out');
-
-    const addressSel = [
-      'input[name*="address"]',
-      'input[autocomplete*="address"]',
-      '#shipping-address1',
-      '[data-address1]',
-    ].join(', ');
-
-    const fields = page.locator(addressSel);
-    if ((await fields.count()) === 0) {
-      expect(page.url()).toMatch(/checkout/i);
-      return;
-    }
-    await expect(fields.first()).toBeVisible();
+  test('expected checkout shipping address fields are visible and editable', async ({
+    page,
+  }, info) => {
+    await classified(info, async () => {
+      await checkout(page);
+      await assertCheckoutField(page, info, 'shippingAddress');
+    });
   });
-
-  // ── Express checkout ──────────────────────────────────────────────────────
-
-  test('express checkout buttons are visible on cart (if enabled)', async ({ page }) => {
-    const added = await addToCartAndGoToCartPage(page);
-    if (!added) test.skip(true, 'Configured product is sold out');
-
-    const expressSel = [
-      '.shopify-payment-button__button',
-      '[data-shopify="payment-button"]',
-      '.apple-pay-button',
-      '.gpay-button',
-      'button[aria-label*="Apple Pay"]',
-      'button[aria-label*="Google Pay"]',
-      'button[aria-label*="Shop Pay"]',
-    ].join(', ');
-
-    const buttons = page.locator(expressSel);
-    if ((await buttons.count()) === 0) {
-      test.skip(true, 'No express checkout buttons — feature may not be enabled');
-      return;
+  test('express checkout buttons are visible on cart when exposed', async ({ page }, info) => {
+    await addProductToCart(page);
+    const buttons = page
+      .locator(
+        '.shopify-payment-button__button, [data-shopify="payment-button"], .apple-pay-button, .gpay-button, button[aria-label*="Apple Pay"], button[aria-label*="Google Pay"], button[aria-label*="Shop Pay"]',
+      )
+      .filter({ visible: true });
+    if (!(await buttons.count())) {
+      info.annotations.push({
+        type: 'checkout-unverified',
+        description: 'Express checkout presence has not been configured or verified',
+      });
+      test.skip(true, 'No exposed express checkout buttons; not verified');
     }
     await expect(buttons.first()).toBeVisible();
   });

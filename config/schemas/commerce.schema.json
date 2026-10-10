@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://e-commerce-tester.local/schemas/commerce.json",
+  "title": "Resolved WooCommerce settings before URL normalization",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "productUrls": {
+      "type": "array",
+      "maxItems": 25,
+      "items": {
+        "type": "string",
+        "pattern": "\\S"
+      }
+    },
+    "productIds": {
+      "type": "array",
+      "maxItems": 25,
+      "items": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9007199254740991
+      }
+    },
+    "apiRoot": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "routes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "catalog": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "cart": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "checkout": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "search": {
+          "type": "string",
+          "pattern": "\\S"
+        }
+      }
+    },
+    "uiProfile": {
+      "enum": ["auto", "classic", "blocks"]
+    },
+    "taxDisplay": {
+      "enum": ["auto", "including", "excluding"]
+    }
+  }
+}

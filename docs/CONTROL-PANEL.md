@@ -84,3 +84,13 @@ pnpm check
 ```
 
 Loopback tests cover setup, editing, save/reload, pause, advanced setting preservation, mobile layout and axe checks. API tests cover validation, revision conflicts, cross-origin writes and report path confinement. Scheduler tests verify live reload without store traffic.
+
+## Approving visual baselines
+
+Choose Reports, a store and a finished run. The visual section shows each captured candidate, the baseline used for that comparison and an available diff. Select the correct screenshots and use **Approve selected screenshots**. Confirming creates a new approved version for that store and leaves other stores and unselected screenshots unchanged. Capturing a new run never changes approval. See [Visual baselines](RUNNING.md#visual-baselines) for environment compatibility and first-run setup.
+
+## WooCommerce stores
+
+Select WooCommerce in Platform, enter one public product URL per line and adjust catalogue/cart/checkout paths. Specify cart tax display if auto detection is unavailable. These stores use the same schedules, reports and approvals as Shopify stores, with separate platform suites and API behavior. See [WooCommerce](WOOCOMMERCE.md).
+
+**Checkout expectations** задава дали checkout е разпознаваем/очакван, блокиран или неподдържан и дали contact/shipping полетата са required, not applicable или not verified yet. Причината се запазва с настройките. Custom field selectors и списъкът на адресните полета се задават в конфигурацията; виж [Checkout очаквания](CONFIGURATION.md#checkout-очаквания).

@@ -4,7 +4,7 @@ let data,
   token,
   selected = null,
   dirty = false,
-  status;
+  schedulerStatus;
 const $ = selector => document.querySelector(selector);
 const escapeHTML = value =>
   String(value ?? '').replace(
@@ -86,16 +86,52 @@ function render() {
   if (!schedule.jobs) schedule.jobs = structuredClone(storeJobs(site));
   const jobs = schedule.jobs;
   const spelling = site.spelling || {};
+  const woo = site.platform === 'woocommerce';
+  const products = woo
+    ? `<label class="full">WooCommerce product URLs<textarea aria-label="WooCommerce product URLs" data-path="${base}.commerce.productUrls" data-list>${escapeHTML((site.commerce?.productUrls || []).join('\n'))}</textarea></label>${field('Catalog path', `${base}.commerce.routes.catalog`, site.commerce?.routes?.catalog || 'shop/')}${field('Cart path', `${base}.commerce.routes.cart`, site.commerce?.routes?.cart || 'cart/')}${field('Checkout path', `${base}.commerce.routes.checkout`, site.commerce?.routes?.checkout || 'checkout/')}<label>Cart prices include tax<select aria-label="Cart prices include tax" data-path="${base}.commerce.taxDisplay">${[
+        ['auto', 'Detect from frontend'],
+        ['including', 'Including tax'],
+        ['excluding', 'Excluding tax'],
+      ]
+        .map(
+          ([value, label]) =>
+            `<option value="${value}" ${(site.commerce?.taxDisplay || 'auto') === value ? 'selected' : ''}>${label}</option>`,
+        )
+        .join('')}</select></label>`
+    : `${field('First product URL or handle', `${base}.productHandle`, site.productHandle)}${field('Second product URL or handle', `${base}.productHandle2`, site.productHandle2)}`;
   editor.innerHTML = `<div class="section-heading"><h2>${escapeHTML(site.name || 'Store settings')}</h2><span class="badge">${schedule.enabled === false ? 'Paused' : 'Scheduled'}</span></div>
-    <div class="grid">${field('Store name', `${base}.name`, site.name)}${field('Store address', `${base}.url`, site.url, 'url')}${field('First product URL or handle', `${base}.productHandle`, site.productHandle)}${field('Second product URL or handle', `${base}.productHandle2`, site.productHandle2)}${field('Search term', `${base}.searchTerm`, site.searchTerm)}${field('Report ID', `${base}.slug`, site.slug, 'text', 1, 'readonly')}${field('Language / locale', `${base}.locale`, site.locale || 'bg-BG')}${field('Timezone', `${base}.timezoneId`, site.timezoneId || 'Europe/Sofia')}</div>
-    <p class="help">Paste product addresses or enter the part after /products/. Use two products suitable for cart checks.</p>
+    <div class="grid">${field('Store name', `${base}.name`, site.name)}${field('Store address', `${base}.url`, site.url, 'url')}<label>Platform<select aria-label="Platform" data-path="${base}.platform"><option value="shopify" ${!woo ? 'selected' : ''}>Shopify</option><option value="woocommerce" ${woo ? 'selected' : ''}>WooCommerce</option></select></label>${products}${field('Search term', `${base}.searchTerm`, site.searchTerm)}${field('Report ID', `${base}.slug`, site.slug, 'text', 1, 'readonly')}${field('Language / locale', `${base}.locale`, site.locale || 'bg-BG')}${field('Timezone', `${base}.timezoneId`, site.timezoneId || 'Europe/Sofia')}</div>
+    <p class="help">${woo ? 'Enter one public product URL per line. Adjust the store paths to match its WordPress installation. Checks use the public Store API and never submit an order.' : 'Paste product addresses or enter the part after /products/. Use two products suitable for cart checks.'}</p>
     <div class="section"><div class="section-heading"><h2>Check schedule</h2><button class="quiet" data-action="add-job">+ Add check</button></div>${checkbox('Enable scheduled checks for this store', `scheduler.sites.${site.slug}.enabled`, schedule.enabled !== false)}<p class="help">Intervals start after a check finishes. Only one store runs at a time.</p>
     ${jobs.map((job, j) => renderJob(job, `${jobBase}.${j}`, j, site.timezoneId || 'Europe/Sofia')).join('')}
     ${jobs.length ? '' : '<p class="help">Add at least one check before enabling this store.</p>'}</div>
+    ${renderCheckoutPolicy(site, base)}
     <details class="section"><summary>Content and request settings</summary><div class="grid section"><label>Spelling behavior<select data-path="${base}.spelling.mode">${['off', 'report', 'strict'].map(mode => `<option value="${mode}" ${(spelling.mode || 'report') === mode ? 'selected' : ''}>${mode}</option>`).join('')}</select></label><label>Accepted brand names and terms<textarea data-path="${base}.spelling.allowWords" data-list>${escapeHTML((spelling.allowWords || []).join('\n'))}</textarea></label></div><p class="help">Enter one accepted term per line. Strict spelling can fail for brand names or unknown words.</p><div class="grid">${renderPacing(schedule.pacing || {}, `scheduler.sites.${site.slug}.pacing`, true)}</div><p class="help">Blank fields inherit the general pauses.</p></details>
     <div class="footer"><p class="help">Existing reports remain when a store is removed.</p><button class="danger" data-action="remove-store">Remove store</button></div>`;
   renderJobStatus();
 }
+function renderCheckoutPolicy(site, base) {
+  const policy = site.checkout || {};
+  const select = (label, key, choices, fallback) =>
+    `<label>${label}<select aria-label="${label}" data-path="${base}.checkout.${key}">${choices.map(([value, text]) => `<option value="${value}" ${(policy[key] || fallback) === value ? 'selected' : ''}>${text}</option>`).join('')}</select></label>`;
+  const expected = [
+    ['required', 'Required'],
+    ['not-applicable', 'Not applicable'],
+    ['unverified', 'Not verified yet'],
+  ];
+  return `<details class="section"><summary>Checkout expectations</summary><div class="grid section">${select(
+    'Checkout interface',
+    'mode',
+    [
+      ['auto', 'Detect supported interface'],
+      ['supported', 'Expect configured interface'],
+      ['unsupported', 'Unsupported provider'],
+      ['blocked', 'Access blocked'],
+    ],
+    'auto',
+  )}${select('Contact field expectation', 'contact', expected, 'required')}${select('Shipping address expectation', 'shippingAddress', expected, 'required')}${field('Checkout expectation reason', `${base}.checkout.reason`, policy.reason || '')}</div><p class="help">Required fields must be visible and usable. For digital products, shipping can be marked not applicable. Staged or inaccessible fields can be marked not verified yet. Custom field selectors and address requirements are available in the configuration.</p></details>`;
+}
+
 function renderJob(job, base, index, timezone) {
   const checkedProjects = job.projects || ['Desktop Chrome'];
   const window = job.window;
@@ -182,9 +218,9 @@ async function load() {
   await refreshStatus();
 }
 function renderJobStatus() {
-  if (!status) return;
+  if (!schedulerStatus) return;
   for (const element of document.querySelectorAll('[data-job-status]')) {
-    const job = status.jobs.find(
+    const job = schedulerStatus.jobs.find(
       job => job.site === selected && job.id === element.dataset.jobStatus,
     );
     element.textContent = job
@@ -194,12 +230,12 @@ function renderJobStatus() {
 }
 async function refreshStatus() {
   try {
-    status = await api('/api/status');
-    $('#worker').textContent = status.healthy
+    schedulerStatus = await api('/api/status');
+    $('#worker').textContent = schedulerStatus.healthy
       ? '● Scheduler online'
       : '○ Scheduler starting or offline';
-    $('#active').textContent = status.running
-      ? `Running: ${status.running.key}`
+    $('#active').textContent = schedulerStatus.running
+      ? `Running: ${schedulerStatus.running.key}`
       : 'No active check';
     renderJobStatus();
   } catch {
@@ -271,6 +307,11 @@ $('#editor').addEventListener('change', event => {
   const input = event.target,
     site = data.sites.find(site => site.slug === selected);
   if (!site) return;
+  if (input.dataset.path?.endsWith('.platform')) {
+    changed();
+    render();
+    return;
+  }
   if (
     input.dataset.path?.endsWith('.productHandle') ||
     input.dataset.path?.endsWith('.productHandle2')
@@ -429,6 +470,7 @@ function displayReport(url, title) {
   }
 }
 function renderReports() {
+  $('#visual-review').hidden = true;
   $('#reports-submenu').innerHTML =
     `<button data-report-store="overview" class="${reportStore === 'overview' ? 'active' : ''}" aria-pressed="${reportStore === 'overview'}">Overview</button>` +
     reportGroups
@@ -458,6 +500,7 @@ function renderReports() {
     .join('');
   const run = group.runs.find(run => run.id === reportRun);
   displayReport(run?.reportUrl, group.name + ' · ' + (run?.id || 'report'));
+  if (group.id.startsWith('site:') && run) refreshVisual(group.id.slice(5), run.id);
 }
 async function refreshReports() {
   try {
@@ -486,5 +529,73 @@ $('#report-list').addEventListener('click', event => {
   if (button) {
     reportRun = button.dataset.reportRun;
     renderReports();
+  }
+});
+
+let visualReview = null;
+let visualRequest = 0;
+async function refreshVisual(site, run) {
+  const request = ++visualRequest;
+  visualReview = null;
+  $('#visual-message').textContent = '';
+  try {
+    const result = await api(
+      `/api/visual?site=${encodeURIComponent(site)}&run=${encodeURIComponent(run)}`,
+    );
+    if (request !== visualRequest || reportStore !== 'site:' + site || reportRun !== run) return;
+    visualReview = result;
+    $('#visual-review').hidden = !result.entries.length;
+    $('#visual-summary').textContent = result.revision
+      ? `Approved version: ${result.revision} · ${result.approvedAt}`
+      : 'No approved version yet. Review the candidates below.';
+    if (!result.complete)
+      $('#visual-summary').textContent += ' Wait for this run to finish before approving.';
+    $('#visual-images').innerHTML = result.entries
+      .map(entry => {
+        const enabled = result.complete && entry.status !== 'error' && !entry.currentlyApproved;
+        const figure = (title, url) =>
+          `<figure><figcaption>${title}</figcaption>${url ? `<a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHTML(url)}" alt="${escapeHTML(title + ': ' + entry.name)}" loading="lazy"></a>` : '<p>No image available</p>'}</figure>`;
+        return `<article class="visual-card"><label class="check"><input type="checkbox" data-visual-id="${escapeHTML(entry.id)}" ${enabled ? '' : 'disabled'}>${escapeHTML(entry.name)} · ${escapeHTML(entry.project)} · Run result: ${escapeHTML(entry.status)}${entry.currentlyApproved ? ' · Already approved' : ''}</label><p class="help">Compared with version: ${escapeHTML(entry.baselineRevision || 'none')} · Allowed difference: ${entry.maxDiffPixelRatio * 100}%</p><div class="visual-grid">${figure('Baseline used by this run', entry.baselineUrl)}${figure('Candidate', entry.currentUrl)}${figure('Difference', entry.diffUrl)}${entry.approvedUrl && entry.baselineRevision !== result.revision ? figure('Currently approved', entry.approvedUrl) : ''}</div></article>`;
+      })
+      .join('');
+    $('#approve-visual').disabled = true;
+  } catch (error) {
+    if (request === visualRequest) $('#reports-message').textContent = error.message;
+  }
+}
+$('#visual-images').addEventListener('change', () => {
+  $('#approve-visual').disabled = !$('#visual-images').querySelector('input:checked');
+});
+$('#approve-visual').addEventListener('click', async () => {
+  const reviewed = visualReview;
+  if (!reviewed) return;
+  const ids = [...$('#visual-images').querySelectorAll('input:checked')].map(
+    input => input.dataset.visualId,
+  );
+  if (
+    !ids.length ||
+    !confirm(
+      `Approve ${ids.length} screenshot(s) as the correct appearance for ${reviewed.site}? Future checks will compare against these images until you approve another version.`,
+    )
+  )
+    return;
+  $('#approve-visual').disabled = true;
+  try {
+    const result = await api('/api/visual/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Control-Token': token },
+      body: JSON.stringify({
+        site: reviewed.site,
+        run: reviewed.run,
+        revision: reviewed.revision,
+        ids,
+      }),
+    });
+    await refreshVisual(reviewed.site, reviewed.run);
+    $('#visual-message').textContent =
+      `Approved ${result.approvedCount} screenshot(s). Future runs will use the new approved version. Historical results remain unchanged.`;
+  } catch (error) {
+    $('#visual-message').textContent = error.message;
+    $('#approve-visual').disabled = false;
   }
 });

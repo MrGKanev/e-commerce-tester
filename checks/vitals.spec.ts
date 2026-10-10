@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { setTimeout as simulatedLatency } from 'node:timers/promises';
 import {
   installWebVitals,
   initWebVitals,
@@ -22,8 +23,13 @@ async function fixture(browser: import('@playwright/test').Browser, body: string
   const context = await browser.newContext();
   const session = await installWebVitals(context, options);
   let requests = 0;
-  await context.route('**/*', route => {
-    if (route.request().isNavigationRequest()) requests++;
+  await context.route('**/*', async route => {
+    if (route.request().isNavigationRequest()) {
+      requests++;
+      // A zero-latency fulfilled response can quantize TTFB to zero. Model a
+      // small response delay so this fixture actually supplies measurable timing.
+      await simulatedLatency(15);
+    }
     return route.fulfill({ contentType: 'text/html', body });
   });
   const page = await context.newPage();

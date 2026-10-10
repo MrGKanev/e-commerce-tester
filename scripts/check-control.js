@@ -1,4 +1,5 @@
 'use strict';
+/* global document, innerWidth -- Used only inside Playwright page.evaluate callbacks. */
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -6,6 +7,7 @@ const assert = require('node:assert/strict');
 const { chromium, expect } = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
 const { createControlServer } = require('./control-server');
+const { digest, approved } = require('./visual-baselines');
 (async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'control-browser-'));
   const configFile = path.join(directory, 'config/configuration.json');
@@ -60,6 +62,20 @@ const { createControlServer } = require('./control-server');
     saved = JSON.parse(fs.readFileSync(configFile));
     assert.deepEqual(saved.sites[0].spelling.acceptedFindings, ['reviewed-id']);
     assert.equal(saved.sites[0].selectors.price, '.custom-price');
+    await page.getByText('Checkout expectations', { exact: true }).click();
+    await page
+      .getByLabel('Shipping address expectation', { exact: true })
+      .selectOption('not-applicable');
+    await page.getByLabel('Checkout interface', { exact: true }).selectOption('supported');
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('Settings saved');
+    await page.reload();
+    await page.getByText('Checkout expectations', { exact: true }).click();
+    await expect(page.getByLabel('Shipping address expectation', { exact: true })).toHaveValue(
+      'not-applicable',
+    );
+    assert.equal(JSON.parse(fs.readFileSync(configFile)).sites[0].checkout.mode, 'supported');
+
     await page.getByRole('button', { name: 'Scheduling & pauses', exact: true }).click();
     await page.getByLabel('Spread first checks over (hours)').fill('2');
     await page.getByRole('button', { name: 'Save changes', exact: true }).click();
@@ -164,7 +180,94 @@ const { createControlServer } = require('./control-server');
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await expect(page.getByLabel('Store name', { exact: true })).toHaveValue('Unsaved store edit');
     await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeEnabled();
+    // Visual candidates require a deliberate selection and confirmation.
+    const visualRun = '2026-10-09_10-00-00-001';
+    const visualDir = path.join(reportRoot, storeId, visualRun, 'visual');
+    fs.mkdirSync(path.join(visualDir, 'entries'), { recursive: true });
+    const id = 'a'.repeat(32);
+    const pixels = await page.screenshot();
+    fs.writeFileSync(path.join(visualDir, id + '-current.png'), pixels);
+    fs.writeFileSync(
+      path.join(visualDir, 'entries', id + '.json'),
+      JSON.stringify({
+        id,
+        site: storeId,
+        run: visualRun,
+        name: 'homepage-fold.png',
+        project: 'Desktop Chrome',
+        status: 'missing',
+        sha256: digest(pixels),
+        environment: { platform: 'local-test' },
+        baselineRevision: null,
+        maxDiffPixelRatio: 0.03,
+        hasBaseline: false,
+        hasDiff: false,
+      }),
+    );
+    fs.writeFileSync(
+      path.join(reportRoot, storeId, visualRun, 'run-metadata.json'),
+      JSON.stringify({ phase: 'finished' }),
+    );
+    await page.getByRole('button', { name: 'Reports', exact: true }).click();
+    await page.locator('#report-list').getByRole('button').first().click();
+    await expect(page.locator('#visual-review')).toBeVisible();
+    await expect(page.locator('#approve-visual')).toBeDisabled();
+    assert.equal(approved(path.join(directory, 'visual-baselines'), storeId).revision, null);
+    await page.locator('[data-visual-id]').check();
+    page.once('dialog', dialog => dialog.dismiss());
+    await page.locator('#approve-visual').click();
+    assert.equal(approved(path.join(directory, 'visual-baselines'), storeId).revision, null);
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('#approve-visual').click();
+    await expect(page.locator('#visual-message')).toContainText('Approved 1 screenshot(s)');
+    assert.ok(approved(path.join(directory, 'visual-baselines'), storeId).revision);
+    await expect(page.locator('[data-visual-id]')).toBeDisabled();
+    await page.reload();
+    await page.getByRole('button', { name: 'Reports', exact: true }).click();
+    await page
+      .locator('#reports-submenu')
+      .getByRole('button', { name: /Updated Shop/ })
+      .click();
+    await expect(page.locator('#visual-summary')).toContainText('Approved version:');
+    const visualAxe = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+      .analyze();
+    assert.deepEqual(
+      visualAxe.violations.map(violation => violation.id),
+      [],
+    );
+    await page.screenshot({
+      path: path.join(os.tmpdir(), 'store-control-visual-mobile.png'),
+      fullPage: true,
+    });
+    assert.equal(
+      await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+      false,
+    );
     assert.deepEqual(errors, []);
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.locator('#add-store').click();
+    await page.getByLabel('Platform', { exact: true }).selectOption('woocommerce');
+    await page.getByLabel('Store name', { exact: true }).fill('Woo fixture');
+    await page.getByLabel('Store address', { exact: true }).fill('https://woo.example.test/wp');
+    await page.getByLabel('WooCommerce product URLs', { exact: true }).fill('/wp/goods/item/');
+    await page.getByLabel('Cart path', { exact: true }).fill('/wp/basket/');
+    await page.getByLabel('Cart prices include tax', { exact: true }).selectOption('including');
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Settings saved' })).toBeVisible();
+    const mixed = JSON.parse(fs.readFileSync(configFile));
+    assert.equal(mixed.sites.length, 2);
+    assert.equal(mixed.sites[1].platform, 'woocommerce');
+    assert.deepEqual(mixed.sites[1].commerce.productUrls, ['/wp/goods/item/']);
+    await page.reload();
+    await page
+      .locator('#store-list')
+      .getByRole('button', { name: /Woo fixture/ })
+      .click();
+    await expect(page.getByLabel('Platform', { exact: true })).toHaveValue('woocommerce');
+    await expect(page.getByLabel('WooCommerce product URLs', { exact: true })).toHaveValue(
+      '/wp/goods/item/',
+    );
     console.log(
       'Control panel browser checks passed: onboarding, schedule/window edits, save/reload, advanced setting preservation, pause, mobile layout and axe. No store requests made.',
     );

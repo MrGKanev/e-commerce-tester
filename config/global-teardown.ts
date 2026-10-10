@@ -10,8 +10,11 @@ import { STORAGE_STATE } from './global-setup';
 import { BASE } from '../tests/helpers';
 import fs from 'fs';
 import { isLimited, paceAPI } from '../tests/pacing';
+import { readSiteSettings } from './site-settings';
 
 export default async function globalTeardown(): Promise<void> {
+  // WooCommerce mutations clean the actual page cart/token session in finally.
+  if (readSiteSettings().platform === 'woocommerce') return;
   if (isLimited() || !fs.existsSync(STORAGE_STATE)) return;
 
   const context = await request.newContext({

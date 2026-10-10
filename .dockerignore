@@ -12,3 +12,4 @@ storageState.*.json
 .rate-limit.*.json
 
 managed-config/
+visual-baselines/

@@ -3,7 +3,7 @@ import { test, expect } from './fixtures';
 import { configuredPages, extraInventoryPages } from './inventory';
 import { waitForVisualReady, clearCart, loadPageImages } from './helpers';
 import { auditSpelling } from './spelling';
-import { readSiteSettings } from '../config/site-settings';
+import { approvedScreenshot } from './visual';
 
 for (const entry of configuredPages()) {
   test(
@@ -18,10 +18,10 @@ for (const entry of configuredPages()) {
       await waitForVisualReady(page);
       await auditSpelling(page, testInfo, entry.language);
       const file = createHash('sha256').update(entry.url).digest('hex').slice(0, 20);
-      await expect(page).toHaveScreenshot(`${entry.type}-${file}.png`, {
+      await approvedScreenshot(page, `${entry.type}-${file}.png`, testInfo, {
         fullPage: true,
         animations: 'disabled',
-        maxDiffPixelRatio: readSiteSettings().thresholds.visual.maxDiffPixelRatio,
+
         mask: [
           page.locator('[class*="chat"], [id*="chat"], [class*="countdown"], [data-cart-count]'),
         ],
@@ -51,12 +51,13 @@ test(
         await page.evaluate(() => scrollTo(0, 0));
         await waitForVisualReady(page);
         await auditSpelling(page, testInfo, entry.language);
-        await expect(page).toHaveScreenshot(
+        await approvedScreenshot(
+          page,
           `discovered-${createHash('sha256').update(entry.url).digest('hex').slice(0, 20)}.png`,
+          testInfo,
           {
             fullPage: true,
             animations: 'disabled',
-            maxDiffPixelRatio: readSiteSettings().thresholds.visual.maxDiffPixelRatio,
           },
         );
       });

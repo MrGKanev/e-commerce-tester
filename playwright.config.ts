@@ -1,6 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 import { STORAGE_STATE } from './config/global-setup';
 import { BASE, USER_AGENT, LOCALE, TIMEZONE_ID } from './tests/helpers';
+import { pin, baselineRoot } from './scripts/visual-baselines';
+import { readSiteSettings } from './config/site-settings';
+const platform = readSiteSettings().platform;
+const wooMatch =
+  /(?:12-performance|29-content|30-inventory-visual|32-shared-pages|35-seo-inventory|36-buyer-journey|34-woocommerce)\.spec\.ts/;
 
 const runDate =
   process.env.TEST_RUN_DATE ||
@@ -10,10 +15,16 @@ const siteSlug = process.env.SITE_SLUG || new URL(BASE).hostname.replace(/[^a-z0
 const reportDir = siteSlug ? `./reports/${siteSlug}/${runDate}` : `./reports/${runDate}`;
 
 process.env.PAGE_INVENTORY_FILE ||= `${reportDir}/page-inventory.json`;
+const baseline = pin(baselineRoot(), siteSlug, runDate);
 
 export default defineConfig({
   testDir: './tests',
-  snapshotPathTemplate: `{testDir}/{testFilePath}-snapshots/${siteSlug || new URL(BASE).hostname.replace(/[^a-z0-9-]/gi, '-')}/{arg}-{projectName}-{platform}{ext}`,
+  ...(platform === 'woocommerce'
+    ? { testMatch: wooMatch }
+    : { testIgnore: '**/34-woocommerce.spec.ts' }),
+  snapshotPathTemplate: `${reportDir}/visual-reference/{arg}{ext}`,
+  updateSnapshots: 'none',
+  metadata: { visualBaseline: { site: siteSlug, revision: baseline.revision }, visualRun: runDate },
   outputDir: `${reportDir}/screenshots`,
 
   // Global setup/teardown: setup accepts cookie consent + saves browser state;
@@ -78,13 +89,17 @@ export default defineConfig({
     {
       name: 'Mobile Chrome',
       testMatch:
-        /(?:07-mobile|10-visual|11-accessibility|24-keyboard|29-content|30-inventory-visual|32-shared-pages)\.spec\.ts/,
+        platform === 'woocommerce'
+          ? wooMatch
+          : /(?:07-mobile|10-visual|11-accessibility|24-keyboard|29-content|30-inventory-visual|32-shared-pages|35-seo-inventory|36-buyer-journey|33-commerce-consistency)\.spec\.ts/,
       use: { ...devices['Pixel 7'] },
     },
     {
       name: 'Mobile Safari',
       testMatch:
-        /(?:07-mobile|10-visual|11-accessibility|24-keyboard|29-content|30-inventory-visual|32-shared-pages)\.spec\.ts/,
+        platform === 'woocommerce'
+          ? wooMatch
+          : /(?:07-mobile|10-visual|11-accessibility|24-keyboard|29-content|30-inventory-visual|32-shared-pages|35-seo-inventory|36-buyer-journey|33-commerce-consistency)\.spec\.ts/,
       use: { ...devices['iPhone 13'] },
     },
   ],

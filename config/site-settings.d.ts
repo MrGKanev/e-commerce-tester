@@ -9,8 +9,25 @@ export type Capability =
   | 'reviews'
   | 'filters'
   | 'variants'
-  | 'mobileMenu';
+  | 'mobileMenu'
+  | 'commerceConsistency';
 export interface SiteSettings {
+  platform: 'shopify' | 'woocommerce';
+  commerce: {
+    productUrls: string[];
+    productIds: number[];
+    apiRoot: string;
+    routes: Record<'catalog' | 'cart' | 'checkout' | 'search', string>;
+    uiProfile: 'auto' | 'classic' | 'blocks';
+    taxDisplay: 'auto' | 'including' | 'excluding';
+  };
+  checkout: {
+    mode: 'auto' | 'supported' | 'unsupported' | 'blocked';
+    reason: string;
+    contact: 'required' | 'not-applicable' | 'unverified';
+    shippingAddress: 'required' | 'not-applicable' | 'unverified';
+    requiredAddressFields: Array<'addressLine1' | 'city' | 'postalCode' | 'country'>;
+  };
   performanceMetrics: {
     enabled: boolean;
     mode: 'report' | 'strict';
@@ -31,7 +48,26 @@ export interface SiteSettings {
       | 'cartItems'
       | 'mobileMenuToggle'
       | 'consentAccept'
-      | 'main',
+      | 'main'
+      | 'commerceRoot'
+      | 'productForm'
+      | 'soldOut'
+      | 'cartUnitPrice'
+      | 'cartLinePrice'
+      | 'searchInput'
+      | 'searchResults'
+      | 'cartUpdate'
+      | 'checkoutButton'
+      | 'checkoutSummary'
+      | 'checkoutQuantity'
+      | 'checkoutLinePrice'
+      | 'checkoutRoot'
+      | 'checkoutEmail'
+      | 'checkoutAddressLine1'
+      | 'checkoutCity'
+      | 'checkoutPostalCode'
+      | 'checkoutCountry'
+      | 'cartEmpty',
       string
     >
   >;
@@ -50,7 +86,7 @@ export interface SiteSettings {
       seo: number;
     };
     accessibility: { maxBlocking: number; maxViolations: number; maxContrastNodes: number };
-    visual: { maxDiffPixelRatio: number };
+    visual: { maxDiffPixelRatio: number; components: Record<string, number> };
   };
   inventory: {
     discoverProducts: boolean;

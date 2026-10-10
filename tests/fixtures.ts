@@ -3,6 +3,7 @@ let vitalSessions: VitalsSession[] = [];
 import path from 'node:path';
 import { readSiteSettings, type Capability } from '../config/site-settings';
 const settings = readSiteSettings();
+import { compatibleSpec } from '../scripts/platform-config';
 let visitedUrls = new Set<string>();
 import { test as base, chromium as originalChromium, type Browser } from '@playwright/test';
 import { assertNotLimited, isLimited, paceAPI, paceContext, pauseBetweenTests } from './pacing';
@@ -52,6 +53,10 @@ export const test = base.extend<{ politeRun: void }>({
       visitedUrls = new Set();
       vitalSessions = [];
       const file = path.basename(testInfo.file);
+      if (!compatibleSpec(file, settings.platform)) {
+        testInfo.annotations.push({ type: 'not-applicable', description: `${file} is not a ${settings.platform} suite` });
+        base.skip(true, 'This test belongs to another commerce platform');
+      }
       if (file === '29-content.spec.ts' && settings.spelling.mode === 'off') {
         testInfo.annotations.push({
           type: 'not-applicable',
@@ -66,6 +71,7 @@ export const test = base.extend<{ politeRun: void }>({
         '28-recently-viewed.spec.ts': 'recentlyViewed',
         '22-newsletter.spec.ts': 'newsletter',
         '19-filters.spec.ts': 'filters',
+        '33-commerce-consistency.spec.ts': 'commerceConsistency',
         '18-variants.spec.ts': 'variants',
       };
       let feature = features[file];

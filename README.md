@@ -1,8 +1,8 @@
 # e-commerce-tester
 
-A local [Playwright](https://playwright.dev) health-check suite for Shopify stores. It checks storefront functionality, visual changes, accessibility, content, security signals and synthetic performance, with reports grouped by store and run.
+A local [Playwright](https://playwright.dev) health-check suite for Shopify and WooCommerce stores. It checks storefront functionality, visual changes, accessibility, content, security signals and synthetic performance, with reports grouped by store and run.
 
-The suite supports desktop Chromium, Firefox and WebKit, plus selected mobile scenarios. The runner defaults to **Desktop Chrome** and runs stores and tests sequentially. Live tests can change the session cart and exercise storefront forms; checkout checks stop before placing an order.
+The suite supports desktop Chromium, Firefox and WebKit, plus selected mobile scenarios. The runner defaults to **Desktop Chrome** and runs stores and tests sequentially. Live tests can change the session cart and exercise storefront forms; checkout checks stop before submitting an order. Woo checkout pages can initiate normal draft checkout state.
 
 ## Quick start
 
@@ -16,7 +16,7 @@ pnpm run install:browsers
 cp examples/sites.example.json sites.json
 ```
 
-Edit `sites.json` with your store URL, two product handles and a search term that returns products. Remove unused example stores, then run:
+For Shopify, edit `sites.json` with your store URL, two product handles and a search term that returns products. For WooCommerce, use [the Woo example](examples/woocommerce-sites.example.json) and [setup guide](docs/WOOCOMMERCE.md). Remove unused example stores, then run:
 
 ```bash
 pnpm test:smoke
@@ -42,6 +42,7 @@ Open **http://localhost:8080** to add stores, choose checks and schedules, pause
 | `pnpm test:smoke`              | Nine core homepage, product, cart and keyboard checks                                   |
 | `pnpm test` / `pnpm test:full` | All `@full` scenarios                                                                   |
 | `pnpm test:pages`              | Shared metadata, media, accessibility, spelling and screenshot checks per inventory URL |
+| `pnpm test:commerce` | Selected variant prices, JSON-LD, cart and availability via the public storefront |
 | `pnpm test:content`            | Dictionary spelling checks across the inventory                                         |
 | `pnpm test:visual`             | Visual snapshot comparisons and inventory snapshots                                     |
 | `pnpm test:audit`              | Opt-in Lighthouse and throttled network checks                                          |
@@ -53,6 +54,8 @@ pnpm test:headed
 pnpm test:debug
 pnpm dashboard:preview
 ```
+
+Visual checks compare with an explicitly approved version per store. Review and approve candidates in the control panel; runs never update approval automatically. See [Visual baselines](docs/RUNNING.md#visual-baselines).
 
 The dashboard preview uses offline sample data. Live runs use request pacing, no automatic retries and one worker. For unattended checks across multiple stores, use the [long-running Docker scheduler](docs/SCHEDULER.md) with configurable intervals and cooldowns. Optional features may be skipped; review coverage and skip reasons alongside pass rate.
 
@@ -73,11 +76,13 @@ These are automated checks of selected scenarios. Dictionary checks do not estab
 
 - [Browser control panel](docs/CONTROL-PANEL.md): manage stores and schedules without editing files.
 - [Docker scheduler](docs/SCHEDULER.md): unattended multi-store checks, random intervals, start windows and persistent cooldowns.
+- [WooCommerce](docs/WOOCOMMERCE.md): platform selection, product URLs, Store API, cart sessions and tax rules.
 - [Configuration](docs/CONFIGURATION.md): stores, environment variables, capabilities, selectors and thresholds.
 - [Running tests](docs/RUNNING.md): modes, browsers, pacing, visual baselines and Docker.
 - [Reports](docs/REPORTS.md): artifacts, dashboard metrics, coverage and comparisons.
 - [Content checks](docs/CONTENT.md): inventory, spelling, accepted findings and OCR.
 - [Performance](docs/PERFORMANCE.md): passive measurements, missing data and Lighthouse.
+- [Price and availability](docs/COMMERCE.md): public storefront, JSON-LD and same-session cart consistency.
 - [Test reference](docs/TESTS.md): scenario coverage by spec.
 - [Contributing](docs/CONTRIBUTING.md): development workflow and offline validation.
 
@@ -94,8 +99,10 @@ playwright.config.ts   Projects, artifacts and snapshot paths
 run.sh                 Entry point for the multi-store runner
 ```
 
-There are no GitHub Actions workflows that execute the suite or quality checks. Run them locally or through Docker; Dependabot provides dependency update PRs.
+GitHub Actions runs TypeScript, lint, unit tests, toolchain validation and selected local browser acceptance checks on pull requests and pushes to `master`. These checks use local fixtures; live store checks run separately through the CLI or scheduler. Dependabot provides dependency update PRs.
 
 ## License
 
 [MIT](LICENSE) © Gabriel Kanev. Bundled dependencies and dictionaries retain their own licenses; see [Content checks](docs/CONTENT.md#licenses).
+
+SEO проверки върху цялото inventory: `pnpm test:seo --site=<slug>`. Подробности: [docs/SEO.md](docs/SEO.md).

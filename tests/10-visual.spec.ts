@@ -2,34 +2,12 @@ import { auditSpelling } from './spelling';
 import { readSiteSettings } from '../config/site-settings';
 import { clearCart, waitForVisualReady, BASE, KNOWN_PRODUCT, goto } from './helpers';
 
-/**
- * 10 · Visual regression tests
- *
- * Uses Playwright's built-in pixel comparison (toHaveScreenshot) to detect
- * visual regressions that functional tests can't catch — broken layouts,
- * missing images, shifted elements, wrong colours, etc.
- *
- * HOW IT WORKS
- * ─────────────
- * First run (or after intentional design changes):
- *   pnpm exec playwright test tests/10-visual.spec.ts --update-snapshots
- *
- * Every subsequent run compares against those saved baselines. A pixel diff
- * above the threshold fails the test with a side-by-side diff image.
- *
- * Snapshots are committed to git so CI catches regressions automatically.
- *
- * THRESHOLDS
- * ──────────
- * maxDiffPixelRatio: 0.03 → up to 3 % of pixels may differ (font rendering,
- * anti-aliasing, minor CDN image compression) without failing.
- *
- * Dynamic content (prices, cart count, chat widgets) is masked so it doesn't
- * cause false positives.
+/** Screenshots compare only with the explicitly approved store version.
+ * New images are candidates in Reports; test runs never approve them.
  */
+import { approvedScreenshot, viewportClip } from './visual';
 
 import { test, expect } from './fixtures';
-
 
 // Elements that change between runs — hide them from the snapshot
 const DYNAMIC_MASKS = [
@@ -49,13 +27,15 @@ const SNAP_OPTS = {
 } as const;
 
 async function maskDynamic(page: import('@playwright/test').Page) {
-  return page.locator(DYNAMIC_MASKS).all().then((els) => els.length ? els : []);
+  return page
+    .locator(DYNAMIC_MASKS)
+    .all()
+    .then(els => (els.length ? els : []));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('10 · Visual regression', { tag: ["@full", "@visual"] }, () => {
-
+test.describe('10 · Visual regression', { tag: ['@full', '@visual'] }, () => {
   // ── Homepage ───────────────────────────────────────────────────────────────
 
   test('homepage — above the fold', async ({ page }, testInfo) => {
@@ -64,9 +44,9 @@ test.describe('10 · Visual regression', { tag: ["@full", "@visual"] }, () => {
     await auditSpelling(page, testInfo);
 
     // Clip to viewport so scroll position is irrelevant
-    await expect(page).toHaveScreenshot('homepage-fold.png', {
+    await approvedScreenshot(page, 'homepage-fold.png', testInfo, {
       ...SNAP_OPTS,
-      clip: { x: 0, y: 0, width: 1280, height: 800 },
+      clip: viewportClip(page),
       mask: await maskDynamic(page),
     });
   });
@@ -78,7 +58,7 @@ test.describe('10 · Visual regression', { tag: ["@full", "@visual"] }, () => {
     await waitForVisualReady(page);
     await auditSpelling(page, testInfo);
 
-    await expect(header).toHaveScreenshot('header.png', {
+    await approvedScreenshot(header, 'header.png', testInfo, {
       ...SNAP_OPTS,
       mask: await maskDynamic(page),
     });
@@ -101,7 +81,7 @@ test.describe('10 · Visual regression', { tag: ["@full", "@visual"] }, () => {
       .first();
     await productSection.waitFor({ state: 'visible' });
 
-    await expect(productSection).toHaveScreenshot('product-hero.png', {
+    await approvedScreenshot(productSection, 'product-hero.png', testInfo, {
       ...SNAP_OPTS,
       mask: [priceMask, ...(await maskDynamic(page))],
     });
@@ -116,9 +96,9 @@ test.describe('10 · Visual regression', { tag: ["@full", "@visual"] }, () => {
     await waitForVisualReady(page);
     await auditSpelling(page, testInfo);
 
-    await expect(page).toHaveScreenshot('cart-empty.png', {
+    await approvedScreenshot(page, 'cart-empty.png', testInfo, {
       ...SNAP_OPTS,
-      clip: { x: 0, y: 0, width: 1280, height: 800 },
+      clip: viewportClip(page),
       mask: await maskDynamic(page),
     });
   });
@@ -131,9 +111,9 @@ test.describe('10 · Visual regression', { tag: ["@full", "@visual"] }, () => {
     await waitForVisualReady(page);
     await auditSpelling(page, testInfo);
 
-    await expect(page).toHaveScreenshot('homepage-mobile.png', {
+    await approvedScreenshot(page, 'homepage-mobile.png', testInfo, {
       ...SNAP_OPTS,
-      clip: { x: 0, y: 0, width: 390, height: 844 },
+      clip: viewportClip(page),
       mask: await maskDynamic(page),
     });
   });
@@ -146,9 +126,9 @@ test.describe('10 · Visual regression', { tag: ["@full", "@visual"] }, () => {
 
     const priceMask = page.locator('span.money, [data-product-price], .price-item--regular');
 
-    await expect(page).toHaveScreenshot('product-mobile.png', {
+    await approvedScreenshot(page, 'product-mobile.png', testInfo, {
       ...SNAP_OPTS,
-      clip: { x: 0, y: 0, width: 390, height: 844 },
+      clip: viewportClip(page),
       mask: [priceMask, ...(await maskDynamic(page))],
     });
   });

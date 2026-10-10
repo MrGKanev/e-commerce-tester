@@ -1,10 +1,12 @@
 import playwright from 'eslint-plugin-playwright';
 import tseslint from 'typescript-eslint';
 import prettierConfig from 'eslint-config-prettier';
+import js from '@eslint/js';
+import globals from 'globals';
 
 export default tseslint.config(
   {
-    files: ['tests/**/*.ts', 'config/**/*.ts', '*.ts'],
+    files: ['tests/**/*.ts', 'config/**/*.ts', 'checks/**/*.ts', '*.ts'],
     extends: [...tseslint.configs.recommended, playwright.configs['flat/recommended']],
     rules: {
       // Playwright-specific
@@ -24,6 +26,28 @@ export default tseslint.config(
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
+    },
+  },
+  {
+    files: ['scripts/**/*.js', 'config/**/*.js'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: globals.node,
+    },
+    rules: {
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
+    },
+  },
+  {
+    files: ['web/**/*.js'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      sourceType: 'script',
+      globals: globals.browser,
+    },
+    rules: {
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
     },
   },
   // Disable formatting rules that conflict with Prettier

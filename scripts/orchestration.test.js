@@ -12,16 +12,19 @@ function fixture(t) {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.mkdirSync(path.join(root, 'scripts'));
   fs.mkdirSync(path.join(root, 'config'));
+  fs.cpSync(path.join(__dirname, '../config/schemas'), path.join(root, 'config/schemas'), { recursive: true });
+  fs.copyFileSync(path.join(__dirname, '../config/config-validation.js'), path.join(root, 'config/config-validation.js'));
+  fs.symlinkSync(path.join(__dirname, '../node_modules'), path.join(root, 'node_modules'), 'dir');
   fs.copyFileSync(path.join(__dirname, '../config/site-settings.js'), path.join(root, 'config/site-settings.js'));
   fs.mkdirSync(path.join(root, 'reports'));
-  for (const name of ['run-sites.js', 'site-config.js', 'update-history.js', 'report-model.js']) {
+  for (const name of ['run-sites.js', 'site-config.js', 'platform-config.js', 'update-history.js', 'report-model.js']) {
     fs.copyFileSync(path.join(__dirname, name), path.join(root, 'scripts', name));
   }
   const bin = path.join(root, 'bin');
   fs.mkdirSync(bin);
   // Stub the browser runner: regression checks must never contact a real store.
   fs.writeFileSync(path.join(bin, 'pnpm'), `#!/usr/bin/env node
-require('fs').appendFileSync('invocations.jsonl', JSON.stringify({args: process.argv.slice(2), url: process.env.STORE_URL, handle: process.env.PRODUCT_HANDLE, slug: process.env.SITE_SLUG, run: process.env.TEST_RUN_DATE}) + '\\n');
+require('fs').appendFileSync('invocations.jsonl', JSON.stringify({args: process.argv.slice(2), url: process.env.STORE_URL, handle: process.env.PRODUCT_HANDLE, slug: process.env.SITE_SLUG, run: process.env.TEST_RUN_DATE, platform: process.env.STORE_PLATFORM, settings: JSON.parse(process.env.SITE_SETTINGS_JSON)}) + '\\n');
 process.exit(Number(process.env.STUB_EXIT || 0));
 `, { mode: 0o755 });
   return { root, env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` } };
@@ -56,6 +59,16 @@ test('loads .env, preserves environment overrides, forwards arguments and create
   assert.equal(call.handle, 'explicit');
   assert.match(call.run, /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}$/);
   assert.ok(call.args.includes('--project=Desktop Chrome'));
+});
+test('one runner keeps Shopify and WooCommerce configuration in separate child environments', t => {
+ const f=fixture(t);sites(f,[{url:'https://shop.example.test',slug:'shop',productHandle:'shop-only',productHandle2:'second'},
+  {url:'https://woo.example.test/wp',slug:'woo',platform:'woocommerce',commerce:{productUrls:['/wp/goods/item/']}}]);
+ const result=run(f);assert.equal(result.status,0,result.stderr);
+ const calls=fs.readFileSync(path.join(f.root,'invocations.jsonl'),'utf8').trim().split('\n').map(JSON.parse);
+ assert.equal(calls[0].platform,'shopify');assert.equal(calls[0].handle,'shop-only');
+ assert.equal(calls[1].platform,'woocommerce');assert.equal(calls[1].handle,'');
+ assert.deepEqual(calls[1].settings.commerce.productUrls,['https://woo.example.test/wp/goods/item/']);
+ assert.equal(calls[1].settings.commerce.apiRoot,'https://woo.example.test/wp/wp-json/wc/store/v1');
 });
 
 test('rejects invalid URLs, traversal slugs and duplicate slugs before launching browsers', t => {
@@ -197,4 +210,35 @@ test('selects one store and consumes scheduler options instead of forwarding the
   assert.ok(calls[0].args.includes('@smoke'));
   assert.ok(!calls[0].args.some(arg => arg.startsWith('--site')));
   assert.equal(run(f, 'run-sites.js', ['--site', 'missing']).status, 1);
+});
+test('commerce evidence is rendered with its failed/unverified state and escaped observations', t => {
+  const f = fixture(t);
+  const date = '2026-10-10_10-00-00-001';
+  report(f, 'store', date, { expected: 1 });
+  const dir = path.join(f.root, 'reports', 'store', date);
+  fs.writeFileSync(path.join(dir, 'commerce-consistency.json'), JSON.stringify({ checks: [{
+    productHandle: 'sample', kind: 'schema', project: 'Chrome', status: 'unverified',
+    reason: '<script>unexpected()</script>', observations: [{ ui: '<img src=x onerror=unexpected()>' }],
+  }] }));
+  const result = run(f, 'update-history.js');
+  assert.equal(result.status, 0, result.stderr);
+  const dashboard = fs.readFileSync(path.join(f.root, 'reports/dashboard.html'), 'utf8');
+  assert.match(dashboard, /Public storefront price and availability/);
+  assert.match(dashboard, /sample · schema · Chrome · unverified/);
+  assert.ok(dashboard.includes('&lt;script&gt;unexpected()&lt;/script&gt;'));
+  assert.ok(!dashboard.includes('<img src=x onerror=unexpected()>'));
+});
+
+test('buyer journey appears separately with exact step, status and escaped expected/observed evidence', t => {
+  const f = fixture(t);
+  const date = '2026-10-10_10-00-00-001';
+  report(f, 'store', date, { expected: 1 });
+  fs.writeFileSync(path.join(f.root, 'reports', 'store', date, 'buyer-journeys.json'), JSON.stringify({ checks: [{ platform: 'woocommerce', project: 'Chrome', status: 'failed', failedStep: 'quantity', reason: '<script>bad()</script>', steps: [{ name: 'quantity', status: 'failed', expected: { quantity: 2 }, actual: { quantity: 1, note: '<img src=x onerror=bad()>' } }] }] }));
+  const result = run(f, 'update-history.js');
+  assert.equal(result.status, 0, result.stderr);
+  const dashboard = fs.readFileSync(path.join(f.root, 'reports/dashboard.html'), 'utf8');
+  assert.match(dashboard, /Buyer journey — Покупателен път/);
+  assert.match(dashboard, /woocommerce · Chrome · failed · step: quantity/);
+  assert.ok(dashboard.includes('&lt;script&gt;bad()&lt;/script&gt;'));
+  assert.ok(!dashboard.includes('<img src=x onerror=bad()>'));
 });

@@ -1,0 +1,45 @@
+name: Project checks
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: project-checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Quality and local browser checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: TypeScript, lint, unit tests and toolchain
+        run: pnpm check
+      - name: Install Chromium and system dependencies
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Local browser acceptance checks
+        run: pnpm test:acceptance:local
+      - name: Upload local failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-check-reports
+          path: reports/local-*/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,7 +1,7 @@
 {
   "name": "e-commerce-tester",
   "version": "1.0.0",
-  "description": "Automated health check for Shopify store",
+  "description": "Automated storefront health checks for Shopify and WooCommerce",
   "packageManager": "pnpm@11.3.0",
   "engines": {
     "node": ">=22.13",
@@ -14,11 +14,12 @@
     "dashboard": "open reports/dashboard.html 2>/dev/null || xdg-open reports/dashboard.html",
     "install:browsers": "pnpm exec playwright install chromium firefox webkit",
     "type-check": "tsc --noEmit",
-    "lint": "eslint tests/ config/ *.ts",
-    "lint:fix": "eslint tests/ config/ *.ts --fix",
+    "lint": "eslint tests/ config/ checks/ scripts/ web/ *.ts",
+    "lint:fix": "eslint tests/ config/ checks/ scripts/ web/ *.ts --fix",
     "format": "prettier --write \"tests/**/*.ts\" \"*.ts\"",
     "format:check": "prettier --check \"tests/**/*.ts\" \"*.ts\"",
     "test:unit": "node --test scripts/*.test.js",
+    "test:acceptance:local": "pnpm test:pacing && pnpm test:readiness && pnpm test:reporting && pnpm test:control:local && pnpm test:pages:local && pnpm test:vitals:local && pnpm test:visual:local && pnpm test:commerce:local && pnpm test:woocommerce:local && pnpm test:seo:local && pnpm test:journey:local && pnpm test:claims:local",
     "check": "pnpm run type-check && pnpm run lint && pnpm run test:unit && pnpm run check:toolchain",
     "test:pacing": "STORE_URL=http://127.0.0.1:45679 SITE_SLUG=pacing-local REQUEST_DELAY_MS=60 REQUEST_JITTER_MS=0 TEST_DELAY_MS=0 TEST_JITTER_MS=0 playwright test --config=checks/pacing.config.ts",
     "dashboard:preview": "node scripts/preview-dashboard.js",
@@ -28,7 +29,13 @@
     "test:smoke": "bash run.sh --mode smoke",
     "test:full": "bash run.sh --mode full",
     "test:visual": "bash run.sh --mode visual",
+    "test:visual:local": "node scripts/check-visual.js",
+    "visual:review": "node scripts/visual-baselines-cli.js review",
+    "visual:approve": "node scripts/visual-baselines-cli.js approve",
     "test:content": "bash run.sh --mode content",
+    "test:commerce": "bash run.sh --mode full --grep @commerce",
+    "test:commerce:local": "STORE_URL=http://127.0.0.1:45990 SITE_SLUG=commerce-local SITE_SETTINGS_JSON='{}' TEST_DELAY_MS=0 TEST_JITTER_MS=0 REQUEST_DELAY_MS=0 REQUEST_JITTER_MS=0 playwright test --config=checks/commerce.config.ts",
+    "test:woocommerce:local": "node scripts/check-woocommerce.js",
     "check:toolchain": "node scripts/check-toolchain.js",
     "test:p2:local": "node scripts/check-p2.js",
     "test:audit": "bash run.sh --mode audit",
@@ -39,10 +46,16 @@
     "scheduler:check": "node scripts/scheduler.js --check",
     "scheduler:status": "node scripts/scheduler.js --status",
     "control": "node scripts/control-server.js",
-    "test:control:local": "node scripts/check-control.js"
+    "test:control:local": "node scripts/check-control.js",
+    "test:seo": "bash run.sh --mode full --grep @seo",
+    "test:seo:local": "playwright test --config=checks/seo.config.ts",
+    "test:journey": "bash run.sh --mode full --grep @journey",
+    "test:journey:local": "node scripts/check-journey.js",
+    "test:claims:local": "node scripts/check-claims.js"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
+    "@eslint/js": "^10.0.1",
     "@faker-js/faker": "^10.6.0",
     "@playwright/test": "1.63.0",
     "@types/node": "^26.6.4",
@@ -52,11 +65,15 @@
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-playwright": "^2.12.1",
+    "globals": "^17.13.0",
     "lighthouse": "^13.5.0",
     "nspell": "2.1.5",
     "playwright-lighthouse": "^4.0.0",
     "prettier": "^3.9.9",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.71.1"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0"
   }
 }

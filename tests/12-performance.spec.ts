@@ -6,6 +6,7 @@ import { test, expect } from './fixtures';
 import { readSiteSettings } from '../config/site-settings';
 import { BASE, SEARCH_TERM, KNOWN_PRODUCT } from './helpers';
 import { runLighthouseAudit } from './lighthouse';
+import { pageInventory } from './inventory';
 const LIGHTHOUSE_THRESHOLDS = readSiteSettings().thresholds.lighthouse;
 
 // ─── B) Lighthouse audit ──────────────────────────────────────────────────────
@@ -37,7 +38,20 @@ test.describe('12b · Lighthouse', { tag: ['@audit'] }, () => {
 
   for (const audit of audits) {
     test(`${audit.title} — Lighthouse scores meet thresholds`, async ({}, testInfo) => {
-      await runLighthouseAudit(audit.url, audit.name, testInfo, LIGHTHOUSE_THRESHOLDS);
+      const type =
+        audit.name === 'lighthouse-product'
+          ? 'product'
+          : audit.name === 'lighthouse-collections'
+            ? 'collection'
+            : audit.name === 'lighthouse-search'
+              ? 'search'
+              : 'home';
+      const target =
+        readSiteSettings().platform === 'woocommerce'
+          ? pageInventory().find(page => page.type === type)?.url
+          : audit.url;
+      test.skip(!target, 'No configured inventory URL for this audit');
+      await runLighthouseAudit(target!, audit.name, testInfo, LIGHTHOUSE_THRESHOLDS);
     });
   }
 });

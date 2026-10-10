@@ -4,13 +4,14 @@
 
 ## Modes and browser selection
 
-The runner defaults to `full` mode and `Desktop Chrome`. It selects the matching tag unless you supply `--grep`, which replaces the preset filter.
+The runner defaults to `full` mode and `Desktop Chrome`. Suites are selected by the store platform; see [WooCommerce](WOOCOMMERCE.md). It selects the matching tag unless you supply `--grep`, which replaces the preset filter.
 
 | Command             | Tag        | Purpose                                                               |
 | ------------------- | ---------- | --------------------------------------------------------------------- |
 | `pnpm test:smoke`   | `@smoke`   | Nine key homepage, product, cart and keyboard checks                  |
 | `pnpm test:full`    | `@full`    | Functional and quality scenarios, including content and visual checks |
 | `pnpm test:pages`   | `@pages`   | Shared read-only checks of each inventory document                    |
+| `pnpm test:commerce` | `@commerce` | Public product/UI/JSON-LD/cart prices and variant sellability |
 | `pnpm test:content` | `@content` | Inventory spelling checks                                             |
 | `pnpm test:visual`  | `@visual`  | Snapshot comparisons                                                  |
 | `pnpm test:audit`   | `@audit`   | Lighthouse and network throttling                                     |
@@ -26,13 +27,13 @@ pnpm test:debug
 
 `--site=<slug>` selects one configured store. `--sites-file=<path>` selects a different store file; both options are consumed by the runner.
 
-Desktop projects cover the full suite. Mobile Chrome (Pixel 7) and Mobile Safari (iPhone 13) select mobile, visual, accessibility, keyboard, content, inventory visual and shared-page specs. Desktop specs that resize the viewport are distinct from these touch/device projects.
+Desktop projects cover the full suite. Mobile Chrome (Pixel 7) and Mobile Safari (iPhone 13) select mobile, visual, accessibility, keyboard, content, inventory visual, shared-page and commerce consistency specs. Desktop specs that resize the viewport are distinct from these touch/device projects.
 
 Lighthouse runs only in the first selected Chromium project. Firefox and WebKit skip it. For unattended execution with configurable per-store intervals, use the [long-running Docker scheduler](SCHEDULER.md).
 
 ## Lifecycle and request pacing
 
-Setup launches Chromium, accepts cookie consent and saves cookies/localStorage to `storageState.<slug>.json` in the project root (`storageState.json` without a slug). Tests reuse that state. Fresh-context consent tests create their own sessions. Setup also prepares the shared inventory. Teardown clears the session cart unless rate-limited.
+Setup launches Chromium, accepts cookie consent and saves cookies/localStorage to `storageState.<slug>.json` in the project root (`storageState.json` without a slug). Tests reuse that state. Fresh-context consent tests create their own sessions. Setup also prepares the shared inventory. Shopify teardown clears the session cart unless rate-limited. Woo mutation scenarios clean their own cookie/token cart session; Woo global teardown makes no Shopify requests.
 
 Live tests use one worker, no automatic retries, 5–8 seconds before tests and 2–4 seconds before paced document navigations and browser/API requests. Static images, scripts and CSS load normally. Service workers are blocked so navigations pass through the pacing layer. Large runs can take substantial time.
 
@@ -48,19 +49,49 @@ Specs use locator assertions, state polling and response listeners registered be
 
 ## Visual baselines
 
-Snapshots are separated by store, browser project and operating system. Generate them on the platform used for comparisons and review each image before accepting it:
+Each store has an explicitly approved version. Test runs compare with that version until a user approves a replacement; the latest run never becomes the baseline automatically. Browser projects have separate images within the store version.
 
-```bash
-pnpm test:visual --project="Desktop Chrome" --update-snapshots
+1. Run `pnpm test:visual --site=my-store` in the environment that will perform future comparisons.
+2. Open the control panel, choose **Reports → store → run**, and review the visual section: baseline used by that run, candidate and difference.
+3. Select only the correct candidates, click **Approve selected screenshots**, and confirm the store. Nothing is selected automatically.
+4. Run the checks again. Approval changes future comparisons; historical failed results remain unchanged.
+
+The first capture fails with a missing-baseline message and produces reviewable candidates. New inventory URLs and browser projects also need approval. Interrupted/in-progress runs cannot be approved until they have finished. Unavailable captures cannot be approved. Concurrent approvals from stale tabs return a conflict and require refresh.
+
+Approved versions live outside report retention:
+
+```text
+visual-baselines/<store>/
+  approved.json
+  versions/<revision>/
+    manifest.json
+    <screenshot-id>.png
+reports/<store>/<run>/visual/
+  entries/<screenshot-id>.json
+  <screenshot-id>-current.png
+  <screenshot-id>-baseline.png
+  <screenshot-id>-diff.png
 ```
 
-To update just the original visual spec:
+A new approval copies unselected existing images and replaces only selected images. Old versions remain available and a run pins its approved revision at startup. Deleting old reports does not delete approved images. Back up `visual-baselines/` alongside configuration; it is gitignored, excluded from Docker builds and mounted in all Compose services. `VISUAL_BASELINES_DIR` can override its location for CLI and control services.
+
+Use the same pinned Docker image and CPU architecture to capture and compare. The image sets `VISUAL_ENVIRONMENT`; compatibility also includes platform, architecture, browser/Playwright versions, locale, timezone, device properties, viewport and capture policy. A mismatch produces candidates with an **incompatible** status rather than a misleading pixel regression. Re-run in the approved environment, or review and explicitly approve the new environment. Updating the browser or image therefore requires a reviewed migration. Native and Docker baselines are not interchangeable.
+
+For file-based use, review the images in the report before invoking explicit approval:
 
 ```bash
-pnpm test:visual tests/10-visual.spec.ts --project="Desktop Chrome" --update-snapshots
+pnpm visual:review --site=my-store --run=<run-timestamp>
+# Use the revision and IDs returned by review; use none only for the first approval.
+pnpm visual:approve --site=my-store --run=<run-timestamp> --revision=none --ids=<id>,<id>
 ```
 
-The default pixel difference ratio is 0.03, configurable per store. Dynamic elements are masked by the spec. Spelling evidence is a separate screenshot and does not annotate the visual baseline.
+Automatic `--update-snapshots`, `-u` and ignored-snapshot comparisons are rejected. Playwright receives disposable run-local copies, never writable approved images.
+
+The six old store screenshots and saved image artifacts from that store were deleted at the user’s request. No legacy screenshots are seeded as baselines. Capture and explicitly approve new candidates for each configured store when needed.
+
+The default difference ratio is 0.03. Per-store `thresholds.visual.components` overrides it by screenshot name without `.png`, for example `{ "header": 0.005, "product-hero": 0.01 }`. Viewport screenshots use the actual configured viewport, including mobile projects. Dynamic elements are masked by the spec. Spelling evidence remains separate from baseline images.
+
+Local lifecycle checks: `pnpm test:visual:local` checks desktop/mobile Chromium; `VISUAL_CHECK_ALL_BROWSERS=1 pnpm test:visual:local` checks all five projects after installing Firefox and WebKit too. These commands use intercepted local pages and temporary approval stores.
 
 ## Docker
 
@@ -78,6 +109,7 @@ Compose loads `.env` and mounts `./reports`. To pass a multi-store configuration
 docker build -t e2e .
 docker run --rm --env-file .env \
   -v "$PWD/reports:/app/reports" \
+  -v "$PWD/visual-baselines:/app/visual-baselines" \
   -v "$PWD/sites.json:/app/sites.json:ro" \
   e2e
 ```

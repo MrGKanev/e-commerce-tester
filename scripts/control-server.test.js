@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { createControlServer } = require('./control-server');
 const { emptyConfiguration } = require('./managed-config');
+const { digest, approved } = require('./visual-baselines');
 async function fixture(t) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'control-test-'));
   const configFile = path.join(directory, 'config/configuration.json');
@@ -51,6 +52,62 @@ function data() {
   };
   return value;
 }
+test('visual approval requires a reviewed revision and same-origin token and is isolated by store', async t => {
+  const f = await fixture(t);
+  const run = '2026-10-10_10-00-00-001',
+    id = 'a'.repeat(32);
+  const reportsDir = path.join(f.directory, 'reports');
+  const visualDir = path.join(reportsDir, 'store', run, 'visual');
+  fs.mkdirSync(path.join(visualDir, 'entries'), { recursive: true });
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
+    'base64',
+  );
+  fs.writeFileSync(path.join(visualDir, id + '-current.png'), png);
+  fs.writeFileSync(
+    path.join(visualDir, 'entries', id + '.json'),
+    JSON.stringify({
+      id,
+      site: 'store',
+      run,
+      sha256: digest(png),
+      status: 'missing',
+      environment: { platform: 'test' },
+    }),
+  );
+  fs.writeFileSync(
+    path.join(reportsDir, 'store', run, 'run-metadata.json'),
+    JSON.stringify({ phase: 'finished' }),
+  );
+  const reviewed = await (await fetch(f.origin + `/api/visual?site=store&run=${run}`)).json();
+  assert.equal(reviewed.revision, null);
+  assert.equal(reviewed.entries.length, 1);
+  assert.equal((await fetch(f.origin + reviewed.entries[0].currentUrl)).status, 200);
+  const post = (headers = {}, revision = null) =>
+    fetch(f.origin + '/api/visual/approve', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Control-Token': f.initial.token,
+        ...headers,
+      },
+      body: JSON.stringify({ site: 'store', run, revision, ids: [id] }),
+    });
+  assert.equal((await post({ 'X-Control-Token': 'wrong' })).status, 403);
+  assert.equal((await post({ Origin: 'https://elsewhere.test' })).status, 403);
+  assert.equal((await post()).status, 200);
+  assert.equal((await post()).status, 409);
+  assert.equal(approved(path.join(f.directory, 'visual-baselines'), 'other').revision, null);
+  const after = await (await fetch(f.origin + `/api/visual?site=store&run=${run}`)).json();
+  assert.equal(after.entries[0].currentlyApproved, true);
+  const image = await fetch(f.origin + after.entries[0].approvedUrl);
+  assert.equal(image.status, 200);
+  assert.deepEqual(Buffer.from(await image.arrayBuffer()), png);
+  assert.equal(
+    (await fetch(f.origin + '/api/visual/image?site=store&revision=../../escape&id=' + id)).status,
+    400,
+  );
+});
 test('empty installation serves the editor and does not create implicit live stores', async t => {
   const f = await fixture(t);
   assert.deepEqual(f.initial.sites, []);

@@ -9,6 +9,7 @@ const { readConfiguration, validateConfiguration } = require('./managed-config')
 const { atomicWrite, loadState } = require('./scheduler');
 const model = require('./scheduler-model');
 const { catalog } = require('./report-catalog');
+const visual = require('./visual-baselines');
 const root = path.join(__dirname, '..');
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -69,6 +70,7 @@ function createControlServer({
   configFile,
   stateDir,
   reportsDir,
+  baselinesDir = path.join(path.dirname(reportsDir), 'visual-baselines'),
   webDir = path.join(root, 'web'),
 }) {
   const token = randomBytes(32).toString('hex');
@@ -86,7 +88,8 @@ function createControlServer({
       }
       if (
         (request.method === 'PUT' && url.pathname === '/api/config') ||
-        (request.method === 'POST' && url.pathname === '/api/validate')
+        (request.method === 'POST' &&
+          ['/api/validate', '/api/visual/approve'].includes(url.pathname))
       ) {
         const origin = request.headers.origin;
         if (
@@ -97,6 +100,19 @@ function createControlServer({
         if (!request.headers['content-type']?.startsWith('application/json'))
           return json(response, 415, { error: 'Expected JSON configuration' });
         const input = await body(request);
+        if (url.pathname === '/api/visual/approve')
+          return json(
+            response,
+            200,
+            visual.approve({
+              reportsDir,
+              root: baselinesDir,
+              site: input.site,
+              run: input.run,
+              revision: input.revision,
+              ids: input.ids,
+            }),
+          );
         const data = { sites: input.sites, scheduler: input.scheduler };
         const validated = validateConfiguration(data);
         if (url.pathname === '/api/validate')
@@ -117,6 +133,33 @@ function createControlServer({
         return json(response, 200, {
           groups: catalog(reportsDir, readConfiguration(configFile).sites),
         });
+      if (request.method === 'GET' && url.pathname === '/api/visual')
+        return json(
+          response,
+          200,
+          visual.review(
+            reportsDir,
+            baselinesDir,
+            url.searchParams.get('site'),
+            url.searchParams.get('run'),
+          ),
+        );
+      if (request.method === 'GET' && url.pathname === '/api/visual/image') {
+        const site = url.searchParams.get('site');
+        const baseline = visual.approved(baselinesDir, site, url.searchParams.get('revision'));
+        const pixels = visual.baselineImage(
+          baselinesDir,
+          site,
+          baseline,
+          url.searchParams.get('id'),
+        );
+        response.writeHead(200, {
+          'Content-Type': 'image/png',
+          'Cache-Control': 'no-store',
+          'X-Content-Type-Options': 'nosniff',
+        });
+        return response.end(pixels);
+      }
       if (request.method === 'GET' && url.pathname === '/api/status') {
         const { config } = readConfiguration(configFile);
         const state = loadState(path.join(stateDir, 'schedule.json'));
@@ -190,7 +233,12 @@ async function main() {
   const stateDir = process.env.SCHEDULER_STATE_DIR || path.join(root, 'scheduler-state');
   const reportsDir = path.join(root, 'reports');
   fs.mkdirSync(stateDir, { recursive: true });
-  const server = createControlServer({ configFile, stateDir, reportsDir });
+  const server = createControlServer({
+    configFile,
+    stateDir,
+    reportsDir,
+    baselinesDir: visual.baselineRoot(),
+  });
   let child;
   let restarting;
   let stopping = false;

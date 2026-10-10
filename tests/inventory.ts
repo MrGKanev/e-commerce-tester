@@ -3,17 +3,51 @@ import path from 'node:path';
 import type { APIRequestContext } from '@playwright/test';
 import { readSiteSettings } from '../config/site-settings';
 import { recordRateLimit, assertNotLimited } from './pacing';
+import {
+  productReferences,
+  storefrontRoute,
+  storeApiUrl,
+  publicUrl,
+} from '../scripts/platform-config';
 
 export type InventoryPage = {
   url: string;
   type: 'home' | 'product' | 'collection' | 'search' | 'cart' | 'static';
   language: string;
   handle?: string;
+  productId?: number;
 };
 const settings = readSiteSettings();
 const origin = (process.env.STORE_URL || 'https://zerno.co').replace(/\/$/, '');
 
 export function configuredPages(): InventoryPage[] {
+  if (settings.platform === 'woocommerce') {
+    const pages: InventoryPage[] = [
+      { url: origin + '/', type: 'home', language: settings.locale },
+      ...productReferences(settings, origin).map(product => ({
+        ...product,
+        type: 'product' as const,
+        language: settings.locale,
+      })),
+      {
+        url: storefrontRoute(settings, origin, 'catalog'),
+        type: 'collection',
+        language: settings.locale,
+      },
+      {
+        url: storefrontRoute(settings, origin, 'search', process.env.SEARCH_TERM || 'product'),
+        type: 'search',
+        language: settings.locale,
+      },
+      { url: storefrontRoute(settings, origin, 'cart'), type: 'cart', language: settings.locale },
+      ...settings.inventory.pages.map(page => ({
+        url: publicUrl(page.path, origin, 'inventory page'),
+        type: page.type,
+        language: page.language || settings.locale,
+      })),
+    ];
+    return [...new Map(pages.map(page => [page.url, page])).values()];
+  }
   const handles = [
     process.env.PRODUCT_HANDLE || 'zerno-z1',
     process.env.PRODUCT_HANDLE_2 || 'zerno-z2',
@@ -49,7 +83,41 @@ export function pageInventory(): InventoryPage[] {
 }
 export async function prepareInventory(request: APIRequestContext): Promise<void> {
   const pages = configuredPages();
-  if (settings.inventory.discoverProducts) {
+  if (
+    settings.platform === 'woocommerce' &&
+    (settings.inventory.discoverProducts || settings.commerce.productIds.length)
+  ) {
+    const urls = settings.commerce.productIds.map(id => storeApiUrl(settings, `products/${id}`));
+    if (settings.inventory.discoverProducts)
+      urls.push(storeApiUrl(settings, 'products', { per_page: settings.inventory.productLimit }));
+    for (const url of urls) {
+      const response = await request.get(url);
+      recordRateLimit(response.status(), response.url(), response.headers()['retry-after'] || null);
+      assertNotLimited();
+      if (!response.ok())
+        throw new Error(`Configured WooCommerce discovery failed: HTTP ${response.status()}`);
+      const result = await response.json();
+      const products = Array.isArray(result) ? result : [result];
+      for (const product of products) {
+        if (
+          !Number.isSafeInteger(product.id) ||
+          product.id <= 0 ||
+          typeof product.permalink !== 'string'
+        )
+          throw new Error('WooCommerce catalogue returned invalid product references');
+        const permalink = publicUrl(product.permalink, origin, 'WooCommerce product permalink');
+        const existing = pages.find(page => page.url === permalink);
+        if (existing) existing.productId = product.id;
+        else
+          pages.push({
+            url: permalink,
+            type: 'product',
+            language: settings.locale,
+            productId: product.id,
+          });
+      }
+    }
+  } else if (settings.platform === 'shopify' && settings.inventory.discoverProducts) {
     const response = await request.get(
       `${origin}/products.json?limit=${settings.inventory.productLimit}`,
     );

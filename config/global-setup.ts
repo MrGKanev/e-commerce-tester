@@ -29,7 +29,8 @@ export const STORAGE_STATE = path.join(
 export default async function globalSetup(): Promise<void> {
   fs.rmSync(RATE_LIMIT_FILE, { force: true });
   const spelling = readSiteSettings().spelling;
-  if (process.env.RUN_MODE !== 'smoke' && spelling.mode !== 'off' && spelling.ocr.enabled) await probeOCR(spelling.ocr, spelling.languages);
+  if (process.env.RUN_MODE !== 'smoke' && spelling.mode !== 'off' && spelling.ocr.enabled)
+    await probeOCR(spelling.ocr, spelling.languages);
   const browser = await chromium.launch();
   try {
     const context = await browser.newContext({
@@ -40,7 +41,16 @@ export default async function globalSetup(): Promise<void> {
     });
     await paceContext(context);
     const page = await context.newPage();
-    await page.evaluate(selectors => { for (const selector of selectors) document.querySelector(selector); }, [...Object.values(readSiteSettings().selectors), ...readSiteSettings().spelling.excludeSelectors, readSiteSettings().spelling.ocr.selector]);
+    await page.evaluate(
+      selectors => {
+        for (const selector of selectors) document.querySelector(selector);
+      },
+      [
+        ...Object.values(readSiteSettings().selectors),
+        ...readSiteSettings().spelling.excludeSelectors,
+        readSiteSettings().spelling.ocr.selector,
+      ],
+    );
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
     assertNotLimited();
     // Only fresh setup waits for a banner; returning sessions probe immediately.
@@ -55,8 +65,8 @@ export default async function globalSetup(): Promise<void> {
   paceAPI(reqCtx);
   try {
     await prepareInventory(reqCtx);
-    const resp = await reqCtx.get('/cart.js');
-    if (resp.status() !== 200) {
+    const resp = readSiteSettings().platform === 'shopify' ? await reqCtx.get('/cart.js') : null;
+    if (resp && resp.status() !== 200) {
       console.warn(
         `[setup] Session health-check: /cart.js returned HTTP ${resp.status()} — tests may behave unexpectedly`,
       );

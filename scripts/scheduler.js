@@ -49,7 +49,7 @@ function acquireLock(directory, now = Date.now()) {
       }
       if (previous.identity && processIdentity(previous.pid) !== previous.identity) alive = false;
     } else alive = Number.isFinite(previous.updatedAt) && now - previous.updatedAt < 90000;
-    if (alive) throw new Error('Another scheduler owns this state directory');
+    if (alive) throw new Error('Another scheduler owns this state directory', { cause: error });
     fs.unlinkSync(file);
     fs.writeFileSync(file, JSON.stringify(owner), { flag: 'wx' });
   }

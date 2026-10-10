@@ -20,6 +20,8 @@ const root        = path.join(__dirname, '..');
 const reportsDir  = path.join(root, 'reports');
 let sitesFile = path.join(root, 'sites.json');
 const extraArgs = process.argv.slice(2);
+if (extraArgs.some(arg => arg === '-u' || arg.startsWith('--update-snapshots')))
+  die('Automatic snapshot updates are disabled. Review and approve visual candidates in Reports.');
 const { loadSites } = require('./site-config');
 function takeOption(name) {
   const index = extraArgs.findIndex(arg => arg === name || arg.startsWith(name + '='));
@@ -74,12 +76,13 @@ for (const site of sites) {
   const env = {
     ...process.env,
     STORE_URL:        site.url,
+    STORE_PLATFORM: site.settings.platform,
     SITE_SETTINGS_JSON: JSON.stringify(site.settings),
     RUN_MODE: mode,
     SITES_FILE: sitesFile,
     PAGE_INVENTORY_FILE: path.join(reportsDir, slug, runDate, 'page-inventory.json'),
-    PRODUCT_HANDLE:   site.productHandle  || process.env.PRODUCT_HANDLE || 'zerno-z1',
-    PRODUCT_HANDLE_2: site.productHandle2 || process.env.PRODUCT_HANDLE_2 || 'zerno-z2',
+    PRODUCT_HANDLE:   site.settings.platform === 'shopify' ? site.productHandle || process.env.PRODUCT_HANDLE || 'zerno-z1' : '',
+    PRODUCT_HANDLE_2: site.settings.platform === 'shopify' ? site.productHandle2 || process.env.PRODUCT_HANDLE_2 || 'zerno-z2' : '',
     SEARCH_TERM:      site.searchTerm     || slug,
     DISCOUNT_CODE:    site.discountCode ?? process.env.DISCOUNT_CODE ?? '',
     SITE_SLUG:        slug,
@@ -92,7 +95,7 @@ for (const site of sites) {
   // Write before spawning so setup failures and killed runs stay visible.
   writeMetadata(metadataFile, {
     schemaVersion: 1, phase: 'starting', startedAt: new Date().toISOString(),
-    site: { name, slug, url: site.url },
+    site: { name, slug, url: site.url, platform: site.settings.platform },
     versions: { node: process.version },
     selection: { args: extraArgs },
     pacing: Object.fromEntries(Object.entries({ TEST_DELAY_MS: 5000, TEST_JITTER_MS: 3000, REQUEST_DELAY_MS: 2000, REQUEST_JITTER_MS: 2000 }).map(([key, fallback]) => [key, env[key] ?? fallback])),

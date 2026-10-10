@@ -1,6 +1,7 @@
-import { addProductToCart, cartAction, clearCart, BASE, KNOWN_PRODUCTS, CART_ITEMS_SEL } from './helpers';
+import { addProductToCart, cartAction, BASE, KNOWN_PRODUCTS, CART_ITEMS_SEL } from './helpers';
 import { test, expect } from './fixtures';
-
+import { verifyEmptyCart } from './storefront-assertions';
+import { CommerceUnverified } from '../scripts/storefront-model';
 
 // Helper: add the known product to cart and return to the cart page
 async function addKnownProductToCart(page: import('@playwright/test').Page) {
@@ -9,8 +10,7 @@ async function addKnownProductToCart(page: import('@playwright/test').Page) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('05 · Cart', { tag: ["@full"] }, () => {
-
+test.describe('05 · Cart', { tag: ['@full'] }, () => {
   // ── Cart page ─────────────────────────────────────────────────────────────
 
   test('cart page loads without errors', async ({ page }) => {
@@ -19,27 +19,25 @@ test.describe('05 · Cart', { tag: ["@full"] }, () => {
     await expect(page).not.toHaveTitle(/404|not found/i);
   });
 
-  test('empty cart shows an empty state message (not blank page)', async ({ page }) => {
-    // Start fresh with an empty cart
-    await clearCart(page);
-    await page.goto(`${BASE}/cart`, { waitUntil: 'domcontentloaded' });
-
-    const body = await page.textContent('body');
-    expect(body?.trim().length ?? 0, 'Cart page body is empty').toBeGreaterThan(50);
-
-    // Should show some "empty" indication OR a list of cart items (not a blank white page)
-    const hasContent = await page.locator(
-      '[class*="empty"], [class*="cart-empty"], p:has-text("empty"), p:has-text("празна"), .is-empty',
-    ).count() > 0 ||
-    await page.locator('.cart-form, form[action="/cart"]').count() > 0;
-    expect(hasContent, 'Cart page has no empty state and no cart form').toBe(true);
+  test('empty cart has a visible empty indication, no UI rows and no public cart items', async ({
+    page,
+  }, info) => {
+    try {
+      await verifyEmptyCart(page, info);
+    } catch (error) {
+      if (!(error instanceof CommerceUnverified)) throw error;
+      info.annotations.push({ type: 'cart-unverified', description: error.message });
+      test.skip(true, error.message);
+    }
   });
 
   test('cart link in header is visible and correct', async ({ page }) => {
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-    const cartLink = page.locator(
-      'a[href="/cart"], header a[href*="cart"], [aria-label*="Cart"], [aria-label*="Количка"]',
-    ).first();
+    const cartLink = page
+      .locator(
+        'a[href="/cart"], header a[href*="cart"], [aria-label*="Cart"], [aria-label*="Количка"]',
+      )
+      .first();
     await expect(cartLink).toBeVisible();
     const href = await cartLink.getAttribute('href');
     expect(href).toContain('cart');
@@ -62,7 +60,8 @@ test.describe('05 · Cart', { tag: ["@full"] }, () => {
 
     const cartText = await page.textContent('body');
     // Z1 product handle should appear somewhere on the cart page
-    const hasProductName = cartText?.toLowerCase().includes(KNOWN_PRODUCTS[0].handle.toLowerCase()) ?? false;
+    const hasProductName =
+      cartText?.toLowerCase().includes(KNOWN_PRODUCTS[0].handle.toLowerCase()) ?? false;
     expect(hasProductName, 'Product name not found in cart page').toBe(true);
   });
 
@@ -106,9 +105,11 @@ test.describe('05 · Cart', { tag: ["@full"] }, () => {
     const count = await qtyInput.count();
     if (count === 0) {
       // Try +/increase button instead
-      const increaseBtn = page.locator(
-        'button[name="plus"], button[aria-label*="Increase"], .quantity__button:last-child, button:has-text("+")',
-      ).first();
+      const increaseBtn = page
+        .locator(
+          'button[name="plus"], button[aria-label*="Increase"], .quantity__button:last-child, button:has-text("+")',
+        )
+        .first();
       if ((await increaseBtn.count()) === 0) {
         test.skip(true, 'No quantity controls found on cart page');
         return;
@@ -137,9 +138,11 @@ test.describe('05 · Cart', { tag: ["@full"] }, () => {
     const countBefore = await page.locator(CART_ITEMS_SEL).count();
     if (countBefore === 0) test.skip(true, 'No items in cart to remove');
 
-    const removeBtn = page.locator(
-      '[class*="remove"], [class*="delete"], a[href*="quantity=0"], button[aria-label*="Remove"], button[aria-label*="Премахни"], .cart__remove',
-    ).first();
+    const removeBtn = page
+      .locator(
+        '[class*="remove"], [class*="delete"], a[href*="quantity=0"], button[aria-label*="Remove"], button[aria-label*="Премахни"], .cart__remove',
+      )
+      .first();
 
     await cartAction(page, async () => {
       if ((await removeBtn.count()) > 0) {
@@ -168,9 +171,11 @@ test.describe('05 · Cart', { tag: ["@full"] }, () => {
     const added = await addKnownProductToCart(page);
     if (!added) test.skip(true, 'Configured product is sold out');
 
-    const checkoutBtn = page.locator(
-      '[name="checkout"], a[href*="/checkout"], button:has-text("Checkout"), button:has-text("Поръчай"), button:has-text("Към поръчката")',
-    ).first();
+    const checkoutBtn = page
+      .locator(
+        '[name="checkout"], a[href*="/checkout"], button:has-text("Checkout"), button:has-text("Поръчай"), button:has-text("Към поръчката")',
+      )
+      .first();
     await expect(checkoutBtn).toBeVisible();
   });
 
@@ -178,20 +183,20 @@ test.describe('05 · Cart', { tag: ["@full"] }, () => {
     const added = await addKnownProductToCart(page);
     if (!added) test.skip(true, 'Configured product is sold out');
 
-    const checkoutBtn = page.locator(
-      '[name="checkout"], a[href*="/checkout"], button:has-text("Checkout")',
-    ).first();
+    const checkoutBtn = page
+      .locator('[name="checkout"], a[href*="/checkout"], button:has-text("Checkout")')
+      .first();
     const count = await checkoutBtn.count();
     if (count === 0) test.skip(true, 'No checkout button found');
 
-    const tag = await checkoutBtn.evaluate((el) => el.tagName.toLowerCase());
+    const tag = await checkoutBtn.evaluate(el => el.tagName.toLowerCase());
     if (tag === 'a') {
       const href = await checkoutBtn.getAttribute('href');
       expect(href).toContain('checkout');
     } else {
       // It's a submit button inside a form — check the form action
       const formAction = await checkoutBtn.evaluate(
-        (el) => (el.closest('form') as HTMLFormElement)?.action ?? '',
+        el => (el.closest('form') as HTMLFormElement)?.action ?? '',
       );
       expect(formAction).toContain('checkout');
     }
@@ -211,9 +216,7 @@ test.describe('05 · Cart', { tag: ["@full"] }, () => {
     );
     expect(overflow, 'Cart page has horizontal overflow on mobile').toBe(false);
 
-    const checkoutBtn = page.locator(
-      '[name="checkout"], a[href*="/checkout"]',
-    ).first();
+    const checkoutBtn = page.locator('[name="checkout"], a[href*="/checkout"]').first();
     const count = await checkoutBtn.count();
     if (count > 0) await expect(checkoutBtn).toBeVisible();
   });

@@ -58,6 +58,8 @@ export default class RunMetadataReporter implements Reporter {
   private findings: Finding[] = [];
   private vitalChecks: Record<string, unknown>[] = [];
   private vitalDocuments = new Map<string, VitalDocument>();
+  private commerceChecks: Record<string, unknown>[] = [];
+  private buyerJourneys: Record<string, unknown>[] = [];
   private ocrTotals = { imagesChecked: 0, wordsRecognized: 0, lowConfidenceSkipped: 0 };
   private ocrEnabled = false;
   private ocrEngines = new Set<string>();
@@ -112,6 +114,7 @@ export default class RunMetadataReporter implements Reporter {
         node: process.version,
       },
       platform: process.platform,
+      visualBaseline: config.metadata.visualBaseline || null,
       configuration: readSiteSettings(),
       mode: process.env.RUN_MODE || null,
       projects: config.projects
@@ -202,12 +205,45 @@ export default class RunMetadataReporter implements Reporter {
       ),
     ];
     scenario.artifacts = result.attachments
-      .filter(a => a.path && (a.contentType.startsWith('image/') || a.name === 'trace'))
+      .filter(
+        a =>
+          a.path &&
+          (a.contentType.startsWith('image/') ||
+            a.name === 'trace' ||
+            a.name === 'commerce-consistency.json' ||
+            a.name === 'buyer-journey.json'),
+      )
       .map(a => ({
         name: a.name,
         path: path.relative(path.dirname(this.file), a.path!),
         contentType: a.contentType,
       }));
+    for (const attachment of result.attachments.filter(a => a.name === 'buyer-journey.json')) {
+      const report = JSON.parse(
+        attachment.body ? attachment.body.toString() : fs.readFileSync(attachment.path!, 'utf8'),
+      ) as Record<string, unknown>;
+      this.buyerJourneys.push(report);
+      const file = path.join(path.dirname(this.file), 'buyer-journeys.json');
+      fs.writeFileSync(
+        file + '.tmp',
+        JSON.stringify({ schemaVersion: 1, checks: this.buyerJourneys }, null, 2),
+      );
+      fs.renameSync(file + '.tmp', file);
+    }
+    for (const attachment of result.attachments.filter(
+      a => a.name === 'commerce-consistency.json',
+    )) {
+      const report = JSON.parse(
+        attachment.body ? attachment.body.toString() : fs.readFileSync(attachment.path!, 'utf8'),
+      ) as Record<string, unknown>;
+      this.commerceChecks.push(report);
+      const file = path.join(path.dirname(this.file), 'commerce-consistency.json');
+      fs.writeFileSync(
+        file + '.tmp',
+        JSON.stringify({ schemaVersion: 1, checks: this.commerceChecks }, null, 2),
+      );
+      fs.renameSync(file + '.tmp', file);
+    }
     for (const attachment of result.attachments.filter(a => a.name === 'web-vitals.json')) {
       const report = JSON.parse(
         attachment.body ? attachment.body.toString() : fs.readFileSync(attachment.path!, 'utf8'),

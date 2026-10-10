@@ -4,6 +4,8 @@ Scenario reference for the storefront specs. The runner defaults to Desktop Chro
 
 Optional features may be skipped. This table describes automated assertions, not a guarantee of complete accessibility, security or legal compliance.
 
+`33-commerce-consistency` (`@full`, `@commerce`) adds public Shopify product/UI/cart price consistency, variant or range JSON-LD checks, actual UI purchase of an available variant and blocked unavailable variants. It samples at most two available price variants and one unavailable variant per configured product. Separate reports distinguish mismatches from unverified observations. See [Commerce checks](COMMERCE.md).
+
 ## Core functionality (01–09)
 
 | File             | Suite                    | What's checked                                                                                                                                                                                                                                                            |
@@ -82,3 +84,13 @@ Optional features may be skipped. This table describes automated assertions, not
 | `32-shared-pages`     | Shared pages (`@pages`)                  | One document per inventory URL reused for title/canonical, visible images, viewport overflow, axe WCAG 2.2 AA, spelling and screenshot evidence                        |
 
 There is no spec numbered 31. Passive performance collection runs through the shared browser fixtures during existing navigations and selected menu/variant/cart interactions; it is not a standalone page-opening suite. See [Performance](PERFORMANCE.md) and [Content checks](CONTENT.md) for measurement limits and review workflows.
+
+## WooCommerce suite
+
+`34-woocommerce` is selected only for Woo stores. Smoke checks homepage/catalogue and actual product/variation addition; full/commerce add public pricing, JSON-LD, unavailable/backorder behavior and checkout readiness. Shared inventory content/visual/page/performance suites use configured Woo URLs. Shopify-specific suites are not selected for Woo and vice versa. See [WooCommerce](WOOCOMMERCE.md).
+
+`35-seo-inventory.spec.ts` е общ за Shopify/WooCommerce: metadata, canonical, JSON-LD и сравнения между зададените/откритите страници. Тагове `@full`, `@pages`, `@seo`; JSON evidence `seo-inventory.json`. Изпълнение: `pnpm test:seo --site=<slug>`; локални проверки: `pnpm test:seo:local`. Виж [SEO inventory](SEO.md).
+
+`36-buyer-journey.spec.ts`: общ UI покупателен път за Shopify/WooCommerce, отделна visitor сесия и `@journey`/`@full` тагове. Локални positive/negative fixture проверки: `pnpm test:journey:local`.
+
+Checkout/empty-cart assertions: `pnpm test:claims:local` покрива и двете платформи. `17-checkout` отделя достигането на checkout от задължителните contact/address полета; `05-cart` и WooCommerce empty-cart сценарият проверяват UI и public cart. Evidence attachments: `checkout-interface.json`, `empty-cart.json`. Не се попълват лични данни и не се подават поръчки.

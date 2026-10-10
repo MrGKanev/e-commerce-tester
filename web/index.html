@@ -78,6 +78,17 @@
         <div class="report-layout">
           <aside id="report-list" aria-label="Available reports"></aside>
           <section class="report-viewer">
+            <section id="visual-review" hidden aria-label="Visual baseline approval">
+              <h2>Visual baseline</h2>
+              <p id="visual-summary" class="help"></p>
+              <p>
+                Only explicitly approved images become the reference for this store. Runs never
+                replace them automatically.
+              </p>
+              <div id="visual-images"></div>
+              <button id="approve-visual" disabled>Approve selected screenshots</button>
+              <p id="visual-message" role="status" aria-live="polite"></p>
+            </section>
             <p id="report-empty" class="welcome">Choose a report to preview.</p>
             <iframe id="report-frame" title="Report preview" hidden></iframe>
           </section>

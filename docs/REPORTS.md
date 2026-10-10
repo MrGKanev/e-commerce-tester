@@ -53,3 +53,13 @@ Visited URLs describe coverage, not defects on every URL. Screenshot and Trace Z
 `run-metadata.json` is created before execution and checkpointed by the reporter. It records Node/Playwright/project versions, observed browser versions, locale/timezone, selected projects/tags/filters, pacing, Git revision and working-tree state, execution status and exit code. Legacy runs explicitly show unavailable metadata.
 
 For annotation conventions and offline reporting validation, see [Contributing](CONTRIBUTING.md).
+
+## Visual approval
+
+The control panel's Reports section shows captured candidates and their baseline/diff images for a selected store run. A baseline missing or environment mismatch is a failed visual check requiring review. Only selected screenshots and an explicit confirmation change the approved store version. Unselected images retain their existing approval. Approval does not change historical results or pass rate.
+
+The comparison revision is recorded in run metadata and each visual entry. The review labels the baseline used by the historical run; the currently approved revision may be newer. In-progress runs cannot be approved. Approval uses revision conflicts to prevent a stale tab from replacing a newer user's approval. Approved images are independent of the latest 30 reports and survive pruning. See [Visual baselines](RUNNING.md#visual-baselines) for storage, Docker and CLI commands.
+
+## Price and availability evidence
+
+The `33-commerce-consistency` suite attaches sanitized `commerce-consistency.json` per scenario, and the reporter checkpoints a combined file in the run directory. The dashboard shows public product/variant observations, UI amounts, same-session cart amounts and discounts, including failed and unverified evidence. Unverified checks are ordinary skips that remain in coverage. See [Commerce checks](COMMERCE.md) for selectors, sample limits and supported pricing.

@@ -109,6 +109,40 @@ function readSpelling(file) {
     return report;
   } catch (error) { return { findings: [], unsupportedLanguages: [], error: error.message }; }
 }
+function readCommerce(file) {
+  if (!fs.existsSync(file)) return null;
+  try {
+    const report = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (!Array.isArray(report.checks) || report.checks.some(check => !check || typeof check !== 'object' || !Array.isArray(check.observations)))
+      throw new Error('Invalid commerce checks');
+    return report;
+  } catch (error) { return { checks: [], error: error.message }; }
+}
+function renderCommerce(run) {
+  if (!run.commerce) return '';
+  const checks = run.commerce.checks;
+  return `<details><summary>Public storefront price and availability (${checks.length} checks)</summary>
+    <p>Variant-specific observations from the storefront and the same visitor session. Unverified evidence is not a successful comparison.</p>
+    ${run.commerce.error ? `<p>${escHtml(run.commerce.error)}</p>` : ''}
+    ${checks.map(check => `<details><summary>${escHtml(check.productHandle)} · ${escHtml(check.kind)} · ${escHtml(check.project)} · ${escHtml(check.status)}</summary>
+      ${check.reason ? `<p>${escHtml(check.reason)}</p>` : ''}<pre>${escHtml(JSON.stringify(check.observations, null, 2))}</pre></details>`).join('')}
+  </details>`;
+}
+
+function readJourneys(file) {
+  if (!fs.existsSync(file)) return null;
+  try {
+    const report = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (!Array.isArray(report.checks) || report.checks.some(check => !check || !Array.isArray(check.steps) || check.steps.some(step => !step || typeof step !== 'object'))) throw new Error('Invalid buyer journey report');
+    return report;
+  } catch (error) { return { checks: [], error: error.message }; }
+}
+function renderJourneys(run) {
+  if (!run.journeys) return '';
+  return '<details><summary>Buyer journey — Покупателен път (' + run.journeys.checks.length + ' checks)</summary><p>Search → product → variant → add → quantity → checkout. No order submitted. Unverified steps remain incomplete.</p>' +
+    (run.journeys.error ? '<p>' + escHtml(run.journeys.error) + '</p>' : '') +
+    run.journeys.checks.map(check => '<details><summary>' + escHtml(check.platform) + ' · ' + escHtml(check.project) + ' · ' + escHtml(check.status) + (check.failedStep ? ' · step: ' + escHtml(check.failedStep) : '') + '</summary>' + (check.reason ? '<p>' + escHtml(check.reason) + '</p>' : '') + '<table><thead><tr><th>Step</th><th>Status</th><th>Expected</th><th>Observed</th></tr></thead><tbody>' + check.steps.map(step => '<tr><td>' + escHtml(step.name) + '</td><td>' + escHtml(step.status) + '</td><td><pre>' + escHtml(JSON.stringify(step.expected, null, 2) || '') + '</pre></td><td><pre>' + escHtml(JSON.stringify(step.actual, null, 2) || step.reason || '') + '</pre></td></tr>').join('') + '</tbody></table></details>').join('') + '</details>';
+}
 
 function collectRunsFromDir(dir, relPrefix) {
   if (!fs.existsSync(dir)) return [];
@@ -140,6 +174,8 @@ function collectRunsFromDir(dir, relPrefix) {
         ...summarizeRun(results, metadata, issue),
         vitals: readVitals(path.join(runDir, 'web-vitals.json')),
         spelling: readSpelling(path.join(runDir, 'spelling.json')),
+        commerce: readCommerce(path.join(runDir, 'commerce-consistency.json')),
+        journeys: readJourneys(path.join(runDir, 'buyer-journeys.json')),
         artifactLink: file => {
           let target = path.isAbsolute(file) ? file : path.resolve(runDir, file);
           if (!fs.existsSync(target) && results.config?.projects?.[0]?.outputDir) target = path.resolve(runDir, path.relative(path.dirname(results.config.projects[0].outputDir), file));
@@ -434,7 +470,7 @@ function renderMetadata(run) {
 
 function renderDiagnostics(run) {
   const relevant = run.scenarios.filter(s => s.outcome !== 'passed');
-  return `${renderVitals(run)}${!run.scopeKnown ? '<p>Scenario inventory was not recorded; selected scope is unknown.</p>' : run.total === 0 ? '<p>No tests selected or discovered.</p>' : ''}
+  return `${renderJourneys(run)}${renderCommerce(run)}${renderVitals(run)}${!run.scopeKnown ? '<p>Scenario inventory was not recorded; selected scope is unknown.</p>' : run.total === 0 ? '<p>No tests selected or discovered.</p>' : ''}
     ${run.reportIssue ? `<p class="c-amber">${escHtml(run.reportIssue)}</p>` : ''}
     ${run.globalErrors.length ? `<details><summary>Global errors (${run.globalErrors.length})</summary>${run.globalErrors.map(error => `<pre>${escHtml(error)}</pre>`).join('')}</details>` : ''}
     <details><summary>Scenarios (${relevant.length} need attention / ${run.total} selected)</summary>
@@ -442,7 +478,7 @@ function renderDiagnostics(run) {
         <summary>${escHtml(scenario.title)} · ${escHtml(scenario.project)} · ${escHtml(scenario.outcome)}${scenario.change ? ' · ' + scenario.change : ''}${scenario.notApplicable ? ' · not applicable' : ''}</summary>
         <p>${escHtml(scenario.file)}${scenario.line ? ':' + scenario.line : ''}${scenario.tags?.length ? ' · ' + escHtml(scenario.tags.join(' ')) : ''}</p>
         ${(scenario.urls || []).map(url => `<p>URL: ${escHtml(url)}</p>`).join('')}
-        ${(scenario.artifacts || []).map(artifact => { const href = run.artifactLink(artifact.path); return href ? `<p><a href="${href}" target="_blank">${escHtml(artifact.name === 'trace' ? 'Trace ZIP' : 'Screenshot: ' + artifact.name)} →</a></p>` : ''; }).join('')}
+        ${(scenario.artifacts || []).map(artifact => { const href = run.artifactLink(artifact.path); return href ? `<p><a href="${href}" target="_blank">${escHtml(artifact.name === 'trace' ? 'Trace ZIP' : artifact.name === 'commerce-consistency.json' ? 'Price and availability evidence' : 'Screenshot: ' + artifact.name)} →</a></p>` : ''; }).join('')}
         ${(scenario.reasons || []).map(reason => `<p>${escHtml(reason)}</p>`).join('')}
         ${['not-run', 'interrupted', 'unfinished'].includes(scenario.outcome) ? '<p>Execution did not complete; this test remains in the coverage denominator.</p>' : ''}
         ${scenario.activeRetry !== undefined ? `<p>Was active at last checkpoint: attempt ${scenario.activeRetry + 1}</p>` : ''}

@@ -1,0 +1,442 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://e-commerce-tester.local/schemas/site-settings.json",
+  "title": "Storefront settings overrides",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "platform": {
+      "enum": ["shopify", "woocommerce"]
+    },
+    "locale": {
+      "type": ["string", "null"]
+    },
+    "timezoneId": {
+      "type": ["string", "null"]
+    },
+    "performanceMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "enum": ["report", "strict"]
+        },
+        "afterDomMs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maxPaintMs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "minPaintMs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maxEventMs": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "checkout": {
+          "type": "boolean"
+        },
+        "discounts": {
+          "type": "boolean"
+        },
+        "currency": {
+          "type": "boolean"
+        },
+        "language": {
+          "type": "boolean"
+        },
+        "recommendations": {
+          "type": "boolean"
+        },
+        "recentlyViewed": {
+          "type": "boolean"
+        },
+        "newsletter": {
+          "type": "boolean"
+        },
+        "reviews": {
+          "type": "boolean"
+        },
+        "filters": {
+          "type": "boolean"
+        },
+        "variants": {
+          "type": "boolean"
+        },
+        "mobileMenu": {
+          "type": "boolean"
+        },
+        "commerceConsistency": {
+          "type": "boolean"
+        }
+      }
+    },
+    "selectors": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "addToCart": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "productTitle": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "price": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "cartCount": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "cartItems": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "mobileMenuToggle": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "consentAccept": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "main": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "commerceRoot": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "productForm": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "soldOut": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "cartUnitPrice": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "cartLinePrice": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "searchInput": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "searchResults": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "cartUpdate": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "checkoutButton": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "checkoutSummary": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "checkoutQuantity": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "checkoutLinePrice": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "checkoutRoot": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "checkoutEmail": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "checkoutAddressLine1": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "checkoutCity": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "checkoutPostalCode": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "checkoutCountry": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "cartEmpty": {
+          "type": "string",
+          "pattern": "\\S"
+        }
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "webVitals": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "lcp": {
+              "type": "number",
+              "minimum": 0
+            },
+            "cls": {
+              "type": "number",
+              "minimum": 0
+            },
+            "interactionLatency": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "performance": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ttfb": {
+              "type": "number",
+              "minimum": 0
+            },
+            "domInteractive": {
+              "type": "number",
+              "minimum": 0
+            },
+            "domContentLoaded": {
+              "type": "number",
+              "minimum": 0
+            },
+            "loadComplete": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "lighthouse": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "performance": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "accessibility": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "best-practices": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "seo": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          }
+        },
+        "accessibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxBlocking": {
+              "type": "number",
+              "minimum": 0
+            },
+            "maxViolations": {
+              "type": "number",
+              "minimum": 0
+            },
+            "maxContrastNodes": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "visual": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxDiffPixelRatio": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "components": {
+              "type": "object",
+              "propertyNames": {
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "additionalProperties": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "discoverProducts": {
+          "type": "boolean"
+        },
+        "productLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 25
+        },
+        "pages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^/(?!/)[^\\\\]*$"
+              },
+              "type": {
+                "enum": ["home", "product", "collection", "search", "cart", "static"]
+              },
+              "language": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            },
+            "required": ["path", "type"]
+          }
+        }
+      }
+    },
+    "spelling": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": ["off", "report", "strict"]
+        },
+        "languages": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": ["bg", "en"]
+          }
+        },
+        "allowWords": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "\\S"
+          }
+        },
+        "acceptedFindings": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "\\S"
+          }
+        },
+        "excludeSelectors": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "\\S"
+          }
+        },
+        "maxFindings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ocr": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "selector": {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            "minConfidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "maxImages": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "tessdataPath": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "checkout": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": ["auto", "supported", "unsupported", "blocked"]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "contact": {
+          "enum": ["required", "not-applicable", "unverified"]
+        },
+        "shippingAddress": {
+          "enum": ["required", "not-applicable", "unverified"]
+        },
+        "requiredAddressFields": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["addressLine1", "city", "postalCode", "country"]
+          }
+        }
+      }
+    }
+  }
+}

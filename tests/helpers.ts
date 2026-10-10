@@ -1,6 +1,7 @@
 import { measureInteraction } from './web-vitals';
 import { readSiteSettings } from '../config/site-settings';
 import { pageInventory } from './inventory';
+import { productReferences, storefrontRoute } from '../scripts/platform-config';
 const settings = readSiteSettings();
 import { Page, Locator, expect, errors } from '@playwright/test';
 
@@ -12,82 +13,90 @@ export const USER_AGENT =
 
 export const LOCALE = settings.locale;
 export const TIMEZONE_ID = settings.timezoneId;
+export const PLATFORM = settings.platform;
+export const CATALOG_URL = storefrontRoute(settings, BASE, 'catalog');
+export const CART_URL = storefrontRoute(settings, BASE, 'cart');
+export const CHECKOUT_URL = storefrontRoute(settings, BASE, 'checkout');
 
 /** Search term used by search-related tests — configurable via .env */
 export const SEARCH_TERM = process.env.SEARCH_TERM ?? 'zerno';
 
 /** Known products for targeted tests — configurable via .env */
-const _handle1 = process.env.PRODUCT_HANDLE ?? 'zerno-z1';
-const _handle2 = process.env.PRODUCT_HANDLE_2 ?? 'zerno-z2';
-
-export const KNOWN_PRODUCTS = [
-  { handle: _handle1, url: `${BASE}/products/${encodeURIComponent(_handle1)}` },
-  { handle: _handle2, url: `${BASE}/products/${encodeURIComponent(_handle2)}` },
-];
+export const KNOWN_PRODUCTS = productReferences(settings, BASE);
 /** Backwards-compat shorthand */
-export const KNOWN_PRODUCT = KNOWN_PRODUCTS[0].url;
+export const KNOWN_PRODUCT = KNOWN_PRODUCTS[0]?.url || BASE;
 
 /** Shopify add-to-cart button selectors — covers Dawn, Debut, Empire, and custom themes */
 export const ADD_TO_CART_SEL =
   settings.selectors.addToCart ||
-  [
-    'form[action*="/cart/add"] button[type="submit"]',
-    'button[name="add"]',
-    '#AddToCart',
-    '#product-submit-button',
-    '[data-add-to-cart]',
-    '.product-form__submit',
-    'button:has-text("Add to cart")',
-    'button:has-text("Добавяне в количката")',
-    'button:has-text("Добавяне")',
-    'button:has-text("В количката")',
-    'button:has-text("Купи")',
-  ].join(', ');
+  (PLATFORM === 'woocommerce'
+    ? 'form.cart .single_add_to_cart_button, .wp-block-woocommerce-product-button button, .wp-block-woocommerce-add-to-cart-form button[type="submit"], [data-woo-add-to-cart]'
+    : [
+        'form[action*="/cart/add"] button[type="submit"]',
+        'button[name="add"]',
+        '#AddToCart',
+        '#product-submit-button',
+        '[data-add-to-cart]',
+        '.product-form__submit',
+        'button:has-text("Add to cart")',
+        'button:has-text("Добавяне в количката")',
+        'button:has-text("Добавяне")',
+        'button:has-text("В количката")',
+        'button:has-text("Купи")',
+      ].join(', '));
 
 export const PRODUCT_TITLE_SEL =
   settings.selectors.productTitle ||
-  [
-    '.product__title h1',
-    '.product__title',
-    'h1.product-single__title',
-    'h1.title',
-    '.product-title h1',
-    'h1',
-  ].join(', ');
+  (PLATFORM === 'woocommerce'
+    ? '.product_title, .wp-block-post-title, main h1'
+    : [
+        '.product__title h1',
+        '.product__title',
+        'h1.product-single__title',
+        'h1.title',
+        '.product-title h1',
+        'h1',
+      ].join(', '));
 
 export const PRICE_SEL =
   settings.selectors.price ||
-  [
-    '.price__regular .price-item',
-    '.price__regular',
-    '.product__price',
-    '[data-product-price]',
-    '.price:not(.price--unavailable)',
-    '.price-item--regular',
-    'span.money',
-  ].join(', ');
+  (PLATFORM === 'woocommerce'
+    ? '.single_variation .price ins .amount, .single_variation .price .amount, .summary > .price ins .amount, .summary > .price .amount, .wp-block-woocommerce-product-price .amount'
+    : [
+        '.price__regular .price-item',
+        '.price__regular',
+        '.product__price',
+        '[data-product-price]',
+        '.price:not(.price--unavailable)',
+        '.price-item--regular',
+        'span.money',
+      ].join(', '));
 
 export const CART_COUNT_SEL =
   settings.selectors.cartCount ||
-  [
-    '#cart-icon-bubble',
-    '[data-cart-count]',
-    '.cart-count',
-    '#CartCount',
-    '.header__cart-count',
-    '.cart__count',
-  ].join(', ');
+  (PLATFORM === 'woocommerce'
+    ? '.cart-contents .count, .wc-block-mini-cart__badge'
+    : [
+        '#cart-icon-bubble',
+        '[data-cart-count]',
+        '.cart-count',
+        '#CartCount',
+        '.header__cart-count',
+        '.cart__count',
+      ].join(', '));
 
 export const CART_ITEMS_SEL =
   settings.selectors.cartItems ||
-  [
-    '.cart__item',
-    '.cart-item',
-    'tr.cart__row',
-    '[data-cart-item]',
-    '.cart__items > *',
-    '.cart-items > *',
-  ].join(', ');
+  (PLATFORM === 'woocommerce'
+    ? '.woocommerce-cart-form .cart_item, .wc-block-cart-items__row, [data-woo-cart-item]'
+    : [
+        '.cart__item',
+        '.cart-item',
+        'tr.cart__row',
+        '[data-cart-item]',
+        '.cart__items > *',
+        '.cart-items > *',
+      ].join(', '));
 
 export const MOBILE_MENU_TOGGLE_SEL =
   settings.selectors.mobileMenuToggle ||
@@ -252,11 +261,21 @@ export async function cartAction(page: Page, action: () => Promise<unknown>): Pr
 }
 
 export async function clearCart(page: Page): Promise<void> {
+  if (PLATFORM === 'woocommerce') {
+    const { wooSession } = await import('./platforms/woocommerce');
+    await wooSession(page).clearCart();
+    return;
+  }
   const response = await page.context().request.post(`${BASE}/cart/clear.js`);
   expect(response.ok(), 'Could not clear cart').toBe(true);
 }
 
 export async function addProductToCart(page: Page, url = KNOWN_PRODUCT): Promise<boolean> {
+  if (PLATFORM === 'woocommerce') {
+    const { addWooProductToCart } = await import('./platforms/woocommerce');
+    await addWooProductToCart(page, url);
+    return true;
+  }
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   const button = page.locator(ADD_TO_CART_SEL).first();
   await expect(button, 'Product add-to-cart control is missing').toBeVisible();

@@ -1,0 +1,22 @@
+[
+  {
+    "name": "WooCommerce store",
+    "slug": "my-woo-store",
+    "platform": "woocommerce",
+    "url": "https://example.com",
+    "searchTerm": "shirt",
+    "locale": "en-US",
+    "timezoneId": "UTC",
+    "commerce": {
+      "productUrls": ["/product/example-shirt/", "/product/example-mug/"],
+      "apiRoot": "/wp-json/wc/store/v1",
+      "routes": {
+        "catalog": "/shop/",
+        "cart": "/cart/",
+        "checkout": "/checkout/",
+        "search": "/?s={query}&post_type=product"
+      },
+      "taxDisplay": "auto"
+    }
+  }
+]
