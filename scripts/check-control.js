@@ -28,7 +28,7 @@ const { digest, approved } = require('./visual-baselines');
     await page.route('**/*', route =>
       new URL(route.request().url()).origin === origin ? route.continue() : route.abort(),
     );
-    await page.goto(origin);
+    await page.goto(`${origin}/settings`);
     await page.getByRole('button', { name: 'Add a store', exact: true }).click();
     await page.getByLabel('Store name', { exact: true }).fill('Example Shop');
     await page.getByLabel('Store address', { exact: true }).fill('https://example.test');

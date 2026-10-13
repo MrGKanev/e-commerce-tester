@@ -182,3 +182,44 @@ test('queued manual runs survive restarts and wait for cooldown', async t => {
   submit(f.stateDir, { action: 'cancel', id });
   await waitFor(() => readQueue(f.stateDir).pending.length === 0);
 });
+test('forcing a queued run skips the store cooldown and moves it to the front', async t => {
+  const f = await setup(t);
+  const state = {
+    schemaVersion: 1,
+    jobs: {},
+    origins: {
+      'https://example.test': {
+        blockedUntil: Date.now() + 60000,
+        rateLimitStreak: 1,
+        failureStreak: 0,
+        marker: 'limit',
+      },
+    },
+    nextDispatchAt: 0,
+    running: null,
+  };
+  fs.writeFileSync(path.join(f.stateDir, 'schedule.json'), JSON.stringify(state));
+  const first = await f.enqueue(),
+    second = await f.enqueue();
+  f.start();
+  await waitFor(() => readQueue(f.stateDir).pending[0]?.waitReason === 'Store cooldown');
+  assert.equal((await f.post('/api/runs/force', { id: 'missing' })).status, 409);
+  assert.equal((await f.post('/api/runs/force', { id: second })).status, 202);
+  await waitFor(() => readQueue(f.stateDir).active?.id === second);
+  assert.deepEqual(
+    readQueue(f.stateDir).pending.map(run => run.id),
+    [first],
+  );
+  // A forced submission never interrupts the active run; it waits behind it.
+  const response = await f.post('/api/runs', {
+    site: 'shop',
+    mode: 'smoke',
+    projects: ['Desktop Chrome'],
+    immediate: true,
+  });
+  const third = (await response.json()).id;
+  await waitFor(() => readQueue(f.stateDir).pending[0]?.id === third);
+  assert.equal(readQueue(f.stateDir).active.id, second);
+  for (const id of [second, third, first]) submit(f.stateDir, { action: 'cancel', id });
+  await waitFor(() => !readQueue(f.stateDir).active && !readQueue(f.stateDir).pending.length);
+});

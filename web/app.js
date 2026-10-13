@@ -115,7 +115,7 @@ function renderCookieConsent(site, base) {
   const consent = site.cookieConsent || {};
   const inputClass =
     'mt-1 w-full rounded-lg border border-solid border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-blue-600';
-  return `<section class="mt-6 border-t border-solid border-slate-200 pt-5" aria-label="Cookie consent settings"><h2 class="mb-2 text-lg font-semibold">Cookie consent</h2><p class="mb-4 text-sm text-slate-600">Choose how normal tests handle cookie banners. Accepted cookies and local storage are reused across the run. GDPR checks use fresh sessions to test consent separately.</p><div class="grid grid-cols-1 gap-4 sm:grid-cols-2"><label class="text-sm font-semibold">Cookie consent behavior<select class="${inputClass}" data-path="${base}.cookieConsent.mode"><option value="accept-all" ${consent.mode !== 'none' ? 'selected' : ''}>Accept all cookies</option><option value="none" ${consent.mode === 'none' ? 'selected' : ''}>Leave banner untouched</option></select></label><label class="text-sm font-semibold">Wait for cookie banner (seconds)<input class="${inputClass}" type="number" min="0" max="30" step="0.1" data-scale="1000" data-path="${base}.cookieConsent.waitMs" value="${(consent.waitMs ?? 5000) / 1000}"></label><label class="text-sm font-semibold">Accept all button selector (optional)<input class="${inputClass}" data-optional data-path="${base}.selectors.consentAccept" value="${escapeHTML(site.selectors?.consentAccept || '')}" placeholder="#accept-all-cookies"></label><label class="text-sm font-semibold">Consent iframe selector (optional)<input class="${inputClass}" data-path="${base}.cookieConsent.frameSelector" value="${escapeHTML(consent.frameSelector || '')}" placeholder="iframe#cookie-consent"></label></div><p class="mt-3 text-sm text-slate-600">Leave selectors blank for common banners. For a custom banner, use the CSS selector of its Accept all button. Activity records whether consent was accepted or no button was found.</p></section>`;
+  return `<section class="mt-6 border-t border-solid border-slate-200 pt-5" aria-label="Cookie consent settings"><h2 class="mb-2 text-lg font-semibold">Cookie consent</h2><p class="mb-4 text-sm text-slate-600">Choose how normal tests handle cookie banners. Accepted cookies and local storage are reused across the run. GDPR checks use fresh sessions to test consent separately.</p><div class="grid grid-cols-1 gap-4 sm:grid-cols-2"><label class="text-sm font-semibold">Cookie consent behavior<select aria-label="Cookie consent behavior" class="${inputClass}" data-path="${base}.cookieConsent.mode"><option value="accept-all" ${consent.mode !== 'none' ? 'selected' : ''}>Accept all cookies</option><option value="none" ${consent.mode === 'none' ? 'selected' : ''}>Leave banner untouched</option></select></label><label class="text-sm font-semibold">Wait for cookie banner (seconds)<input class="${inputClass}" type="number" min="0" max="30" step="0.1" data-scale="1000" data-path="${base}.cookieConsent.waitMs" value="${(consent.waitMs ?? 5000) / 1000}"></label><label class="text-sm font-semibold">Accept all button selector (optional)<input class="${inputClass}" data-optional data-path="${base}.selectors.consentAccept" value="${escapeHTML(site.selectors?.consentAccept || '')}" placeholder="#accept-all-cookies"></label><label class="text-sm font-semibold">Consent iframe selector (optional)<input class="${inputClass}" data-path="${base}.cookieConsent.frameSelector" value="${escapeHTML(consent.frameSelector || '')}" placeholder="iframe#cookie-consent"></label></div><p class="mt-3 text-sm text-slate-600">Leave selectors blank for common banners. For a custom banner, use the CSS selector of its Accept all button. Activity records whether consent was accepted or no button was found.</p></section>`;
 }
 function renderCheckoutPolicy(site, base) {
   const policy = site.checkout || {};
@@ -463,7 +463,7 @@ function updateLocation(section) {
 }
 function restoreLocation() {
   const url = new URL(location.href);
-  const section = url.pathname.split('/')[1] || 'settings';
+  const section = url.pathname.split('/')[1] || (data?.sites.length ? 'runs' : 'settings');
   reportStore = url.searchParams.get('store') || 'overview';
   reportRun = url.searchParams.get('run');
   selectedRun = section === 'runs' ? url.searchParams.get('run') : null;
@@ -471,7 +471,7 @@ function restoreLocation() {
 }
 function showSection(section, navigate = true) {
   if (navigate) updateLocation(section);
-  for (const name of ['settings', 'reports', 'runs']) {
+  for (const name of ['runs', 'reports', 'settings']) {
     const active = section === name;
     $(`#${name}-view`).hidden = !active;
     $(`#${name}-tab`).classList.toggle('active', active);
@@ -697,14 +697,14 @@ async function loadRunStores() {
           .join('')
       : '<option value="">Add and save a store in Settings first</option>';
     if (saved.sites.some(site => site.slug === previous)) $('#run-store').value = previous;
-    $('#enqueue-run').disabled = !saved.sites.length;
+    $('#enqueue-run').disabled = $('#run-now').disabled = !saved.sites.length;
     await refreshRuns();
   } catch (error) {
     runsMessage(error.message, true);
   }
 }
-function runCard(run, action = '') {
-  return `<article class="run-card"><button class="quiet run-select" data-run-select="${escapeHTML(run.id)}">${escapeHTML(run.name || run.site)} · ${escapeHTML(run.mode)}<small>${escapeHTML(run.source)} · ${escapeHTML(run.status)} · ${escapeHTML(run.projects.join(', '))}${run.waitReason ? '<br>' + escapeHTML(run.waitReason) + ' · Eligible: ' + escapeHTML(new Date(run.eligibleAt).toLocaleString()) : ''}</small></button>${action ? `<button class="quiet run-stop" data-run-cancel="${escapeHTML(run.id)}" ${run.status === 'stopping' ? 'disabled' : ''}>${action}</button>` : ''}</article>`;
+function runCard(run, action = '', canForce = false) {
+  return `<article class="run-card flex-wrap"><button class="quiet run-select w-full whitespace-normal sm:w-auto sm:flex-1" data-run-select="${escapeHTML(run.id)}">${escapeHTML(run.name || run.site)} · ${escapeHTML(run.mode)}<small>${escapeHTML(run.source)} · ${escapeHTML(run.status)} · ${escapeHTML(run.projects.join(', '))}${run.waitReason ? '<br>' + escapeHTML(run.waitReason) + ' · Eligible: ' + escapeHTML(new Date(run.eligibleAt).toLocaleString()) : ''}</small></button>${canForce && !run.forced ? `<button class="rounded-lg border border-solid border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" data-run-force="${escapeHTML(run.id)}">Run now</button>` : ''}${run.forced && run.status === 'queued' ? '<span class="rounded-lg bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">Forced</span>' : ''}${action ? `<button class="quiet run-stop" data-run-cancel="${escapeHTML(run.id)}" ${run.status === 'stopping' ? 'disabled' : ''}>${action}</button>` : ''}</article>`;
 }
 async function refreshRuns() {
   if (runPolling) return;
@@ -715,7 +715,7 @@ async function refreshRuns() {
       ? runCard(runs.active, runs.active.status === 'stopping' ? 'Stopping…' : 'Stop run')
       : '<p class="muted">No active run</p>';
     $('#run-pending').innerHTML = runs.pending.length
-      ? runs.pending.map(run => runCard(run, 'Remove')).join('')
+      ? runs.pending.map(run => runCard(run, 'Remove', true)).join('')
       : '<p class="muted">Queue is empty</p>';
     $('#run-scheduled').innerHTML =
       [...status.jobs]
@@ -789,8 +789,9 @@ function renderRunDetails({ run, events, log }) {
 
 $('#run-form').addEventListener('submit', async event => {
   event.preventDefault();
-  const button = $('#enqueue-run');
-  button.disabled = true;
+  const immediate = event.submitter?.id === 'run-now';
+  const buttons = [$('#enqueue-run'), $('#run-now')];
+  buttons.forEach(button => (button.disabled = true));
   try {
     const selectedProjects = [...document.querySelectorAll('[name="run-project"]:checked')].map(
       input => input.value,
@@ -803,15 +804,20 @@ $('#run-form').addEventListener('submit', async event => {
         site: $('#run-store').value,
         mode: $('#run-mode').value,
         projects: selectedProjects,
+        immediate,
       }),
     });
-    runsMessage('Run submitted. It will appear in the queue within a second.');
+    runsMessage(
+      immediate
+        ? 'Forced run submitted. It starts as soon as the current run finishes.'
+        : 'Run submitted. It will appear in the queue within a second.',
+    );
     selectedRun = null;
     await refreshRuns();
   } catch (error) {
     runsMessage(error.message, true);
   } finally {
-    button.disabled = false;
+    buttons.forEach(button => (button.disabled = !$('#run-store').value));
   }
 });
 document.addEventListener('click', async event => {
@@ -820,6 +826,22 @@ document.addEventListener('click', async event => {
     selectedRun = select.dataset.runSelect;
     updateLocation('runs');
     await refreshRuns();
+  }
+  const force = event.target.closest('[data-run-force]');
+  if (force) {
+    force.disabled = true;
+    try {
+      await api('/api/runs/force', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Control-Token': token },
+        body: JSON.stringify({ id: force.dataset.runForce }),
+      });
+      runsMessage('Moved to the front. It starts as soon as the current run finishes.');
+      await refreshRuns();
+    } catch (error) {
+      runsMessage(error.message, true);
+      force.disabled = false;
+    }
   }
   const cancel = event.target.closest('[data-run-cancel]');
   if (cancel) {

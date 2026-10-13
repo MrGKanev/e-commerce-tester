@@ -42,6 +42,7 @@ function manualRun(configuration, input) {
     projects: job.projects,
     queuedAt: Date.now(),
     status: 'queued',
+    forced: input.immediate === true,
     job,
     sites: configuration.sites.map(({ settings: _settings, ...value }) => value),
   };

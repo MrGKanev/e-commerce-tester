@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Store Health · Settings</title>
+    <title>Store Health</title>
     <link rel="stylesheet" href="/style.css" />
     <link rel="stylesheet" href="/tailwind.css" />
     <script src="/app.js" defer></script>
@@ -12,58 +12,16 @@
     <header>
       <a class="brand" href="/">● Store Health</a>
       <nav>
-        <a id="settings-tab" class="nav-tab active" href="/settings" aria-current="page"
-          >Settings</a
-        >
+        <a id="runs-tab" class="nav-tab" href="/runs">Runs</a>
         <a id="reports-tab" class="nav-tab" href="/reports" aria-controls="reports-submenu"
           >Reports</a
         >
-        <a id="runs-tab" class="nav-tab" href="/runs">Runs</a>
+        <a id="settings-tab" class="nav-tab" href="/settings">Settings</a>
         <button id="reload" class="quiet">Reload settings</button>
       </nav>
     </header>
     <nav id="reports-submenu" class="report-submenu" aria-label="Report stores" hidden></nav>
     <main>
-      <div id="settings-view">
-        <div class="heading">
-          <div>
-            <p class="eyebrow">CONTROL PANEL</p>
-            <h1>Stores & schedules</h1>
-            <p class="muted">Choose what to check and when. Changes apply after the current run.</p>
-          </div>
-          <button id="save" disabled>Save changes</button>
-        </div>
-        <p id="message" role="status" aria-live="polite"></p>
-        <section class="status-strip" aria-label="Scheduler status">
-          <span id="worker">Connecting…</span><span id="active">No active check</span>
-        </section>
-        <div class="layout">
-          <aside>
-            <div class="list-heading">
-              <h2>Stores</h2>
-              <button id="add-store" class="quiet">+ Add</button>
-            </div>
-            <div id="store-list"></div>
-            <button id="general" class="general quiet">Scheduling & pauses</button>
-            <details class="import">
-              <summary>Import existing configuration</summary>
-              <p class="muted">Optional: choose your existing store and scheduler files.</p>
-              <label
-                >Store file<input
-                  id="import-sites"
-                  type="file"
-                  accept=".json,application/json" /></label
-              ><label
-                >Scheduler file<input
-                  id="import-scheduler"
-                  type="file"
-                  accept=".json,application/json" /></label
-              ><button id="import" class="quiet">Load files into editor</button>
-            </details>
-          </aside>
-          <section id="editor" class="panel" aria-label="Settings editor"></section>
-        </div>
-      </div>
       <section id="runs-view" hidden aria-label="Manual runs and queue">
         <div class="heading">
           <div>
@@ -86,7 +44,16 @@
             Manual runs also work for paused stores. Save store edits in Settings first. Runs
             execute one at a time and respect request pauses, gaps and cooldowns.
           </p>
-          <button id="enqueue-run" type="submit">Add to queue</button>
+          <div class="flex flex-wrap gap-2">
+            <button id="enqueue-run" type="submit">Add to queue</button>
+            <button
+              id="run-now"
+              type="submit"
+              class="rounded-lg border border-solid border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 disabled:opacity-50"
+            >
+              Run now
+            </button>
+          </div>
         </form>
         <div class="run-layout">
           <section class="panel">
@@ -161,6 +128,46 @@
           </section>
         </div>
       </section>
+      <div id="settings-view" hidden>
+        <div class="heading">
+          <div>
+            <p class="eyebrow">CONTROL PANEL</p>
+            <h1>Stores & schedules</h1>
+            <p class="muted">Choose what to check and when. Changes apply after the current run.</p>
+          </div>
+          <button id="save" disabled>Save changes</button>
+        </div>
+        <p id="message" role="status" aria-live="polite"></p>
+        <section class="status-strip" aria-label="Scheduler status">
+          <span id="worker">Connecting…</span><span id="active">No active check</span>
+        </section>
+        <div class="layout">
+          <aside>
+            <div class="list-heading">
+              <h2>Stores</h2>
+              <button id="add-store" class="quiet">+ Add</button>
+            </div>
+            <div id="store-list"></div>
+            <button id="general" class="general quiet">Scheduling & pauses</button>
+            <details class="import">
+              <summary>Import existing configuration</summary>
+              <p class="muted">Optional: choose your existing store and scheduler files.</p>
+              <label
+                >Store file<input
+                  id="import-sites"
+                  type="file"
+                  accept=".json,application/json" /></label
+              ><label
+                >Scheduler file<input
+                  id="import-scheduler"
+                  type="file"
+                  accept=".json,application/json" /></label
+              ><button id="import" class="quiet">Load files into editor</button>
+            </details>
+          </aside>
+          <section id="editor" class="panel" aria-label="Settings editor"></section>
+        </div>
+      </div>
       <footer class="project-footer">
         Built by Gabriel Kanev ·
         <a
@@ -181,7 +188,7 @@
         <p id="activity-test" class="help">No active test</p>
         <p id="activity-url" class="help"></p>
       </div>
-      <div id="activity-feed" class="run-events" aria-label="Latest activity">
+      <div id="activity-feed" class="run-events" aria-label="Latest activity" tabindex="0">
         <p class="muted">Activity will appear here when a run starts.</p>
       </div>
     </section>

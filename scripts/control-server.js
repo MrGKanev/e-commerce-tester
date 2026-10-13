@@ -96,6 +96,7 @@ function createControlServer({
             '/api/visual/approve',
             '/api/runs',
             '/api/runs/cancel',
+            '/api/runs/force',
             '/api/reports/delete',
           ].includes(url.pathname))
       ) {
@@ -120,6 +121,12 @@ function createControlServer({
             return json(response, 409, { error: 'Queue is full (100 runs)' });
           queue.submit(stateDir, { action: 'enqueue', run });
           return json(response, 202, { id: run.id });
+        }
+        if (url.pathname === '/api/runs/force') {
+          if (!queue.readQueue(stateDir).pending.some(run => run.id === input.id))
+            return json(response, 409, { error: 'This run is no longer queued' });
+          queue.submit(stateDir, { action: 'force', id: input.id });
+          return json(response, 202, { ok: true });
         }
         if (url.pathname === '/api/runs/cancel') {
           const runs = queue.readQueue(stateDir);

@@ -277,6 +277,15 @@ async function main(args = process.argv.slice(2), { runnerFile } = {}) {
     saveRuns();
   }
   if (runs.active) completeRun('interrupted');
+  // Forced runs go first (in submission order) and skip store cooldown and run gaps; a run that is already active is never interrupted.
+  function moveForced(id) {
+    const [run] = runs.pending.splice(
+      runs.pending.findIndex(run => run.id === id),
+      1,
+    );
+    const index = runs.pending.findIndex(run => !run.forced);
+    runs.pending.splice(index < 0 ? runs.pending.length : index, 0, run);
+  }
   function commands() {
     const directory = path.join(settings.stateDir, 'commands');
     if (!fs.existsSync(directory)) return;
@@ -295,6 +304,13 @@ async function main(args = process.argv.slice(2), { runnerFile } = {}) {
         ![runs.active, ...runs.pending, ...runs.history].some(run => run?.id === command.run.id)
       ) {
         runs.pending.push(command.run);
+        if (command.run.forced) moveForced(command.run.id);
+      } else if (command.action === 'force') {
+        const run = runs.pending.find(run => run.id === command.id);
+        if (run) {
+          run.forced = true;
+          moveForced(run.id);
+        }
       } else if (command.action === 'cancel') {
         if (runs.active?.id === command.id) {
           runs.active.status = 'stopping';
@@ -397,7 +413,9 @@ async function main(args = process.argv.slice(2), { runnerFile } = {}) {
           marker: '',
         };
       const due = manual
-        ? Math.max(state.origins[job.origin].blockedUntil, state.nextDispatchAt)
+        ? manual.forced
+          ? 0
+          : Math.max(state.origins[job.origin].blockedUntil, state.nextDispatchAt)
         : model.readyAt(state, job, Date.now());
       if (manual && manual.eligibleAt !== due) {
         manual.eligibleAt = due;
