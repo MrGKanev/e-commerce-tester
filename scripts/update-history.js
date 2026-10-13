@@ -20,7 +20,7 @@ const fs   = require('fs');
 const path = require('path');
 const { summarizeRun, percent, compareRuns } = require('./report-model');
 
-const reportsDir = path.join(__dirname, '..', 'reports');
+const reportsDir = process.env.REPORTS_DIR || path.join(__dirname, '..', 'reports');
 
 // ── Load site metadata from sites.json (for name / URL display) ──────────────
 
@@ -46,7 +46,7 @@ function collectAllSites() {
   if (!fs.existsSync(reportsDir)) return sites;
 
   for (const entry of fs.readdirSync(reportsDir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
+    if (!entry.isDirectory() || entry.name === '.trash') continue;
     // Skip dated dirs at the root (legacy single-site runs)
     if (/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}(?:-\d{2}-\d{3})?$/.test(entry.name)) continue;
 

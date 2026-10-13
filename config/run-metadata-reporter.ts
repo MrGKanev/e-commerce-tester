@@ -78,6 +78,7 @@ export default class RunMetadataReporter implements Reporter {
         node: process.version,
       },
       source: sourceRevision(),
+      cookieConsent: readSiteSettings().cookieConsent,
       phase: 'starting',
       startedAt: new Date().toISOString(),
     };

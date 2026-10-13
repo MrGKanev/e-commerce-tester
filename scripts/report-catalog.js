@@ -62,7 +62,7 @@ function catalog(reportsDir, sites = []) {
   }
   const groups = fs
     .readdirSync(root, { withFileTypes: true })
-    .filter(entry => entry.isDirectory() && !RUN.test(entry.name))
+    .filter(entry => entry.isDirectory() && entry.name !== '.trash' && !RUN.test(entry.name))
     .map(entry => {
       const entries = runs(path.join(root, entry.name), [entry.name]);
       return {

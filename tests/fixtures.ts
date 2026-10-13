@@ -1,3 +1,4 @@
+import { consentButton, acceptCookieConsent } from './cookie-consent';
 import { controlEvent } from '../config/control-events';
 import { installWebVitals, attachWebVitals, type VitalsSession } from './web-vitals';
 let vitalSessions: VitalsSession[] = [];
@@ -13,6 +14,7 @@ export { expect } from '@playwright/test';
 export type { Page, BrowserContext } from '@playwright/test';
 
 let actualBrowserVersion: string | undefined;
+let automateConsent = true;
 
 function paceBrowser(browser: Browser): Browser {
   actualBrowserVersion = browser.version();
@@ -20,6 +22,15 @@ function paceBrowser(browser: Browser): Browser {
   browser.newContext = async options => {
     const context = await newContext({ ...options, serviceWorkers: 'block' });
     await paceContext(context);
+    const newPage = context.newPage.bind(context);
+    context.newPage = async () => {
+      const page = await newPage();
+      if (automateConsent && settings.cookieConsent.mode === 'accept-all')
+        await page.addLocatorHandler(consentButton(page, settings), async () => {
+          await acceptCookieConsent(page, settings);
+        });
+      return page;
+    };
     vitalSessions.push(await installWebVitals(context));
     context.on('page', page =>
       page.on('framenavigated', frame => {
@@ -56,6 +67,7 @@ export const test = base.extend<{ politeRun: void }>({
       visitedUrls = new Set();
       vitalSessions = [];
       const file = path.basename(testInfo.file);
+      automateConsent = file !== '15-gdpr.spec.ts';
       if (!compatibleSpec(file, settings.platform)) {
         testInfo.annotations.push({
           type: 'not-applicable',

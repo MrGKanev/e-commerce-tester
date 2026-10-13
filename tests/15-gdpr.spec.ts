@@ -1,4 +1,12 @@
-import { optionalVisible, waitForContent, BASE, KNOWN_PRODUCT, LOCALE, TIMEZONE_ID, COOKIE_CONSENT_SEL } from './helpers';
+import {
+  optionalVisible,
+  waitForContent,
+  BASE,
+  KNOWN_PRODUCT,
+  LOCALE,
+  TIMEZONE_ID,
+  cookieConsentButton,
+} from './helpers';
 /**
  * GDPR / Cookie Consent tests
  *
@@ -15,7 +23,6 @@ import { optionalVisible, waitForContent, BASE, KNOWN_PRODUCT, LOCALE, TIMEZONE_
  *  6. Decline button (if present) hides banner without JS errors
  */
 import { test, expect } from './fixtures';
-
 
 /** Selectors for the "decline / reject all" button — less standardised than accept */
 const COOKIE_DECLINE_SEL = [
@@ -35,13 +42,12 @@ const CONSENT_PATTERN = /consent|cookie|gdpr|tracking|privacy|cc_/i;
 
 /** Wait for the consent banner to appear; returns true if visible, false if absent */
 async function waitForBanner(page: import('@playwright/test').Page): Promise<boolean> {
-  return optionalVisible(page.locator(COOKIE_CONSENT_SEL).filter({ visible: true }).first(), 5000);
+  return optionalVisible(cookieConsentButton(page), 5000);
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-test.describe('15 · GDPR / Cookie Consent', { tag: ["@full"] }, () => {
-
+test.describe('15 · GDPR / Cookie Consent', { tag: ['@full'] }, () => {
   test('cookie banner appears on first visit (fresh context, no cookies)', async ({ browser }) => {
     const context = await browser.newContext({ locale: LOCALE, timezoneId: TIMEZONE_ID });
     const page = await context.newPage();
@@ -69,7 +75,7 @@ test.describe('15 · GDPR / Cookie Consent', { tag: ["@full"] }, () => {
     try {
       await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
-      const banner = page.locator(COOKIE_CONSENT_SEL).filter({ visible: true }).first();
+      const banner = cookieConsentButton(page);
       if (!(await waitForBanner(page))) {
         test.skip(true, 'No cookie banner detected');
         return;
@@ -81,7 +87,7 @@ test.describe('15 · GDPR / Cookie Consent', { tag: ["@full"] }, () => {
       // Full reload — consent should be remembered via cookie/localStorage
       await page.reload({ waitUntil: 'domcontentloaded' });
 
-      const reappeared = await optionalVisible(page.locator(COOKIE_CONSENT_SEL).filter({ visible: true }).first(), 2_000);
+      const reappeared = await optionalVisible(cookieConsentButton(page), 2_000);
 
       expect(reappeared, 'Cookie banner reappeared after consent was given').toBe(false);
     } finally {
@@ -96,7 +102,7 @@ test.describe('15 · GDPR / Cookie Consent', { tag: ["@full"] }, () => {
     try {
       await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
-      const banner = page.locator(COOKIE_CONSENT_SEL).filter({ visible: true }).first();
+      const banner = cookieConsentButton(page);
       if (!(await waitForBanner(page))) {
         test.skip(true, 'No cookie banner detected');
         return;
@@ -108,7 +114,7 @@ test.describe('15 · GDPR / Cookie Consent', { tag: ["@full"] }, () => {
       // Navigate to product page — banner should stay gone
       await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
 
-      const bannerOnProduct = await optionalVisible(page.locator(COOKIE_CONSENT_SEL).filter({ visible: true }).first(), 2_000);
+      const bannerOnProduct = await optionalVisible(cookieConsentButton(page), 2_000);
 
       expect(bannerOnProduct, 'Cookie banner reappeared on product page after consent').toBe(false);
     } finally {
@@ -123,7 +129,7 @@ test.describe('15 · GDPR / Cookie Consent', { tag: ["@full"] }, () => {
     try {
       await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
-      const banner = page.locator(COOKIE_CONSENT_SEL).filter({ visible: true }).first();
+      const banner = cookieConsentButton(page);
       if (!(await waitForBanner(page))) {
         test.skip(true, 'No cookie banner detected');
         return;
@@ -133,12 +139,15 @@ test.describe('15 · GDPR / Cookie Consent', { tag: ["@full"] }, () => {
       await banner.waitFor({ state: 'hidden', timeout: 3_000 });
 
       const cookies = await context.cookies();
-      const lsKeys  = await page.evaluate(() => Object.keys(window.localStorage));
+      const lsKeys = await page.evaluate(() => Object.keys(window.localStorage));
 
       const matchingCookies = cookies.filter(c => CONSENT_PATTERN.test(c.name));
-      const matchingLsKeys  = lsKeys.filter(k => CONSENT_PATTERN.test(k));
+      const matchingLsKeys = lsKeys.filter(k => CONSENT_PATTERN.test(k));
 
-      console.log('Consent cookies:', matchingCookies.map(c => c.name));
+      console.log(
+        'Consent cookies:',
+        matchingCookies.map(c => c.name),
+      );
       console.log('Consent localStorage keys:', matchingLsKeys);
 
       expect(
@@ -155,7 +164,7 @@ test.describe('15 · GDPR / Cookie Consent', { tag: ["@full"] }, () => {
     const page = await context.newPage();
     const errors: string[] = [];
 
-    page.on('pageerror', (err) => {
+    page.on('pageerror', err => {
       const msg = err.message;
       if (
         !msg.includes('Non-Error exception') &&
@@ -169,7 +178,7 @@ test.describe('15 · GDPR / Cookie Consent', { tag: ["@full"] }, () => {
     try {
       await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
-      const banner = page.locator(COOKIE_CONSENT_SEL).filter({ visible: true }).first();
+      const banner = cookieConsentButton(page);
       if (await waitForBanner(page)) {
         await banner.click();
         await banner.waitFor({ state: 'hidden', timeout: 3_000 });
@@ -178,10 +187,7 @@ test.describe('15 · GDPR / Cookie Consent', { tag: ["@full"] }, () => {
       // Allow any async side-effects to settle
       await waitForContent(page);
 
-      expect(
-        errors.length,
-        `JS errors during consent flow:\n  ${errors.join('\n  ')}`,
-      ).toBe(0);
+      expect(errors.length, `JS errors during consent flow:\n  ${errors.join('\n  ')}`).toBe(0);
     } finally {
       await context.close();
     }
@@ -191,7 +197,7 @@ test.describe('15 · GDPR / Cookie Consent', { tag: ["@full"] }, () => {
     const context = await browser.newContext({ locale: LOCALE, timezoneId: TIMEZONE_ID });
     const page = await context.newPage();
     const errors: string[] = [];
-    page.on('pageerror', (err) => errors.push(err.message));
+    page.on('pageerror', err => errors.push(err.message));
 
     try {
       await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30_000 });
@@ -208,14 +214,17 @@ test.describe('15 · GDPR / Cookie Consent', { tag: ["@full"] }, () => {
       await declineBtn.waitFor({ state: 'hidden', timeout: 3_000 });
 
       // Banner should disappear after declining
-      const bannerAfterDecline = await optionalVisible(page.locator(COOKIE_CONSENT_SEL).filter({ visible: true }).first(), 1_000);
+      const bannerAfterDecline = await optionalVisible(cookieConsentButton(page), 1_000);
 
       expect(bannerAfterDecline, 'Banner still visible after declining consent').toBe(false);
 
       const filteredErrors = errors.filter(
         e => !e.includes('ResizeObserver') && !e.includes('Script error.'),
       );
-      expect(filteredErrors.length, `JS errors after decline:\n  ${filteredErrors.join('\n  ')}`).toBe(0);
+      expect(
+        filteredErrors.length,
+        `JS errors after decline:\n  ${filteredErrors.join('\n  ')}`,
+      ).toBe(0);
     } finally {
       await context.close();
     }

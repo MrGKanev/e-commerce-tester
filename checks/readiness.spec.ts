@@ -165,3 +165,57 @@ test('graphic-only main content is ready for visual and OCR inspection', async (
   await page.setContent('<main><canvas width="100" height="40"></canvas></main>');
   await waitForContent(page);
 });
+
+test('accept all never clicks reject or preferences when they precede the accept action', async ({
+  page,
+}) => {
+  const { acceptCookieConsent } = await import('../tests/cookie-consent');
+  const { resolveSiteSettings } = await import('../config/site-settings');
+  await page.setContent(
+    '<div class="cookie-banner"><button onclick="document.body.dataset.choice = \'reject\'">Reject all</button><button>Preferences</button><button onclick="document.body.dataset.choice = \'all\'; this.parentElement.remove()">Accept all</button></div>',
+  );
+  expect(await acceptCookieConsent(page, resolveSiteSettings())).toBe('accepted');
+  await expect(page.locator('body')).toHaveAttribute('data-choice', 'all');
+});
+test('consent settings support custom iframe buttons, saved cookie state, and leaving banners untouched', async ({
+  page,
+  browser,
+}) => {
+  const { acceptCookieConsent } = await import('../tests/cookie-consent');
+  const { resolveSiteSettings } = await import('../config/site-settings');
+  await page.goto(BASE);
+  await page.setContent(
+    '<iframe id="consent" srcdoc="&lt;button id=agree onclick=&quot;parent.document.cookie=\'allConsent=yes; path=/\'; this.remove()&quot;&gt;Agree to all&lt;/button&gt;"></iframe>',
+  );
+  const settings = resolveSiteSettings({
+    cookieConsent: { frameSelector: '#consent' },
+    selectors: { consentAccept: '#agree' },
+  });
+  expect(await acceptCookieConsent(page, settings, 500)).toBe('accepted');
+  const storageState = await page.context().storageState();
+  expect(
+    storageState.cookies.some(cookie => cookie.name === 'allConsent' && cookie.value === 'yes'),
+  ).toBe(true);
+  const context = await browser.newContext({ storageState });
+  expect((await context.cookies()).some(cookie => cookie.name === 'allConsent')).toBe(true);
+  await context.close();
+  await page.setContent('<button id="cookie-accept">Accept all</button>');
+  expect(
+    await acceptCookieConsent(page, resolveSiteSettings({ cookieConsent: { mode: 'none' } })),
+  ).toBe('disabled');
+  await expect(page.locator('#cookie-accept')).toBeVisible();
+});
+
+import { test as storefrontTest } from '../tests/fixtures';
+storefrontTest(
+  'normal storefront actions accept a late cookie overlay automatically',
+  async ({ page }) => {
+    await page.setContent(`<main><button onclick="document.body.dataset.continued = 'yes'">Continue</button></main><script>
+    setTimeout(() => { const banner = document.createElement('div'); banner.style.cssText = 'position:fixed;inset:0;z-index:10;background:white'; banner.innerHTML = '<button id="cookie-accept">Accept all</button>'; document.body.append(banner); banner.querySelector('button').onclick = () => { document.body.dataset.consent = 'all'; banner.remove(); }; }, 30);
+  </script>`);
+    await page.waitForFunction(() => document.querySelector('#cookie-accept') !== null);
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await expect(page.locator('body')).toHaveAttribute('data-consent', 'all');
+    await expect(page.locator('body')).toHaveAttribute('data-continued', 'yes');
+  },
+);

@@ -20,6 +20,7 @@ const DEFAULTS = {
     shippingAddress: 'required',
     requiredAddressFields: ['addressLine1', 'city', 'postalCode', 'country'],
   },
+  cookieConsent: { mode: 'accept-all', waitMs: 5000, frameSelector: '' },
   capabilities: {},
   selectors: {},
   thresholds: {
@@ -81,6 +82,7 @@ function resolveSiteSettings(input = {}) {
     metrics.maxEventMs < metrics.maxPaintMs
   )
     throw new Error('Invalid performanceMetrics observation settings');
+  Object.assign(result.cookieConsent, input.cookieConsent);
   Object.assign(result.checkout, input.checkout);
   result.checkout.requiredAddressFields = [...result.checkout.requiredAddressFields];
   Object.assign(result.capabilities, input.capabilities);

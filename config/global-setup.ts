@@ -47,6 +47,7 @@ export default async function globalSetup(): Promise<void> {
       },
       [
         ...Object.values(readSiteSettings().selectors),
+        ...[readSiteSettings().cookieConsent.frameSelector].filter(Boolean),
         ...readSiteSettings().spelling.excludeSelectors,
         readSiteSettings().spelling.ocr.selector,
       ],
@@ -54,7 +55,7 @@ export default async function globalSetup(): Promise<void> {
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
     assertNotLimited();
     // Only fresh setup waits for a banner; returning sessions probe immediately.
-    await dismissCookieConsent(page, 5000);
+    await dismissCookieConsent(page, readSiteSettings().cookieConsent.waitMs);
     await context.storageState({ path: STORAGE_STATE });
   } finally {
     await browser.close();

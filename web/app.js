@@ -105,10 +105,17 @@ function render() {
     <div class="section"><div class="section-heading"><h2>Check schedule</h2><button class="quiet" data-action="add-job">+ Add check</button></div>${checkbox('Enable scheduled checks for this store', `scheduler.sites.${site.slug}.enabled`, schedule.enabled !== false)}<p class="help">Intervals start after a check finishes. Only one store runs at a time.</p>
     ${jobs.map((job, j) => renderJob(job, `${jobBase}.${j}`, j, site.timezoneId || 'Europe/Sofia')).join('')}
     ${jobs.length ? '' : '<p class="help">Add at least one check before enabling this store.</p>'}</div>
+    ${renderCookieConsent(site, base)}
     ${renderCheckoutPolicy(site, base)}
     <details class="section"><summary>Content and request settings</summary><div class="grid section"><label>Spelling behavior<select data-path="${base}.spelling.mode">${['off', 'report', 'strict'].map(mode => `<option value="${mode}" ${(spelling.mode || 'report') === mode ? 'selected' : ''}>${mode}</option>`).join('')}</select></label><label>Accepted brand names and terms<textarea data-path="${base}.spelling.allowWords" data-list>${escapeHTML((spelling.allowWords || []).join('\n'))}</textarea></label></div><p class="help">Enter one accepted term per line. Strict spelling can fail for brand names or unknown words.</p><div class="grid">${renderPacing(schedule.pacing || {}, `scheduler.sites.${site.slug}.pacing`, true)}</div><p class="help">Blank fields inherit the general pauses.</p></details>
     <div class="footer"><p class="help">Existing reports remain when a store is removed.</p><button class="danger" data-action="remove-store">Remove store</button></div>`;
   renderJobStatus();
+}
+function renderCookieConsent(site, base) {
+  const consent = site.cookieConsent || {};
+  const inputClass =
+    'mt-1 w-full rounded-lg border border-solid border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-blue-600';
+  return `<section class="mt-6 border-t border-solid border-slate-200 pt-5" aria-label="Cookie consent settings"><h2 class="mb-2 text-lg font-semibold">Cookie consent</h2><p class="mb-4 text-sm text-slate-600">Choose how normal tests handle cookie banners. Accepted cookies and local storage are reused across the run. GDPR checks use fresh sessions to test consent separately.</p><div class="grid grid-cols-1 gap-4 sm:grid-cols-2"><label class="text-sm font-semibold">Cookie consent behavior<select class="${inputClass}" data-path="${base}.cookieConsent.mode"><option value="accept-all" ${consent.mode !== 'none' ? 'selected' : ''}>Accept all cookies</option><option value="none" ${consent.mode === 'none' ? 'selected' : ''}>Leave banner untouched</option></select></label><label class="text-sm font-semibold">Wait for cookie banner (seconds)<input class="${inputClass}" type="number" min="0" max="30" step="0.1" data-scale="1000" data-path="${base}.cookieConsent.waitMs" value="${(consent.waitMs ?? 5000) / 1000}"></label><label class="text-sm font-semibold">Accept all button selector (optional)<input class="${inputClass}" data-optional data-path="${base}.selectors.consentAccept" value="${escapeHTML(site.selectors?.consentAccept || '')}" placeholder="#accept-all-cookies"></label><label class="text-sm font-semibold">Consent iframe selector (optional)<input class="${inputClass}" data-path="${base}.cookieConsent.frameSelector" value="${escapeHTML(consent.frameSelector || '')}" placeholder="iframe#cookie-consent"></label></div><p class="mt-3 text-sm text-slate-600">Leave selectors blank for common banners. For a custom banner, use the CSS selector of its Accept all button. Activity records whether consent was accepted or no button was found.</p></section>`;
 }
 function renderCheckoutPolicy(site, base) {
   const policy = site.checkout || {};
@@ -503,6 +510,8 @@ function renderReports() {
       )
       .join('');
   const group = reportGroups.find(group => group.id === reportStore);
+  $('#delete-report').disabled = !group?.runs.length;
+  $('#delete-store-reports').disabled = !group?.runs.length;
   $('#reports-title').textContent = group ? group.name + ' reports' : 'All stores · run history';
   if (!group) {
     $('#report-list').innerHTML =
@@ -537,6 +546,42 @@ async function refreshReports() {
   }
 }
 
+async function removeReports(all) {
+  const group = reportGroups.find(group => group.id === reportStore);
+  if (!group) return;
+  const ids = all ? group.runs.map(run => run.id) : [reportRun];
+  if (!ids[0]) return;
+  if (
+    !confirm(
+      all
+        ? `Delete ${ids.length} reports for ${group.name}? They will be moved to the local report trash.`
+        : `Delete report ${reportRun} for ${group.name}? It will be moved to the local report trash.`,
+    )
+  )
+    return;
+  $('#delete-report').disabled = true;
+  $('#delete-store-reports').disabled = true;
+  try {
+    const result = await api('/api/reports/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Control-Token': token },
+      body: JSON.stringify({ group: group.id, runs: ids }),
+    });
+    visualRequest++;
+    visualReview = null;
+    reportRun = null;
+    $('#report-frame').removeAttribute('src');
+    await refreshReports();
+    history.replaceState(null, '', sectionURL('reports'));
+    $('#reports-message').textContent = `${result.deleted} report(s) moved to local trash.`;
+  } catch (error) {
+    $('#reports-message').textContent = error.message;
+    $('#delete-report').disabled = false;
+    $('#delete-store-reports').disabled = false;
+  }
+}
+$('#delete-report').addEventListener('click', () => removeReports(false));
+$('#delete-store-reports').addEventListener('click', () => removeReports(true));
 $('#refresh-reports').addEventListener('click', refreshReports);
 $('#reports-submenu').addEventListener('click', event => {
   const button = event.target.closest('[data-report-store]');

@@ -1,3 +1,4 @@
+import { consentSelector, consentButton, acceptCookieConsent } from './cookie-consent';
 import { measureInteraction } from './web-vitals';
 import { readSiteSettings } from '../config/site-settings';
 import { pageInventory } from './inventory';
@@ -125,29 +126,8 @@ export const MOBILE_MENU_OPEN_SEL = [
 ].join(', ');
 
 /** Cookie consent accept button selectors — covers common Shopify/EU consent tools */
-export const COOKIE_CONSENT_SEL =
-  settings.selectors.consentAccept ||
-  [
-    '#onetrust-accept-btn-handler',
-    '#accept-cookies',
-    '#cookie-accept',
-    'button[id*="accept"][id*="cookie"]',
-    'button[id*="cookie"][id*="accept"]',
-    'button[class*="cookie"][class*="accept"]',
-    'button[class*="accept"][class*="cookie"]',
-    '[data-cookiebanner] button',
-    '[data-cookie-consent] button',
-    '.cookie-banner button',
-    '.cookie-consent button',
-    '.cc-btn.cc-allow',
-    'button:has-text("Accept all")',
-    'button:has-text("Accept")',
-    'button:has-text("Приемам всички")',
-    'button:has-text("Приемам")',
-    'button:has-text("Приемане")',
-    'button:has-text("Съгласен съм")',
-    'button:has-text("Разрешаване на всички")',
-  ].join(', ');
+export const COOKIE_CONSENT_SEL = consentSelector(settings);
+export const cookieConsentButton = (page: Page) => consentButton(page, settings);
 
 /** Optional feature discovery catches only absence, never page/action failures. */
 export async function optionalVisible(locator: Locator, timeout = 1500): Promise<boolean> {
@@ -162,12 +142,7 @@ export async function optionalVisible(locator: Locator, timeout = 1500): Promise
 
 /** Returning sessions probe immediately; only setup explicitly waits for a new banner. */
 export async function dismissCookieConsent(page: Page, appearanceTimeout = 0): Promise<void> {
-  const button = page.locator(COOKIE_CONSENT_SEL).filter({ visible: true }).first();
-  if (appearanceTimeout > 0) {
-    if (!(await optionalVisible(button, appearanceTimeout))) return;
-  } else if (!(await button.isVisible())) return;
-  await button.click();
-  await expect(button, 'Consent action did not dismiss the banner').toBeHidden();
+  await acceptCookieConsent(page, settings, appearanceTimeout);
 }
 
 export async function waitForContent(page: Page): Promise<void> {

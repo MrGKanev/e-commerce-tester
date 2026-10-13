@@ -268,6 +268,40 @@ const { digest, approved } = require('./visual-baselines');
     await expect(page.getByLabel('WooCommerce product URLs', { exact: true })).toHaveValue(
       '/wp/goods/item/',
     );
+    await page.getByLabel('Cookie consent behavior', { exact: true }).selectOption('none');
+    await page.getByLabel('Wait for cookie banner (seconds)', { exact: true }).fill('2.5');
+    await page
+      .getByLabel('Accept all button selector (optional)', { exact: true })
+      .fill('#agree-all');
+    await page
+      .getByLabel('Consent iframe selector (optional)', { exact: true })
+      .fill('#consent-frame');
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+    await expect(page.locator('#message')).toContainText('Settings saved');
+    await page.reload();
+    await page
+      .locator('#store-list')
+      .getByRole('button', { name: /Woo fixture/ })
+      .click();
+    await expect(page.getByLabel('Cookie consent behavior', { exact: true })).toHaveValue('none');
+    await expect(page.getByLabel('Wait for cookie banner (seconds)', { exact: true })).toHaveValue(
+      '2.5',
+    );
+    await expect(
+      page.getByLabel('Accept all button selector (optional)', { exact: true }),
+    ).toHaveValue('#agree-all');
+    await expect(
+      page.getByLabel('Consent iframe selector (optional)', { exact: true }),
+    ).toHaveValue('#consent-frame');
+    await page.getByLabel('Cookie consent behavior', { exact: true }).selectOption('accept-all');
+    await page.getByLabel('Accept all button selector (optional)', { exact: true }).fill('');
+    await page.getByLabel('Consent iframe selector (optional)', { exact: true }).fill('');
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+    await expect(page.locator('#message')).toContainText('Settings saved');
+    assert.equal(
+      JSON.parse(fs.readFileSync(configFile)).sites[1].selectors?.consentAccept,
+      undefined,
+    );
     // Exercise manual enqueue and persistent activity without external traffic.
     const stateDirectory = path.join(directory, 'state');
     fs.mkdirSync(stateDirectory, { recursive: true });
@@ -388,9 +422,46 @@ const { digest, approved } = require('./visual-baselines');
     await expect(page.locator('#settings-view')).toBeVisible();
     await page.goForward();
     await expect(page.locator('#reports-view')).toBeVisible();
+    await page
+      .locator('#reports-submenu')
+      .getByRole('button', { name: /Updated Shop/ })
+      .click();
+    await expect(page.locator('#delete-report')).toBeEnabled();
+    const beforeDelete = fs.readdirSync(path.join(reportRoot, storeId)).length;
+    page.once('dialog', dialog => dialog.dismiss());
+    await page.locator('#delete-report').click();
+    assert.equal(fs.readdirSync(path.join(reportRoot, storeId)).length, beforeDelete);
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('#delete-report').click();
+    await expect(page.locator('#reports-message')).toContainText(
+      '1 report(s) moved to local trash',
+    );
+    assert.equal(fs.readdirSync(path.join(reportRoot, storeId)).length, beforeDelete - 1);
+    assert.ok(approved(path.join(directory, 'visual-baselines'), storeId).revision);
+    await expect(page.locator('#delete-store-reports')).toBeEnabled();
+    const deleteAxe = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+      .analyze();
+    assert.deepEqual(
+      deleteAxe.violations.map(violation => violation.id),
+      [],
+    );
+    await page.screenshot({
+      path: path.join(os.tmpdir(), 'store-control-delete-mobile.png'),
+      fullPage: true,
+    });
+    assert.equal(
+      await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+      false,
+    );
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('#delete-store-reports').click();
+    await expect(page.locator('#reports-message')).toContainText('report(s) moved to local trash');
+    assert.equal(fs.readdirSync(path.join(reportRoot, storeId)).length, 0);
+    await expect(page.locator('#delete-report')).toBeDisabled();
     assert.deepEqual(errors, []);
     console.log(
-      'Control panel browser checks passed: onboarding, schedule/window edits, save/reload, advanced setting preservation, pause, manual queue controls, persistent activity, direct section URLs, reload/back/forward navigation, mobile layout and axe. No store requests made.',
+      'Control panel browser checks passed: onboarding, schedule/window edits, save/reload, advanced setting preservation, pause, manual queue controls, persistent activity, direct section URLs, reload/back/forward navigation, report deletion, cookie settings, mobile layout and axe. No store requests made.',
     );
   } finally {
     await browser?.close();

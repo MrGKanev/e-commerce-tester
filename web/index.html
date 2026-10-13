@@ -123,7 +123,23 @@
             <h1 id="reports-title">Run history</h1>
             <p class="muted">Choose a store above and a report below.</p>
           </div>
-          <button id="refresh-reports" class="quiet">Refresh reports</button>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="refresh-reports" class="quiet">Refresh reports</button>
+            <button
+              id="delete-report"
+              class="rounded-lg border border-solid border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:opacity-50"
+              disabled
+            >
+              Delete report
+            </button>
+            <button
+              id="delete-store-reports"
+              class="rounded-lg border border-solid border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:opacity-50"
+              disabled
+            >
+              Delete all store reports
+            </button>
+          </div>
         </div>
         <p id="reports-message" role="status"></p>
         <div class="report-layout">

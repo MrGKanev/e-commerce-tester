@@ -11,6 +11,7 @@ const model = require('./scheduler-model');
 const { catalog } = require('./report-catalog');
 const visual = require('./visual-baselines');
 const queue = require('./run-queue');
+const { deleteReports } = require('./report-deletion');
 const root = path.join(__dirname, '..');
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -90,9 +91,13 @@ function createControlServer({
       if (
         (request.method === 'PUT' && url.pathname === '/api/config') ||
         (request.method === 'POST' &&
-          ['/api/validate', '/api/visual/approve', '/api/runs', '/api/runs/cancel'].includes(
-            url.pathname,
-          ))
+          [
+            '/api/validate',
+            '/api/visual/approve',
+            '/api/runs',
+            '/api/runs/cancel',
+            '/api/reports/delete',
+          ].includes(url.pathname))
       ) {
         const origin = request.headers.origin;
         if (
@@ -103,6 +108,12 @@ function createControlServer({
         if (!request.headers['content-type']?.startsWith('application/json'))
           return json(response, 415, { error: 'Expected JSON configuration' });
         const input = await body(request);
+        if (url.pathname === '/api/reports/delete')
+          return json(
+            response,
+            200,
+            deleteReports({ reportsDir, stateDir, group: input.group, runs: input.runs }),
+          );
         if (url.pathname === '/api/runs') {
           const run = queue.manualRun(readConfiguration(configFile), input);
           if (queue.readQueue(stateDir).pending.length >= 100)
@@ -212,6 +223,8 @@ function createControlServer({
       if (url.pathname.startsWith('/api/'))
         return json(response, 404, { error: 'Unknown endpoint' });
       const decoded = decodeURIComponent(url.pathname);
+      if (decoded.split('/').includes('.trash'))
+        return json(response, 404, { error: 'File not found' });
       if (decoded === '/reports/dashboard.html') {
         const file = path.join(reportsDir, 'dashboard.html');
         if (

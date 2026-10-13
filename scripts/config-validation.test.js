@@ -142,3 +142,16 @@ test('checkout expectations validate explicit policies, required address fields 
   ])
     assert.throws(() => resolveSiteSettings({ checkout }), /checkout/);
 });
+
+test('cookie consent settings have independent defaults and reject invalid choices or waits', () => {
+  const settings = resolveSiteSettings({ cookieConsent: { mode: 'none', waitMs: 2500 } });
+  assert.deepEqual(settings.cookieConsent, { mode: 'none', waitMs: 2500, frameSelector: '' });
+  assert.equal(resolveSiteSettings().cookieConsent.mode, 'accept-all');
+  for (const cookieConsent of [
+    { mode: 'reject' },
+    { waitMs: -1 },
+    { waitMs: 30001 },
+    { waitMs: '5000' },
+  ])
+    assert.throws(() => resolveSiteSettings({ cookieConsent }));
+});

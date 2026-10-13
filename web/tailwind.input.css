@@ -1,5 +1,5 @@
 /* Keep the legacy base styles while migrating touched UI to Tailwind utilities. */
-@layer theme, utilities;
+@layer theme;
 @import 'tailwindcss/theme.css' layer(theme);
-@import 'tailwindcss/utilities.css' layer(utilities) source('./');
+@import 'tailwindcss/utilities.css' source('./');
 @source '../scripts/update-history.js';

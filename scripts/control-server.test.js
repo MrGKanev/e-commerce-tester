@@ -232,3 +232,87 @@ test('section URLs serve the control app directly while report assets retain the
   }
   assert.equal((await fetch(f.origin + '/reports/missing.html')).status, 404);
 });
+
+function reportFixture(f) {
+  const root = path.join(f.directory, 'reports');
+  const dates = ['2026-10-11_09-00-00-001', '2026-10-12_09-00-00-001'];
+  for (const site of ['shop', 'other'])
+    for (const date of dates) {
+      const dir = path.join(root, site, date, 'html');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, 'index.html'), '<html>report</html>');
+      fs.writeFileSync(
+        path.join(dir, '../results.json'),
+        JSON.stringify({ stats: { expected: 1 } }),
+      );
+      fs.writeFileSync(
+        path.join(dir, '../run-metadata.json'),
+        JSON.stringify({ phase: 'finished' }),
+      );
+    }
+  const post = (body, headers = {}) =>
+    fetch(f.origin + '/api/reports/delete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Control-Token': f.initial.token,
+        ...headers,
+      },
+      body: JSON.stringify(body),
+    });
+  return { root, dates, post };
+}
+test('report deletion is protected, scoped to reviewed runs, rebuilds overview and preserves a local trash copy', async t => {
+  const f = await fixture(t),
+    r = reportFixture(f);
+  const input = { group: 'site:shop', runs: [r.dates[0]] };
+  assert.equal((await r.post(input, { 'X-Control-Token': 'bad' })).status, 403);
+  assert.equal((await r.post(input, { Origin: 'https://elsewhere.test' })).status, 403);
+  assert.equal((await r.post({ group: 'site:../other', runs: [r.dates[0]] })).status, 409);
+  assert.equal((await r.post({ group: 'site:shop', runs: ['../other'] })).status, 409);
+  const baselines = path.join(f.directory, 'visual-baselines/shop');
+  fs.mkdirSync(baselines, { recursive: true });
+  fs.writeFileSync(path.join(baselines, 'approved.json'), 'keep');
+  const response = await r.post(input);
+  assert.equal(response.status, 200);
+  const { deleted, trashBatch } = await response.json();
+  assert.equal(deleted, 1);
+  assert.equal(fs.existsSync(path.join(r.root, 'shop', r.dates[0])), false);
+  assert.equal(fs.existsSync(path.join(r.root, 'shop', r.dates[1])), true);
+  assert.equal(fs.existsSync(path.join(r.root, 'other', r.dates[0])), true);
+  assert.equal(fs.readFileSync(path.join(baselines, 'approved.json'), 'utf8'), 'keep');
+  assert.equal(
+    fs.existsSync(path.join(r.root, '.trash', trashBatch, r.dates[0], 'results.json')),
+    true,
+  );
+  assert.equal((await fetch(f.origin + `/reports/.trash/${trashBatch}/manifest.json`)).status, 404);
+  const { groups } = await (await fetch(f.origin + '/api/reports')).json();
+  assert.deepEqual(
+    groups.find(group => group.id === 'site:shop').runs.map(run => run.id),
+    [r.dates[1]],
+  );
+  assert.ok(groups.every(group => group.id !== 'site:.trash'));
+  assert.ok(fs.existsSync(path.join(r.root, 'dashboard.html')));
+  assert.equal((await r.post(input)).status, 409);
+  assert.equal((await r.post({ group: 'site:shop', runs: [r.dates[1]] })).status, 200);
+});
+test('active store reports cannot be deleted and symlinked trash cannot receive files', async t => {
+  const f = await fixture(t),
+    r = reportFixture(f);
+  const state = path.join(f.directory, 'state');
+  fs.mkdirSync(state, { recursive: true });
+  fs.writeFileSync(
+    path.join(state, 'runs.json'),
+    JSON.stringify({ active: { site: 'shop' }, pending: [], history: [] }),
+  );
+  const input = { group: 'site:shop', runs: r.dates };
+  assert.equal((await r.post(input)).status, 409);
+  assert.equal(fs.existsSync(path.join(r.root, 'shop', r.dates[0])), true);
+  fs.writeFileSync(
+    path.join(state, 'runs.json'),
+    JSON.stringify({ active: null, pending: [], history: [] }),
+  );
+  fs.symlinkSync(f.directory, path.join(r.root, '.trash'));
+  assert.equal((await r.post(input)).status, 400);
+  assert.equal(fs.existsSync(path.join(r.root, 'shop', r.dates[0])), true);
+});
