@@ -104,25 +104,25 @@ Visual component keys are screenshot names without `.png`. Unspecified names inh
 
 `platform` defaults to `shopify` for backward compatibility. Set `woocommerce` explicitly for Woo stores. Shopify retains origin URLs and product handles; Woo supports installation paths and `commerce.productUrls`, `productIds`, `apiRoot`, `routes` and `taxDisplay`. The panel exposes platform, product URLs and cart/catalogue/checkout paths. Advanced settings survive import/edit. See [WooCommerce](WOOCOMMERCE.md).
 
-### JSON Schema и Ajv
+### JSON Schema and Ajv
 
-Конфигурацията на магазините се проверява локално с Ajv, като Node зависимост. Не изисква регистрация, API key, Python или външна услуга.
+Store configuration is validated locally with Ajv, as a Node dependency. It needs no registration, API key, Python or external service.
 
-- `config/schemas/site-settings.schema.json`: настройки, capabilities, selectors, thresholds, inventory, spelling и performance наблюдение.
-- `config/schemas/sites.schema.json`: непразен списък с магазини и основните им полета; преизползва settings schema чрез локално регистриран `$ref`.
-- `config/schemas/commerce.schema.json`: Woo commerce структура след прилагане на съществуващите defaults, преди нормализиране на URL-ите. Shopify игнорира Woo-specific настройките както преди.
+- `config/schemas/site-settings.schema.json`: settings, capabilities, selectors, thresholds, inventory, spelling and performance monitoring.
+- `config/schemas/sites.schema.json`: a non-empty list of stores and their main fields; it reuses the settings schema through a locally registered `$ref`.
+- `config/schemas/commerce.schema.json`: the Woo commerce structure after existing defaults are applied, before URLs are normalized. Shopify ignores Woo-specific settings as before.
 
-`loadSites`, `validateSites` и `resolveSiteSettings` използват общия `config/config-validation.js`. Панелът и import/save API минават през същата валидация. Панелът продължава да допуска празен списък за нова инсталация; непразните списъци минават през sites schema.
+`loadSites`, `validateSites` and `resolveSiteSettings` use the shared `config/config-validation.js`. The control panel and the import/save API go through the same validation. The panel still accepts an empty list for a new installation; non-empty lists go through the sites schema.
 
-Ajv проверява типовете, позволените вложени полета, enum стойностите, числовите граници и масивите. Събира грешките с път до проблемното поле, например `/0/inventory/productLimit`. Не преобразува `"false"` в boolean, не добавя defaults и не премахва полета. Не включва подадените стойности в съобщенията за schema грешки. Схемите се компилират еднократно за процеса; няма remote schema loading.
+Ajv checks types, allowed nested fields, enum values, numeric bounds and arrays. It collects errors with the path to the offending field, for example `/0/inventory/productLimit`. It does not coerce `"false"` to a boolean, add defaults or remove fields. It does not include the supplied values in schema error messages. Schemas are compiled once per process; there is no remote schema loading.
 
-Defaults и сливането на частични настройки остават в resolver-а. `Intl` locale/timezone проверки, връзките между времевите прозорци, уникалните slug-ове, безопасните storefront URL-и и изискванията за scheduled магазини остават отделни семантични проверки. Scheduler jobs/windows продължават да се валидират от текущия scheduler model.
+Defaults and merging of partial settings stay in the resolver. `Intl` locale/timezone checks, the relationships between time windows, unique slugs, safe storefront URLs and the requirements for scheduled stores remain separate semantic checks. Scheduler jobs/windows continue to be validated by the current scheduler model.
 
-За съвместимост допълнителните полета на най-горното ниво на магазина се запазват; непознатите ключове във вложените контролирани настройки се отхвърлят. Това позволява съществуващите metadata и настройки на оркестрацията да останат в store файла.
+For compatibility, extra top-level store fields are preserved; unknown keys inside the controlled nested settings are rejected. This lets existing metadata and orchestration settings stay in the store file.
 
-### Checkout очаквания
+### Checkout expectations
 
-Политиката е обща за Shopify/WooCommerce и може да се избере в панела под **Checkout expectations**. Тя отделя навигацията до checkout от доказването на конкретни полета.
+The policy is shared by Shopify and WooCommerce and can be chosen in the panel under **Checkout expectations**. It separates navigation to checkout from proving specific fields.
 
 ```json
 {
@@ -141,10 +141,10 @@ Defaults и сливането на частични настройки оста
 }
 ```
 
-`mode: auto` проверява разпознатите интерфейси. При неразпознат/нееднозначен checkout резултатът е непроверен, а не успешен. `supported` изисква точно един видим checkout root; липсата му е грешка. `unsupported`/`blocked` дават изрична непровереност с `reason`, без проверките на полетата да минават само по URL.
+`mode: auto` checks recognized interfaces. An unrecognized or ambiguous checkout is reported as unverified, not as a pass. `supported` requires exactly one visible checkout root; its absence is a failure. `unsupported` and `blocked` give an explicit unverified result with a `reason`, so field checks never pass on the URL alone.
 
-Contact/shipping политиките са `required`, `not-applicable` или `unverified`. Задължителните полета трябва да са видими, еднозначни и editable. За дигитален магазин използвайте `shippingAddress: not-applicable`; за адрес на по-късна стъпка, която още не автоматизираме — `unverified` с причина. Неприложимото поле се отчита като такова, не като проверено успешно. Липсващото задължително поле в разпознат интерфейс е грешка.
+The contact and shipping policies are `required`, `not-applicable` or `unverified`. Required fields must be visible, unambiguous and editable. For a digital store use `shippingAddress: not-applicable`; for an address on a later step that we do not automate yet, use `unverified` with a reason. A not-applicable field is reported as such, not as checked successfully. A missing required field in a recognized interface is a failure.
 
-Списъкът `requiredAddressFields` е изричен и непразен. Например държава без пощенски код може да използва `addressLine1`, `city`, `country`. Допълнителни custom selectors: `checkoutAddressLine1`, `checkoutCity`, `checkoutPostalCode`, `checkoutCountry`. Няма автоматично попълване на лични данни или подаване на поръчка.
+The `requiredAddressFields` list is explicit and non-empty. For example, a country without postal codes can use `addressLine1`, `city`, `country`. Additional custom selectors: `checkoutAddressLine1`, `checkoutCity`, `checkoutPostalCode`, `checkoutCountry`. Personal data is never filled in automatically and no order is submitted.
 
-Празната количка се доказва едновременно с празен public cart в същата сесия, нула видими cart rows и видим непразен empty-state indicator. Сам cart form, скрит empty текст или непразна API количка не са достатъчни. За custom UI настройте `cartItems` и `cartEmpty`.
+An empty cart is proven by all of these together: an empty public cart in the same session, zero visible cart rows and a visible non-empty empty-state indicator. A cart form alone, hidden empty text or a non-empty API cart is not enough. For a custom UI, configure `cartItems` and `cartEmpty`.

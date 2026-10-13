@@ -10,6 +10,8 @@ const SHARED = [
   '36-buyer-journey.spec.ts',
   '37-store-expectations.spec.ts',
   '38-third-party-scripts.spec.ts',
+  '39-a11y-extras.spec.ts',
+  '40-a11y-dynamic.spec.ts',
 ];
 function compatibleSpec(file, platform) {
   const name = path.basename(file);

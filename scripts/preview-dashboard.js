@@ -9,7 +9,7 @@ const { spawnSync } = require('node:child_process');
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'store-dashboard-preview-'));
 fs.mkdirSync(path.join(root, 'scripts'));
 for (const file of ['update-history.js', 'report-model.js']) fs.copyFileSync(path.join(__dirname, file), path.join(root, 'scripts', file));
-fs.writeFileSync(path.join(root, 'sites.json'), JSON.stringify([{ name: 'DEMO — примерни резултати', slug: 'demo', url: '' }]));
+fs.writeFileSync(path.join(root, 'sites.json'), JSON.stringify([{ name: 'DEMO — sample results', slug: 'demo', url: '' }]));
 
 function scenario(title, status, annotations = [], results) {
   return { title, id: title, file: 'demo.spec.ts', line: 1, tags: ['@demo'], tests: [{
@@ -37,7 +37,7 @@ for (const sample of samples) {
     projects: [{ name: 'Demo Chrome', browser: 'chromium', locale: 'bg-BG', timezone: 'Europe/Sofia', retries: 1, repeatEach: 1 }],
     browserVersions: { 'Demo Chrome': 'demo version' }, selection: { tags: ['@demo'], grep: '/@demo/' },
   }));
-  fs.writeFileSync(path.join(dir, 'index.html'), '<html lang="bg"><meta charset="utf-8"><h1>Демонстрационен отчет</h1><p>Това са примерни данни. Не са изпълнявани заявки към магазин.</p></html>');
+  fs.writeFileSync(path.join(dir, 'index.html'), '<html lang="en"><meta charset="utf-8"><h1>Demo report</h1><p>This is sample data. No requests were made to a store.</p></html>');
 }
 const result = spawnSync(process.execPath, [path.join(root, 'scripts/update-history.js')], {
   stdio: 'inherit',

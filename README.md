@@ -105,4 +105,4 @@ GitHub Actions runs TypeScript, lint, unit tests, toolchain validation and selec
 
 [MIT](LICENSE) © Gabriel Kanev. Bundled dependencies and dictionaries retain their own licenses; see [Content checks](docs/CONTENT.md#licenses).
 
-SEO проверки върху цялото inventory: `pnpm test:seo --site=<slug>`. Подробности: [docs/SEO.md](docs/SEO.md).
+SEO checks across the whole inventory: `pnpm test:seo --site=<slug>`. Details: [docs/SEO.md](docs/SEO.md).

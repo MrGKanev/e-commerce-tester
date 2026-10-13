@@ -237,7 +237,7 @@ test('buyer journey appears separately with exact step, status and escaped expec
   const result = run(f, 'update-history.js');
   assert.equal(result.status, 0, result.stderr);
   const dashboard = fs.readFileSync(path.join(f.root, 'reports/dashboard.html'), 'utf8');
-  assert.match(dashboard, /Buyer journey — Покупателен път/);
+  assert.match(dashboard, /Buyer journey \(/);
   assert.match(dashboard, /woocommerce · Chrome · failed · step: quantity/);
   assert.ok(dashboard.includes('&lt;script&gt;bad()&lt;/script&gt;'));
   assert.ok(!dashboard.includes('<img src=x onerror=bad()>'));

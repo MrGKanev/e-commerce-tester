@@ -101,6 +101,8 @@ test('platform gating excludes the other platform before execution while shared 
     '32-shared-pages.spec.ts',
     '35-seo-inventory.spec.ts',
     '36-buyer-journey.spec.ts',
+    '39-a11y-extras.spec.ts',
+    '40-a11y-dynamic.spec.ts',
   ])
     for (const platform of ['shopify', 'woocommerce'])
       assert.equal(compatibleSpec(name, platform), true);

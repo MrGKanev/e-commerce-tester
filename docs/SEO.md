@@ -1,36 +1,36 @@
 # SEO inventory
 
-`pnpm test:seo --site=<slug>` изпълнява `35-seo-inventory` за Shopify и WooCommerce. Проверката влиза и в режимите `full` и `pages`, за desktop и mobile browser projects.
+`pnpm test:seo --site=<slug>` runs `35-seo-inventory` for Shopify and WooCommerce. The check is also part of the `full` and `pages` modes, for desktop and mobile browser projects.
 
-Използва подготвеното `page-inventory.json`: начална страница, зададените продукти, каталог, search, cart, допълнителните `inventory.pages` и продуктите от включено `inventory.discoverProducts`. Не обхожда автоматично всички линкове в сайта; обхватът е ограничен от конфигурацията и `productLimit`.
+It uses the prepared `page-inventory.json`: the home page, the configured products, the catalogue, search, cart, any extra `inventory.pages` and the products from `inventory.discoverProducts` when enabled. It does not crawl every link on the site; coverage is limited by the configuration and `productLimit`.
 
-Проверява крайния документ след навигация и показване на съдържанието. Източниците са публичният rendered DOM и HTTP `X-Robots-Tag`, без административни API, промени на количката или поръчки. Не създава собствени изображения; общата Playwright настройка за screenshot при грешка остава приложима.
+It checks the final document after navigation and content rendering. The sources are the public rendered DOM and the HTTP `X-Robots-Tag` header, with no administrative APIs, cart changes or orders. It creates no images of its own; the shared Playwright screenshot-on-failure setting still applies.
 
-Грешки, които провалят теста:
+Errors that fail the test:
 
-- HTTP грешки или неуспешна навигация.
-- Липсващо, празно или повече от едно заглавие.
-- Липсваща, празна или повече от една description за индексируема страница.
-- Липсващ canonical за индексируема страница, множество canonical-и или невалиден/относителен canonical URL.
-- Невалиден JSON синтаксис или корен от скаларна стойност в JSON-LD.
-- Canonical към друга вече проверена страница с HTTP грешка или `noindex`.
+- HTTP errors or failed navigation.
+- A missing, empty or duplicated title.
+- A missing, empty or duplicated description on an indexable page.
+- A missing canonical on an indexable page, multiple canonicals, or an invalid or relative canonical URL.
+- Invalid JSON syntax or a scalar root value in JSON-LD.
+- A canonical pointing to another already-checked page that has an HTTP error or `noindex`.
 
-Предупреждения за човешки преглед:
+Warnings for human review:
 
-- Canonical, различен от крайния URL; това може да е умишлено за варианти и филтри.
-- `og:url`, различен от canonical.
-- URL на JSON-LD Product/WebPage, различен по домейн или път от canonical. Query за вариант не се третира като разминаване.
-- Product name, различен от единствения видим H1. Свързани продукти и различно форматиране могат да обяснят предупреждението.
-- Липсващ или множество видими H1.
-- Еднакви title/description между различни canonical страници. Алтернативни URL-и с общ canonical се изключват.
-- Canonical верига между вече проверени страници.
+- A canonical that differs from the final URL; this may be intentional for variants and filters.
+- An `og:url` that differs from the canonical.
+- A JSON-LD Product/WebPage URL whose domain or path differs from the canonical. A variant query is not treated as a mismatch.
+- A product name that differs from the single visible H1. Related products and different formatting can explain the warning.
+- A missing or multiple visible H1.
+- Identical title/description across different canonical pages. Alternative URLs that share a canonical are excluded.
+- A canonical chain between already-checked pages.
 
-Cart, search и страниците с изричен `noindex`/`none` не изискват description и canonical като индексируемите страници. `noindex` се записва в отчета като информация; не можем да знаем дали е умишлен без зададена политика за конкретната страница. Невалиден JSON-LD и дублиран canonical се проверяват и там.
+Cart, search and pages with an explicit `noindex`/`none` do not need a description and canonical like indexable pages do. `noindex` is recorded in the report as information; we cannot know whether it is intentional without a policy for that specific page. Invalid JSON-LD and a duplicated canonical are still checked there.
 
-За всеки browser project HTML отчетът съдържа attachment `seo-inventory.json`: проверените URL-и, HTTP статуси, прочетените metadata/JSON-LD, грешките и предупрежденията. Проверката продължава след проблем на отделна страница; спира при общия механизъм за rate limit. Canonical цели извън провереното inventory не получават допълнителни заявки.
+For each browser project the HTML report contains the attachment `seo-inventory.json`: the checked URLs, HTTP statuses, the metadata/JSON-LD that was read, and the errors and warnings. The check continues after a problem on a single page and stops only on the shared rate-limit mechanism. Canonical targets outside the checked inventory receive no extra requests.
 
-Това е техническа проверка на наличните данни, не пълна Schema.org или Google Rich Results валидация. Цените и наличността на конкретни варианти се проверяват от отделните commerce тестове. Не доказва как Google е индексирал сайта.
+This is a technical check of the available data, not a full Schema.org or Google Rich Results validation. Prices and availability of specific variants are verified by the separate commerce tests. It does not prove how Google has indexed the site.
 
-Локална валидация без реален магазин: `pnpm test:seo:local`.
+Local validation without a real store: `pnpm test:seo:local`.
 
-Официални насоки: [Canonical URLs](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls), [Robots metadata](https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag), [Structured data policies](https://developers.google.com/search/docs/appearance/structured-data/sd-policies).
+Official guidance: [Canonical URLs](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls), [Robots metadata](https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag), [Structured data policies](https://developers.google.com/search/docs/appearance/structured-data/sd-policies).

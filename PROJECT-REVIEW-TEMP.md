@@ -1,465 +1,467 @@
-# Временен анализ и предложения за e-commerce-tester
+# Temporary analysis and proposals for e-commerce-tester
 
-Дата: 9 октомври 2026 г.
-Последно обновяване: 10 октомври 2026 г.
+Date: October 9, 2026
+Last updated: October 10, 2026
 
-Работен документ за обсъждане и планиране. Статусът на реализираните предложения е отбелязан в съответната точка; останалите са план. Сравненията с външни продукти са по публична документация, а не по практически тест на тези услуги.
+A working document for discussion and planning. The status of implemented proposals is noted in the relevant section; the rest is a plan. Comparisons with external products are based on public documentation, not on hands-on testing of those services.
 
-## Основна препоръка
+## Main recommendation
 
-Да развием проекта като инструмент за постоянно наблюдение на Shopify магазини: надеждни проверки на покупателния път, ясни проблеми, доказателства и известия.
+Develop the project into a tool for continuous monitoring of Shopify stores: reliable buyer-journey checks, clear problems, evidence and notifications.
 
-Вече има широко функционално покритие. Най-голямата полза сега ще дойде от по-достоверни резултати, лесна настройка и навременно уведомяване при проблем.
+Functional coverage is already broad. The biggest gain now will come from more trustworthy results, easy setup and timely notification when something breaks.
 
-Потенциалното предимство е управление на няколко магазина в собствен панел, специализирани Shopify проверки и проверки на българско съдържание.
+The potential advantage is managing several stores in a dedicated panel, Shopify-specific checks and checks of Bulgarian-language content.
 
-## Какво е прегледано и проверено
+## What was reviewed and verified
 
-Прегледани са структурата, основните тестове и помощни модули, конфигурацията, изпълнението за няколко магазина, scheduler-ът, отчетите, браузърният панел, документацията и Docker настройките.
+Reviewed: the structure, the main tests and helper modules, the configuration, multi-store execution, the scheduler, the reports, the browser control panel, the documentation and the Docker setup.
 
-Изпълнени успешно:
+Run successfully:
 
-- `pnpm check`: TypeScript, ESLint, 42 unit теста и съответствие на Docker/Playwright версиите.
-- `pnpm test:readiness`: 14 локални браузърни теста.
-- `pnpm test:reporting`: локални acceptance проверки на метаданни, coverage, пропуснати и flaky сценарии. Тук умишлено се симулира неуспешен първи опит.
-- `pnpm test:control:local`: настройка, записване, презареждане, графици, пауза, запазване на разширени настройки, мобилно оформление и axe проверки.
+- `pnpm check`: TypeScript, ESLint, 42 unit tests and Docker/Playwright version consistency.
+- `pnpm test:readiness`: 14 local browser tests.
+- `pnpm test:reporting`: local acceptance checks of metadata, coverage, skipped and flaky scenarios. A failed first attempt is deliberately simulated here.
+- `pnpm test:control:local`: setup, saving, reloading, schedules, pause, preservation of advanced settings, mobile layout and axe checks.
 
-Не са изпълнявани тестове към реални магазини. Резултатите потвърждават локалните проверки на инструмента, но не доказват работата му с всяка Shopify тема.
+No tests were run against real stores. The results confirm the tool's local checks, but do not prove it works with every Shopify theme.
 
-## Какво вече е добро
+## What is already good
 
-- Широко покритие: продукти, варианти, количка, checkout, търсене, мобилна версия, достъпност, SEO, съдържание и производителност.
-- Scheduler с постоянен state, cooldown при 429, `Retry-After`, watchdog, заключване срещу едновременни scheduler-и и часови прозорци.
-- Отчетите разграничават pass rate и coverage, както и неуспех, пропускане, прекъсване и незавършено изпълнение.
-- Локални фикстури за проверка на самия инструмент.
-- Използване на готови компоненти: Playwright, axe, Lighthouse, речници и Tesseract.
-- Запазване на метаданни и доказателства, полезни при диагностика.
+- Broad coverage: products, variants, cart, checkout, search, mobile, accessibility, SEO, content and performance.
+- A scheduler with persistent state, cooldown on 429, `Retry-After`, a watchdog, locking against concurrent schedulers and time windows.
+- Reports distinguish pass rate from coverage, and failure, skip, interruption and incomplete runs from one another.
+- Local fixtures to verify the tool itself.
+- Off-the-shelf components: Playwright, axe, Lighthouse, dictionaries and Tesseract.
+- Metadata and evidence are kept, which helps diagnosis.
 
-Тези части трябва да останат основата на развитието.
+These parts should remain the foundation of further development.
 
-## Какво да вземем от добрите сходни решения
+## What to take from good similar solutions
 
-| Решение | Какво прави добре | Как да го приложим при нас |
+| Solution | What it does well | How to apply it here |
 | --- | --- | --- |
-| [Checkly](https://www.checklyhq.com/product/playwright-check-suites/) | Playwright мониторинг, различни региони и диагностика | Малък набор критични потребителски сценарии, оперативни известия и ясни доказателства при отказ |
-| [Checkly alerting](https://www.checklyhq.com/product/alerting/) | Потвърждаване на неуспех, ескалация и известия при възстановяване | Състояние на проблемите, групиране на повторения, прагове за известяване и отделна потвърждаваща проверка |
-| [StoreWatch QA](https://apps.shopify.com/storewatch-qa) | Фокусиран Shopify покупателен път и лесна настройка | Настройка от URL и продукт; водещ резултат „Пътят до checkout работи“ |
-| [Argos](https://argos-ci.com/docs/playwright) | Визуални проверки с Playwright | Преглед на baseline, текущ screenshot и diff; одобряване на умишлени промени |
-| [Uptime Kuma](https://github.com/louislam/uptime-kuma) | Леки проверки за наличност, известия и собствено хостване | Отделен uptime слой и наблюдение дали самият tester работи |
+| [Checkly](https://www.checklyhq.com/product/playwright-check-suites/) | Playwright monitoring, multiple regions and diagnostics | A small set of critical user scenarios, operational notifications and clear evidence on failure |
+| [Checkly alerting](https://www.checklyhq.com/product/alerting/) | Failure confirmation, escalation and recovery notifications | Problem state, grouping of repeats, notification thresholds and a separate confirming check |
+| [StoreWatch QA](https://apps.shopify.com/storewatch-qa) | A focused Shopify buyer journey and easy setup | Setup from a URL and a product; a headline result "The path to checkout works" |
+| [Argos](https://argos-ci.com/docs/playwright) | Visual checks with Playwright | Review of baseline, current screenshot and diff; approval of intentional changes |
+| [Uptime Kuma](https://github.com/louislam/uptime-kuma) | Lightweight availability checks, notifications and self-hosting | A separate uptime layer and monitoring of whether the tester itself is running |
 
-### Принципи, които си струва да заимстваме
+### Principles worth borrowing
 
-1. **Първо показваме дали покупателният път работи.** Подробният технически отчет остава достъпен от този резултат.
-2. **Всеки проблем има доказателство.** Стъпка, очаквано и действително поведение, URL, screenshot и trace, когато са налични.
-3. **Известяваме за промяна на състоянието.** Нов проблем, потвърден проблем, възстановяване; повторенията се групират.
-4. **Сравняваме съпоставими проверки.** Еднакъв режим, браузър и обхват или последен известен резултат за конкретната проверка.
-5. **Настройката проверява собствените си предположения.** Избраният продукт, вариантите и селекторите се валидират преди активиране на график.
-6. **Леките проверки са чести, тежките са редки.** Uptime, покупателен път, пълен audit и визуални проверки имат различни графици.
+1. **Show first whether the buyer journey works.** The detailed technical report stays reachable from that result.
+2. **Every problem has evidence.** The step, expected and actual behavior, URL, screenshot and trace, when available.
+3. **Notify on state change.** New problem, confirmed problem, recovery; repeats are grouped.
+4. **Compare comparable checks.** The same mode, browser and scope, or the last known result for that specific check.
+5. **Setup verifies its own assumptions.** The chosen product, variants and selectors are validated before a schedule is activated.
+6. **Light checks are frequent, heavy ones are rare.** Uptime, the buyer journey, the full audit and visual checks have different schedules.
 
-Заимстваме подходите и използваме публичните интеграции. Не е нужно да пресъздаваме цялата инфраструктура на външните продукти.
+We borrow the approaches and use public integrations. There is no need to recreate the whole infrastructure of the external products.
 
-## Приоритетни подобрения
+## Priority improvements
 
-### 1. Проверки, които доказват твърдението си
+### 1. Checks that prove their claim
 
-**Статус: реализирано и проверено локално за Shopify/WooCommerce.** `17-checkout` вече отделя достигането на реален checkout route с четимо съдържание/HTTP статус от проверките на contact и shipping интерфейса. Query параметър с думата checkout не доказва достигане. Липсващо, скрито, disabled или нееднозначно задължително поле не дава успех.
+**Status: implemented and verified locally for Shopify/WooCommerce.** `17-checkout` now separates reaching a real checkout route with readable content/HTTP status from the checks of the contact and shipping interface. A query parameter containing the word checkout does not prove arrival. A missing, hidden, disabled or ambiguous required field does not pass.
 
-Общите `storefront-assertions` проверяват точно един разпознат/конфигуриран checkout root и видими editable полета. `checkout` настройките задават supported/auto/unsupported/blocked интерфейс, required/not-applicable/unverified contact/shipping политика, причина и конкретни requiredAddressFields. Панелът има отделна Checkout expectations секция. Неразпознат/блокиран интерфейс остава непроверен; изрично неприложимите полета се маркират като такива. Настройките се валидират от Ajv.
+The shared `storefront-assertions` check exactly one recognized/configured checkout root and visible editable fields. The `checkout` settings define a supported/auto/unsupported/blocked interface, a required/not-applicable/unverified contact/shipping policy, a reason and concrete requiredAddressFields. The panel has a separate Checkout expectations section. An unrecognized or blocked interface stays unverified; explicitly not-applicable fields are marked as such. Settings are validated by Ajv.
 
-`05-cart` и WooCommerce empty-cart сценарият изискват реално празен public cart в същата сесия, нула видими продуктови редове и изричен видим empty-state indicator. Cart form сам по себе си, скрит empty текст и непразна API количка не могат да дадат успех. Shopify clear/read използват наблюдавания локализиран route root; WooCommerce използва собствената cookie/token сесия.
+`05-cart` and the WooCommerce empty-cart scenario require a genuinely empty public cart in the same session, zero visible product rows and an explicit visible empty-state indicator. A cart form on its own, hidden empty text or a non-empty API cart cannot produce a pass. Shopify clear/read use the observed localized route root; WooCommerce uses its own cookie/token session.
 
-JSON evidence: `checkout-interface.json`, `empty-cart.json`. Общата contact политика се използва и от Woo checkout/покупателния път. Подробности: [Checkout очаквания](docs/CONFIGURATION.md#checkout-очаквания).
+JSON evidence: `checkout-interface.json`, `empty-cart.json`. The shared contact policy is also used by the Woo checkout and the buyer journey. Details: [Checkout expectations](docs/CONFIGURATION.md#checkout-expectations).
 
-**Валидация:** 40 локални claims проверки (по 20 за платформа), regressions с 26 journey сценария и 22 Woo commerce сценария, панел save/reload/mobile/axe и общите unit/type/lint проверки. Лични данни не се попълват; production магазини и поръчки не са използвани.
+**Validation:** 40 local claims checks (20 per platform), regressions with 26 journey scenarios and 22 Woo commerce scenarios, panel save/reload/mobile/axe and the shared unit/type/lint checks. No personal data is filled in; production stores and orders were not used.
 
-**Критерий за готовност:** липсващо очаквано поле или грешно съдържание на количката не може да даде успешен резултат за съответната проверка.
-### 2. Един цялостен покупателен сценарий
+**Definition of done:** a missing expected field or wrong cart content cannot yield a passing result for the relevant check.
 
-**Статус: реализирано за Shopify и WooCommerce, проверено локално.** `36-buyer-journey` изпълнява:
+### 2. One end-to-end buyer scenario
 
-`търсене → продукт → вариант → добавяне → количество → checkout`
+**Status: implemented for Shopify and WooCommerce, verified locally.** `36-buyer-journey` runs:
 
-Автоматично планира наличен продукт от до шест кандидата в inventory, с предпочитание към продукт с варианти. Стъпките се изпълняват през UI в отделна празна visitor сесия. Shopify потвърждава количката чрез локализирания публичен Cart API; WooCommerce използва отделния Store API адаптер със същите cookies/token/nonce, currency minor units и tax policy. Проверяват се идентичност, активна цена, количество 1 → 2 и UI/API суми на реда.
+`search → product → variant → add → quantity → checkout`
 
-Checkout се отчита като проверен само при четим преглед с правилния продукт/опции, количество и сума на реда. Не се натиска Place order/Pay. Известните order/payment и Woo checkout mutation заявки се блокират; зависещите от тях checkout реализации остават непроверени. След добавяне се прави cleanup, освен при общ rate-limit stop.
+It automatically plans an available product from up to six inventory candidates, preferring a product with variants. The steps run through the UI in a separate, empty visitor session. Shopify confirms the cart through the localized public Cart API; WooCommerce uses a separate Store API adapter with the same cookies/token/nonce, currency minor units and tax policy. Identity, active price, quantity 1 → 2 and UI/API line totals are checked.
 
-Панелът има отделен раздел „Buyer journey — Покупателен път“. `buyer-journeys.json` съхранява очакваното, наблюдаваното, статуса и първата проблемна стъпка. Подробните commerce тестове остават за диагностика. Неподдържани picker-и, нееднозначни контроли, ограничения до един брой или недостъпен checkout summary не дават автоматичен успех.
+Checkout is counted as verified only with a readable summary showing the right product/options, quantity and line amount. Place order/Pay is never pressed. Known order/payment and Woo checkout mutation requests are blocked; checkout implementations that depend on them stay unverified. After adding, cleanup is performed, except under a shared rate-limit stop.
 
-Команди: `pnpm test:journey --site=<slug>` и `pnpm test:journey:local`; включен в `@full` и CI acceptance. Обхват/ограничения: [docs/COMMERCE.md](docs/COMMERCE.md).
+The panel has a separate "Buyer journey" section. `buyer-journeys.json` stores the expected and observed values, the status and the first problem step. The detailed commerce tests remain for diagnosis. Unsupported pickers, ambiguous controls, single-quantity limits or an inaccessible checkout summary do not yield an automatic pass.
 
-**Валидация:** 26 локални journey сценария (13 за всяка платформа), 69 unit теста, TypeScript/lint, регресионните 26 Shopify и 22 WooCommerce commerce проверки. Покрити са прост/вариантен продукт, изчерпан продукт, грешна цена/количество/вариант, липсващо търсене, непроверим checkout, блокирана автоматична order заявка и cleanup. Реални магазини и поръчки не са използвани.
+Commands: `pnpm test:journey --site=<slug>` and `pnpm test:journey:local`; included in `@full` and CI acceptance. Scope/limitations: [docs/COMMERCE.md](docs/COMMERCE.md).
 
-**Критерий за готовност:** при проблем отчетът посочва точната стъпка и разминаването между очакваното и действителното състояние.
-### 3. Известия и състояние на проблемите
+**Validation:** 26 local journey scenarios (13 per platform), 69 unit tests, TypeScript/lint, and the regression 26 Shopify and 22 WooCommerce commerce checks. Covered: a simple/variant product, a sold-out product, wrong price/quantity/variant, missing search, unverifiable checkout, a blocked automatic order request and cleanup. Real stores and orders were not used.
 
-Добавяме:
+**Definition of done:** on a problem, the report names the exact step and the mismatch between the expected and the actual state.
 
-- Нов критичен проблем.
-- Повтарящ се проблем, без известие при всяко изпълнение.
-- Възстановяване след успешна проверка на същия сценарий.
-- Maintenance прозорци за временно потискане на известията.
-- Връзка към отчет и доказателства.
-- Отделен запис за неуспешна доставка на известие.
+### 3. Notifications and problem state
 
-Първият неуспех остава в историята. При необходимост планираме отделна потвърждаваща проверка, която спазва pacing, `Retry-After` и cooldown. Не използваме retries, които прикриват първоначалния резултат.
+We add:
 
-Готова основа: [Apprise](https://github.com/caronc/apprise), който поддържа много notification услуги. За начало е достатъчен един канал и малък адаптер към резултатите; Apprise има смисъл при нужда от повече канали.
+- A new critical problem.
+- A recurring problem, without a notification on every run.
+- Recovery after a successful check of the same scenario.
+- Maintenance windows to temporarily suppress notifications.
+- A link to the report and the evidence.
+- A separate record of a failed notification delivery.
 
-**Критерий за готовност:** един проблем води до едно първоначално известие, повторенията се групират, а проверено възстановяване изпраща отделно известие.
+The first failure stays in the history. If needed, we plan a separate confirming check that respects pacing, `Retry-After` and cooldown. We do not use retries that hide the initial result.
 
-### 4. Съпоставими сравнения и постоянни идентификатори
+Ready-made foundation: [Apprise](https://github.com/caronc/apprise), which supports many notification services. One channel and a small adapter over the results are enough to start; Apprise makes sense when more channels are needed.
 
-В `scripts/update-history.js` всеки run се сравнява с непосредствено предишния, който може да има различен режим и обхват. В `scripts/report-model.js` идентичността зависи от project, file и title.
+**Definition of done:** one problem leads to one initial notification, repeats are grouped, and a verified recovery sends a separate notification.
 
-Предложение:
+### 4. Comparable comparisons and stable identifiers
 
-- Постоянен `checkId`, независим от заглавието и преместването на файла.
-- Baseline по режим, браузър и обхват.
-- Последен известен резултат за конкретна проверка.
-- Разграничаване между „новонаблюдаван проблем“ и „регресия след успешна проверка“.
-- Пропусната или неизпълнена проверка не доказва възстановяване.
+In `scripts/update-history.js` every run is compared with the immediately preceding one, which may have a different mode and scope. In `scripts/report-model.js` identity depends on project, file and title.
 
-**Критерий за готовност:** последователност `full → smoke → full` не създава подвеждаща регресия само поради различния обхват.
+Proposal:
 
-### 5. Лесна настройка на магазин и профили за теми
+- A stable `checkId`, independent of the title and of file moves.
+- A baseline per mode, browser and scope.
+- The last known result for a specific check.
+- A distinction between a "newly observed problem" and a "regression after a passing check".
+- A skipped or unexecuted check does not prove recovery.
 
-Предложена последователност:
+**Definition of done:** the sequence `full → smoke → full` does not create a misleading regression merely because of the different scope.
 
-`URL → откриване на продукти → избор на продукт и наличен вариант → проверка на селектори → първи smoke run → активиране на график`
+### 5. Easy store setup and theme profiles
 
-Надграждаме съществуващото откриване през `/products.json`. То е ограничено и не избира автоматично подходящ наличен вариант. При недостъпно откриване запазваме ръчната настройка с ясна причина.
+Proposed sequence:
 
-Добавяме общ Shopify профил, профил за Dawn и персонализирани overrides. Capabilities стават изрична метаинформация на проверките, вместо да се определят по файл и текст на теста в `tests/fixtures.ts`.
+`URL → product discovery → choose a product and an available variant → selector check → first smoke run → activate schedule`
 
-Премахваме автоматичния fallback към `zerno.co` и старите продуктови handle-и при липсваща конфигурация. Примерите остават отделни от реалните настройки.
+We build on the existing discovery through `/products.json`. It is limited and does not automatically choose a suitable available variant. When discovery is unavailable, we keep manual setup with a clear reason.
 
-**Критерий за готовност:** потребителят може да добави магазин без редакция на JSON и получава конкретно обяснение, ако автоматичната настройка не е възможна.
+We add a general Shopify profile, a Dawn profile and custom overrides. Capabilities become explicit metadata of the checks, instead of being derived from the file and test text in `tests/fixtures.ts`.
 
-### 6. Управление на визуалните baseline-и
+We remove the automatic fallback to `zerno.co` and the old product handles when configuration is missing. Examples stay separate from real settings.
 
-**Статус: реализирано и проверено.** Всеки магазин има постоянна изрично одобрена версия в `visual-baselines/`, независима от последните отчети. Панелът показва baseline/candidate/diff и позволява одобряване на избрани изображения с потвърждение. Версиите се запазват, сравненията фиксират revision в началото, а автоматично обновяване е блокирано. Добавени са проверки за еднаква среда, реални viewport размери и прагове по компонент. Старите фирмени изображения са изтрити по заявка на потребителя; няма автоматично одобрени изображения.
+**Definition of done:** a user can add a store without editing JSON and gets a concrete explanation if automatic setup is not possible.
 
-Валидация: `pnpm check` мина с 47 unit теста, без TypeScript или lint errors. Минаха общите локални acceptance проверки, визуалният цикъл на всичките пет browser проекта, UI одобряване/отказ/презареждане, axe проверката на визуалния панел и Docker Compose валидацията. Визуалният тест умишлено очаква отказ при липсващо одобрение, промяна, различна среда и автоматично snapshot обновяване. Реални магазини не са посещавани. За всеки магазин първата версия остава за изричен преглед и одобрение от потребителя.
+### 6. Managing visual baselines
 
-Първоначална констатация: `playwright.config.ts` очакваше baseline изображения в подпапка за магазина, а шестте проследени изображения в `tests/10-visual.spec.ts-snapshots/` са по стария път без нея.
+**Status: implemented and verified.** Each store has a persistent, explicitly approved version in `visual-baselines/`, independent of the latest reports. The panel shows baseline/candidate/diff and lets the user approve selected images with confirmation. Versions are kept, comparisons pin the revision at the start, and automatic updating is blocked. Checks for an identical environment, real viewport sizes and per-component thresholds were added. The old company images were deleted at the user's request; no images are automatically approved.
 
-Предложение:
+Validation: `pnpm check` passed with 47 unit tests, with no TypeScript or lint errors. The shared local acceptance checks passed, along with the visual cycle on all five browser projects, UI approve/reject/reload, the axe check of the visual panel and Docker Compose validation. The visual test deliberately expects a failure on missing approval, change, a different environment and automatic snapshot updating. No real stores were visited. For each store, the first version is left for the user's explicit review and approval.
 
-- Изясняване и миграция на baseline структурата.
-- Еднаква среда за създаване и сравнение, например фиксиран Docker образ.
-- Преглед на baseline, текущо изображение и diff.
-- Изрично одобряване на умишлени промени.
-- Отделни прагове за важни компоненти.
-- Проверка на viewport и clip настройките за всички включени browser projects.
+Initial finding: `playwright.config.ts` expected baseline images in a per-store subfolder, while the six tracked images in `tests/10-visual.spec.ts-snapshots/` were at the old path without it.
 
-Playwright описва влиянието на средата върху визуалните резултати: [Visual comparisons](https://playwright.dev/docs/test-snapshots).
+Proposal:
 
-Започваме с вградените Playwright сравнения. [Argos](https://argos-ci.com/docs/playwright) е вариант, ако искаме готов процес за визуален преглед и приемаме външна услуга.
+- Clarify and migrate the baseline structure.
+- An identical environment for creating and comparing, for example a pinned Docker image.
+- Review of baseline, current image and diff.
+- Explicit approval of intentional changes.
+- Separate thresholds for important components.
+- Check viewport and clip settings for all included browser projects.
 
-### 7. CI за самия инструмент
+Playwright describes how the environment affects visual results: [Visual comparisons](https://playwright.dev/docs/test-snapshots).
 
-**Статус: реализирано и повторно проверено локално на 10 октомври 2026 г.** `.github/workflows/ci.yml` се задейства за pull request, push към `master` и ръчно стартиране. Използва Node от `.nvmrc`, pnpm от `package.json`, frozen-lockfile инсталация и Chromium със системните зависимости. Изпълнява `pnpm check` и `pnpm test:acceptance:local`.
+We start with the built-in Playwright comparisons. [Argos](https://argos-ci.com/docs/playwright) is an option if we want a ready-made visual review process and accept an external service.
 
-Acceptance командата вече включва дванадесет групи: pacing, readiness, reporting, control panel, shared-page, vitals, visual approval lifecycle, Shopify commerce, WooCommerce, SEO inventory, buyer journey и checkout/empty-cart claims. Всички използват локални фикстури; production мониторингът запазва отделния си график. Visual lifecycle включва очаквани неуспешни вътрешни сценарии, които wrapper-ът проверява като част от успешната acceptance група.
+### 7. CI for the tool itself
 
-ESLint обхваща `scripts/`, `web/`, `checks/`, `tests/`, `config/` и коренните TypeScript файлове, с отделни Node/browser настройки. При неуспех CI качва наличните `reports/local-*/` artifacts със срок 7 дни. Workflow-ът има read-only repository permissions, 20-minute timeout и отменя остарели изпълнения на същия ref.
+**Status: implemented and re-verified locally on October 10, 2026.** `.github/workflows/ci.yml` triggers on pull requests, pushes to `master` and manual runs. It uses Node from `.nvmrc`, pnpm from `package.json`, a frozen-lockfile install and Chromium with system dependencies. It runs `pnpm check` and `pnpm test:acceptance:local`.
 
-**Валидация:** последният `pnpm check` мина с **70 unit теста**, TypeScript и без lint errors; остават lint warnings. При тази повторна проверка `pnpm install --frozen-lockfile --offline`, форматът на workflow/config/package файловете и общата команда с **всичките десет acceptance групи** минаха успешно. Новите buyer journey и checkout/empty-cart claims групи са проверени отделно с 26 и 40 локални сценария за двете платформи; добавени са към общата команда. Workflow-ът още не е изпълнен на GitHub runner; промените са локални и за първото GitHub изпълнение е нужен push. Production магазини не са посещавани.
+The acceptance command now includes twelve groups: pacing, readiness, reporting, control panel, shared-page, vitals, visual approval lifecycle, Shopify commerce, WooCommerce, SEO inventory, buyer journey and checkout/empty-cart claims. All use local fixtures; production monitoring keeps its own schedule. The visual lifecycle includes expected internal failure scenarios, which the wrapper verifies as part of the successful acceptance group.
 
-**Критерий за готовност:** workflow-ът проверява конфигурацията, scheduler-а, отчетите и основния UI преди merge. За да бъде успешният check задължително условие за merge, GitHub branch protection/ruleset трябва да изисква `Quality and local browser checks`; такава repository настройка не е променяна в тази задача.
+ESLint covers `scripts/`, `web/`, `checks/`, `tests/`, `config/` and the root TypeScript files, with separate Node/browser settings. On failure, CI uploads the available `reports/local-*/` artifacts with a 7-day retention. The workflow has read-only repository permissions, a 20-minute timeout and cancels stale runs on the same ref.
 
-## Допълнителни идеи — следващи възможности
+**Validation:** the latest `pnpm check` passed with **70 unit tests** and TypeScript, with no lint errors; lint warnings remain. In this re-check, `pnpm install --frozen-lockfile --offline`, the format of the workflow/config/package files and the shared command with **all ten acceptance groups** passed. The new buyer journey and checkout/empty-cart claims groups were verified separately with 26 and 40 local scenarios for both platforms; they were added to the shared command. The workflow has not yet run on a GitHub runner; the changes are local and the first GitHub run needs a push. Production stores were not visited.
 
-Добавено на 10 октомври 2026 г. Точките 8–19 са предложения, не реализирани функции. Приоритетите са относителни; преди реализация уточняваме конкретните магазини и очаквания.
+**Definition of done:** the workflow verifies the configuration, scheduler, reports and core UI before merge. To make a passing check a merge requirement, a GitHub branch protection/ruleset must require `Quality and local browser checks`; that repository setting was not changed in this task.
 
-### 8. Разпознаване на причината за неуспешна проверка
+## Additional ideas — next possibilities
 
-**Полза:** веднага различаваме проблем на магазина от неподходящ тестов продукт, променен селектор или проблем в средата на tester-а.
+Added on October 10, 2026. Items 8–19 are proposals, not implemented features. Priorities are relative; before implementation we clarify the specific stores and expectations.
 
-Добавяме класификация: storefront failure, configuration failure, unavailable test data, rate limited, blocked/challenge, runner failure и unverified. Запазваме оригиналната грешка, HTTP статусите и доказателствата. Изчерпан тестов продукт не трябва да изглежда нито като повреден checkout, нито като успешна проверка.
+### 8. Identifying the cause of a failed check
 
-Началната версия може да използва ясни правила по стъпка и тип грешка. AI обяснение е допълнение, което трябва да сочи доказателствата и да обозначава предположенията.
+**Benefit:** we can immediately tell a store problem from an unsuitable test product, a changed selector or a problem in the tester's environment.
 
-**Критерий за готовност:** една и съща причинна категория има еднакво представяне във всички отчети и известия, без да променя действителния test outcome.
+We add a classification: storefront failure, configuration failure, unavailable test data, rate limited, blocked/challenge, runner failure and unverified. We keep the original error, HTTP statuses and evidence. A sold-out test product must look neither like a broken checkout nor like a passing check.
 
-**Приоритет:** висок; надгражда точки 1, 3 и 4.
+The first version can use clear rules by step and error type. An AI explanation is an addition that must point to the evidence and mark assumptions.
 
-### 9. Изрични очаквания за всеки магазин
+**Definition of done:** the same cause category has the same representation in all reports and notifications, without changing the actual test outcome.
 
-**Полза:** общите Shopify тестове проверяват действителния замисъл на магазина.
+**Priority:** high; builds on items 1, 3 and 4.
 
-Вместо само capabilities добавяме настройки като: има ли доставка на физически продукти, трябва ли да има newsletter, какъв тип количка се очаква, кои валути и езици са активни, какво е очакваното поведение на consent.
+### 9. Explicit expectations per store
 
-За всяка настройка пазим произход: зададена от потребителя, открита и потвърдена, или неизвестна. Автоматично откриване не трябва само да изключва проверка при изчезнала функционалност.
+**Benefit:** the shared Shopify tests verify the store's actual intent.
 
-Пример: ако магазинът е настроен с newsletter, липсващата форма е проблем; ако поддръжката е неизвестна, резултатът е непроверен. При магазин с цифрови продукти адресните полета може изрично да не са приложими.
+Instead of only capabilities, we add settings such as: whether physical products are shipped, whether there should be a newsletter, what kind of cart is expected, which currencies and languages are active, and what the expected consent behavior is.
 
-**Критерий за готовност:** всяко `not-applicable` решение има проверима причина или изрична настройка, а не просто липсващ елемент.
+For each setting we keep its origin: set by the user, discovered and confirmed, or unknown. Automatic discovery must not merely switch off a check when functionality disappears.
 
-**Приоритет:** висок; естествено продължение на точка 5.
+Example: if the store is configured with a newsletter, a missing form is a problem; if support is unknown, the result is unverified. For a store with digital products, address fields may be explicitly not applicable.
 
-### 10. Представителен подбор на продукти и варианти
+**Definition of done:** every `not-applicable` decision has a verifiable reason or an explicit setting, not just a missing element.
 
-**Полза:** не проверяваме само два продукта, които могат да пропуснат важни проблеми.
+**Priority:** high; a natural continuation of item 5.
 
-Позволяваме роли: наличен продукт, продукт с няколко варианта, намален продукт, изчерпан продукт, bundle или subscription при съответните магазини. Потребителят може да посочи важни продукти, които винаги се проверяват.
+### 10. Representative selection of products and variants
 
-Разделяме постоянния критичен набор от ротационен набор. Ротацията е възпроизводима: записваме seed и точния списък в отчета. Ако критичен тестов продукт стане неподходящ, предлагаме замяна с обяснение. Промяна на тестовите данни не означава автоматично одобрение на нов визуален baseline.
+**Benefit:** we do not check only two products, which can miss important problems.
 
-**Критерий за готовност:** от отчета можем да повторим проверката със същите продукти и варианти.
+We allow roles: an available product, a product with several variants, a discounted product, a sold-out product, a bundle or subscription for the relevant stores. The user can name important products that are always checked.
 
-**Приоритет:** висок за магазини с голям каталог; среден за малки магазини.
+We separate a permanent critical set from a rotating set. Rotation is reproducible: we record the seed and the exact list in the report. If a critical test product becomes unsuitable, we propose a replacement with an explanation. Changing the test data does not automatically mean approving a new visual baseline.
 
-### 11. Бюджет за заявки и изпълнения
+**Definition of done:** from the report we can repeat the check with the same products and variants.
 
-**Полза:** можем да планираме полезен мониторинг с предвидим обем трафик и време.
+**Priority:** high for stores with a large catalogue; medium for small stores.
 
-Добавяме максимален брой проверени страници, ориентировъчен брой заявки, лимит на продължителността и дневен бюджет по магазин/origin. При създаване на график показваме приблизителен обем според измерените предишни изпълнения, ясно обозначен като оценка.
+### 11. Budget for requests and runs
 
-При изчерпване на бюджета следващата работа се отлага и се отчита като неизпълнена. Критичните проверки получават предимство пред тежки inventory audits. Статичните ресурси и външните услуги се броят отделно; бюджетът не е обещание, че няма да има rate limiting.
+**Benefit:** we can plan useful monitoring with a predictable volume of traffic and time.
 
-**Критерий за готовност:** scheduler-ът не надхвърля зададения измерим лимит и панелът обяснява всяко отлагане.
+We add a maximum number of checked pages, an approximate number of requests, a duration limit and a daily budget per store/origin. When a schedule is created, we show an approximate volume based on measured previous runs, clearly labelled as an estimate.
 
-**Приоритет:** среден; полезен преди добавяне на повече магазини и паралелизъм.
+When the budget is exhausted, the next work is postponed and reported as not executed. Critical checks take precedence over heavy inventory audits. Static resources and external services are counted separately; the budget is not a promise that there will be no rate limiting.
 
-### 12. Проверки след промяна, освен по график
+**Definition of done:** the scheduler does not exceed the configured measurable limit and the panel explains every postponement.
 
-**Полза:** откриваме проблем скоро след deployment или важна промяна, вместо да чакаме следващия интервал.
+**Priority:** medium; useful before adding more stores and parallelism.
 
-Добавяме защитен trigger endpoint за CI и по-късно Shopify интеграция за поддържаните и релевантни събития. Избираме кратък smoke/visual набор според причината. Групираме близките събития, за да не пускаме десетки изпълнения при масова промяна.
+### 12. Checks after a change, not only on a schedule
 
-Готова основа за Shopify интеграцията: официалните [webhooks](https://shopify.dev/docs/api/webhooks/latest). Конкретните topics, достъпът и API версията се проверяват при реализация; не всяка промяна на витрината има подходящ webhook. Поддържаме и обикновен CI trigger без Shopify приложение.
+**Benefit:** we detect a problem soon after a deployment or an important change, instead of waiting for the next interval.
 
-**Критерий за готовност:** събитието се вижда като причина за run-а, дублирани доставки не стартират дублирани jobs, а cooldown-ът остава валиден.
+We add a protected trigger endpoint for CI and later a Shopify integration for supported, relevant events. We choose a short smoke/visual set according to the cause. We group nearby events so that a bulk change does not start dozens of runs.
 
-**Приоритет:** среден; след „Пусни сега“ и устойчиво управление на проблемите.
+Ready-made foundation for the Shopify integration: the official [webhooks](https://shopify.dev/docs/api/webhooks/latest). The specific topics, access and API version are checked at implementation time; not every storefront change has a suitable webhook. We also support a plain CI trigger without a Shopify app.
 
-### 13. Записване на специфични потребителски сценарии
+**Definition of done:** the event is visible as the reason for the run, duplicate deliveries do not start duplicate jobs, and the cooldown stays valid.
 
-**Полза:** магазин с персонализация, конфигуратор или нестандартна количка може да има собствен критичен сценарий.
+**Priority:** medium; after "Run now" and robust problem management.
 
-Използваме [Playwright codegen](https://playwright.dev/docs/codegen) за първоначален запис на действия и locators. После добавяме assertions, очаквани продукти/суми и ограничения на действията; записаните кликове сами по себе си не доказват правилно поведение.
+### 13. Recording store-specific user scenarios
 
-За начало поддържаме прегледани `.spec.ts` сценарии в repository. По-късно може да има редактор на ограничен списък стъпки в панела. Качване и изпълнение на произволен JavaScript през панела изисква отделен модел на изолация и достъп, затова не е първата реализация.
+**Benefit:** a store with personalization, a configurator or a non-standard cart can have its own critical scenario.
 
-**Критерий за готовност:** персонализираният сценарий използва общите pacing, отчети, capabilities и артефакти и посочва коя бизнес цел проверява.
+We use [Playwright codegen](https://playwright.dev/docs/codegen) for an initial recording of actions and locators. Then we add assertions, expected products/amounts and limits on the actions; recorded clicks alone do not prove correct behavior.
 
-**Приоритет:** среден; когато общите theme профили не са достатъчни.
+To start, we maintain reviewed `.spec.ts` scenarios in the repository. Later there may be an editor for a restricted list of steps in the panel. Uploading and running arbitrary JavaScript through the panel requires a separate isolation and access model, so it is not the first implementation.
 
-### 14. Сравнение на кандидат за публикуване с production
+**Definition of done:** the custom scenario uses the shared pacing, reports, capabilities and artifacts, and states which business goal it verifies.
 
-**Полза:** проверяваме бъдеща тема или staging версия, преди тя да стане видима за клиентите.
+**Priority:** medium; when the shared theme profiles are not enough.
 
-Добавяме отделна цел за preview/staging и проверяваме критичния сценарий спрямо production очакванията. Shopify preview може да изисква query параметри и cookies; текущият origin-only модел трябва да се разшири с изрични preview настройки, без да се разхлабва произволно URL валидацията.
+### 14. Comparing a release candidate with production
 
-Production и preview пазят отделни сесии. Визуалният кандидат може да се сравни с одобрения production baseline, но preview изпълнение не го заменя. Публикуването на тема остава отделно действие; резултатът от tester-а е доказателство за решение, не автоматично одобрение на deployment.
+**Benefit:** we check a future theme or a staging version before it becomes visible to customers.
 
-**Критерий за готовност:** отчетът ясно показва коя версия е проверена и как се различава от одобрената production версия.
+We add a separate preview/staging target and verify the critical scenario against production expectations. A Shopify preview may require query parameters and cookies; the current origin-only model must be extended with explicit preview settings, without arbitrarily loosening URL validation.
 
-**Приоритет:** среден до висок, ако проектът се използва при разработване на теми.
+Production and preview keep separate sessions. The visual candidate can be compared with the approved production baseline, but a preview run does not replace it. Publishing a theme remains a separate action; the tester's result is evidence for a decision, not an automatic approval of the deployment.
 
-### 15. Следене на външните скриптове и приложения
+**Definition of done:** the report clearly shows which version was checked and how it differs from the approved production version.
 
-**Полза:** виждаме кога нов widget, app или tracking скрипт влошава страницата.
+**Priority:** medium to high, if the project is used while developing themes.
 
-От наблюдаваните network заявки и performance записи строим списък на външните домейни, скриптове, видимите им разходи и грешки. Показваме нов домейн, нов скрипт, нараснал ресурсен обем или променено blocking поведение спрямо съпоставими изпълнения.
+### 15. Monitoring external scripts and apps
 
-Записваме какъв consent state е използван. При промени в CDN адресите нормализираме само добре определени версии/параметри. Блокиране на конкретен скрипт може да се използва като диагностичен експеримент, но не доказва само по себе си, че приложение е причината.
+**Benefit:** we see when a new widget, app or tracking script degrades the page.
 
-**Критерий за готовност:** промяната има URL, момент на наблюдение и измерим ефект; неизвестният трансферен размер не се отчита като нула.
+From the observed network requests and performance records we build a list of external domains, scripts, their visible costs and errors. We show a new domain, a new script, increased resource size or changed blocking behavior compared with comparable runs.
 
-**Приоритет:** среден; надгражда съществуващите passive performance измервания.
+We record which consent state was used. When CDN addresses change, we normalize only well-defined versions/parameters. Blocking a specific script can be used as a diagnostic experiment, but does not by itself prove that the app is the cause.
 
-### 16. Одобрени текстови очаквания за ключово съдържание
+**Definition of done:** the change has a URL, a time of observation and a measurable effect; an unknown transfer size is not reported as zero.
 
-**Полза:** засичаме изчезнали или нежелано променени ключови текстове, дори когато screenshot diff е малък.
+**Priority:** medium; builds on the existing passive performance measurements.
 
-Потребителят избира конкретни текстове/области: бутон за покупка, доставка, връщане, предупреждение за наличност, headline. Пазим одобрени очаквания по магазин и език, с diff и ръчно одобряване при умишлена промяна.
+### 16. Approved text expectations for key content
 
-Нормализираме whitespace и изрично избрани динамични стойности. Не замразяваме целия DOM, каталога или всички цени. Това е допълнение към речниците и визуалните baseline-и: правописът, правилният текст и правилното оформление са различни проверки.
+**Benefit:** we catch key texts that disappear or are changed unintentionally, even when the screenshot diff is small.
 
-**Критерий за готовност:** липсващ ключов текст дава конкретен проблем; нов run не променя автоматично одобреното очакване.
+The user chooses specific texts/areas: the purchase button, shipping, returns, an availability warning, the headline. We keep approved expectations per store and language, with a diff and manual approval on an intentional change.
 
-**Приоритет:** среден; полезен за кампании и многоезични магазини.
+We normalize whitespace and explicitly chosen dynamic values. We do not freeze the whole DOM, the catalogue or all prices. This complements the dictionaries and the visual baselines: spelling, correct text and correct layout are different checks.
 
-### 17. Визуални baseline-и за състояния и история на одобренията
+**Definition of done:** a missing key text gives a concrete problem; a new run does not automatically change the approved expectation.
 
-**Полза:** надграждаме реализираната точка 6 с важни състояния, които обикновена снимка на страницата не показва.
+**Priority:** medium; useful for campaigns and multilingual stores.
 
-Добавяме именувани състояния: отворено мобилно меню, количка с продукт, избран вариант, validation error и изчерпан продукт. Всяко състояние има собствен постоянен идентификатор, браузър и одобрена снимка.
+### 17. Visual baselines for states and an approval history
 
-В панела добавяме бележка при одобрение, история на версиите и изрично връщане към конкретна предишна версия. При екипна употреба записваме и кой потребител е одобрил. AI или евристики могат да описват разликата, но не одобряват автоматично версия.
+**Benefit:** we build on the implemented item 6 with important states that an ordinary page screenshot does not show.
 
-Одобряването на screenshot не трябва да отменя функционална грешка в същия run. Например визуално одобрен бутон, който не добавя продукт, остава функционален проблем.
+We add named states: an open mobile menu, a cart with a product, a selected variant, a validation error and a sold-out product. Each state has its own stable identifier, browser and approved image.
 
-**Критерий за готовност:** rollback е конкретно избран и потвърден; историята показва версия, снимки, причина и време на одобрение.
+In the panel we add a note on approval, a version history and an explicit rollback to a specific earlier version. For team use we also record which user approved. AI or heuristics may describe the difference, but do not approve a version automatically.
 
-**Приоритет:** среден; след употреба и обратна връзка за текущия approval flow.
+Approving a screenshot must not cancel a functional failure in the same run. For example, a visually approved button that does not add a product remains a functional problem.
 
-### 18. Възпроизводими проблеми и повече theme фикстури
+**Definition of done:** a rollback is specifically chosen and confirmed; the history shows the version, images, reason and time of approval.
 
-**Полза:** поправяме tester-а без многократно натоварване на production и проверяваме, че поддръжката на тема не е случайна.
+**Priority:** medium; after usage and feedback on the current approval flow.
 
-Добавяме локални представителни страници за cart drawer/cart page, variant picker, predictive search, consent и локализация. Готова отправна точка за конкретна тема е официалният [Shopify Dawn repository](https://github.com/Shopify/dawn); версията се фиксира и лицензните условия се проверяват при използване на файлове.
+### 18. Reproducible problems and more theme fixtures
 
-При трудно възпроизводим проблем може да запазим минимален прегледан HTML/API fixture или [Playwright HAR replay](https://playwright.dev/docs/mock#replaying-from-har). Премахваме сесийни данни от споделяните фикстури. HAR replay възпроизвежда записани отговори, не доказва текущото поведение на реалния Shopify backend.
+**Benefit:** we fix the tester without repeatedly loading production, and verify that theme support is not accidental.
 
-**Критерий за готовност:** поправката има локален сценарий, който възпроизвежда проблема и би се провалил преди нея.
+We add local representative pages for the cart drawer/cart page, variant picker, predictive search, consent and localization. A ready starting point for a specific theme is the official [Shopify Dawn repository](https://github.com/Shopify/dawn); the version is pinned and the license terms are checked when files are used.
 
-**Приоритет:** висок за надеждността при повече теми; добавя се постепенно при реални проблеми.
+For a hard-to-reproduce problem we can keep a minimal reviewed HTML/API fixture or a [Playwright HAR replay](https://playwright.dev/docs/mock#replaying-from-har). We strip session data from shared fixtures. HAR replay reproduces recorded responses; it does not prove the current behavior of the real Shopify backend.
 
-### 19. Преносим backup и наблюдение на самия tester
+**Definition of done:** a fix comes with a local scenario that reproduces the problem and would have failed before it.
 
-**Полза:** възстановяваме конфигурацията и одобрените версии след проблем и знаем кога самият инструмент е спрял да проверява.
+**Priority:** high for reliability across more themes; added gradually as real problems appear.
 
-Добавяме export/import пакет с конфигурация, approved pointers, version manifests и избраните изображения. Пакетът има schema версия и checksums. При import показваме кои магазини и одобрения ще се добавят или заменят; изискваме изрично решение при конфликт. Не включваме browser storage и credentials по подразбиране.
+### 19. Portable backup and monitoring of the tester itself
 
-Отделно измерваме опашката, възрастта на последния валиден run, scheduler heartbeat, cooldown-и, дисково пространство и доставката на известия. HTTP сървър, който отговаря, не е достатъчно доказателство за работещ мониторинг.
+**Benefit:** we restore the configuration and approved versions after a problem, and know when the tool itself has stopped checking.
 
-При нужда от интеграция с observability инфраструктура може да използваме [OpenTelemetry за Node.js](https://opentelemetry.io/docs/languages/js/) за traces и metrics. Началната версия може да е прост статус/API и външен heartbeat monitor.
+We add an export/import package with the configuration, approved pointers, version manifests and the selected images. The package has a schema version and checksums. On import we show which stores and approvals will be added or replaced, and require an explicit decision on conflict. We do not include browser storage and credentials by default.
 
-**Критерий за готовност:** възстановяването в празна инсталация запазва същите одобрени изображения, а спрял scheduler се различава от здрав магазин.
+Separately, we measure the queue, the age of the last valid run, the scheduler heartbeat, cooldowns, disk space and notification delivery. An HTTP server that responds is not sufficient proof of working monitoring.
 
-**Приоритет:** висок при постоянно хостване; среден за локална употреба.
+If integration with observability infrastructure is needed, we can use [OpenTelemetry for Node.js](https://opentelemetry.io/docs/languages/js/) for traces and metrics. The first version can be a simple status/API and an external heartbeat monitor.
 
-### Кои от новите идеи да започнем първо
+**Definition of done:** restoring into an empty installation keeps the same approved images, and a stopped scheduler is distinguishable from a healthy store.
 
-| Идея | Защо сега | Зависимост |
+**Priority:** high for continuous hosting; medium for local use.
+
+### Which of the new ideas to start with
+
+| Idea | Why now | Dependency |
 | --- | --- | --- |
-| 8. Класификация на отказите | Намалява подвеждащите резултати и бъдещия шум от известия | Ясни assertions и постоянни check IDs |
-| 9. Очаквания по магазин | Общите тестове получават смисъл за конкретния магазин | Конфигурация и настройка в панела |
-| 10. Представителни продукти | Подобрява покритието на реалния покупателен път | Discovery и проверка на вариантите |
-| 18. Theme фикстури | Прави новата поддръжка проверима и устойчивa | Добавят се заедно с конкретни поправки |
-| 19. Backup и здраве на tester-а | Пази вече одобрените версии и постоянното наблюдение | Persistence модел и статус на scheduler-а |
+| 8. Failure classification | Reduces misleading results and future notification noise | Clear assertions and stable check IDs |
+| 9. Per-store expectations | Shared tests gain meaning for a specific store | Configuration and setup in the panel |
+| 10. Representative products | Improves coverage of the real buyer journey | Discovery and variant verification |
+| 18. Theme fixtures | Makes new support verifiable and durable | Added together with concrete fixes |
+| 19. Backup and tester health | Protects already approved versions and continuous monitoring | Persistence model and scheduler status |
 
-Идеите 11–17 са следващи модули според нуждите на магазините. Основният покупателен сценарий и известяването от точки 2 и 3 остават преди разширяването към още интеграции.
+Ideas 11–17 are next modules, depending on the stores' needs. The main buyer scenario and the notifications from items 2 and 3 come before expanding to more integrations.
 
-## Готови компоненти за допълнителни функции
+## Ready-made components for additional features
 
-| Нужда | Решение | Как се включва | Условие или ограничение |
+| Need | Solution | How it is included | Condition or limitation |
 | --- | --- | --- | --- |
-| Известия към много канали | [Apprise](https://github.com/caronc/apprise) | Отделен service и адаптер от резултатите | Пазим credentials извън отчетите; започваме с нужните канали |
-| Наличност и наблюдение на tester-а | [Uptime Kuma](https://github.com/louislam/uptime-kuma) | Отделна услуга успоредно с browser checks | Нужен е смислен health/heartbeat сигнал за scheduler-а |
-| Визуално одобряване | [Argos](https://argos-ci.com/docs/playwright) | Playwright интеграция | Hosted услугата изисква акаунт; кодът е MIT, но собственото разгръщане е сложно |
-| Lighthouse история и бюджети | [Lighthouse CI](https://github.com/GoogleChrome/lighthouse-ci) | CI или отделен audit процес | Не дублираме без нужда текущите Lighthouse проверки |
-| Shopify theme audit в CI | [Shopify Lighthouse CI Action](https://github.com/Shopify/lighthouse-ci-action) | В workflow на theme repository | Оценяваме пригодността за конкретната тема и среда |
-| Liquid и theme JSON проверки | [Shopify Theme Check](https://shopify.dev/docs/storefronts/themes/tools/theme-check) | Допълнителен модул или workflow на темата | Изисква файловете на темата; не работи само от URL |
-| Производителност при реални посещения | [CrUX API](https://developer.chrome.com/docs/crux/api) | Периодично извличане на отделни field показатели | 28-дневен прозорец; възможна липса на данни за даден URL или origin |
-| Общ конфигурационен schema — реализирано | [Ajv](https://github.com/ajv-validator/ajv) | Локални JSON Schema за sites/settings/Woo commerce; обща валидация за файлове и панела | Defaults и платформени URL/Intl проверки се запазват; без coercion и външни API |
+| Notifications to many channels | [Apprise](https://github.com/caronc/apprise) | A separate service and an adapter over the results | Keep credentials out of reports; start with the needed channels |
+| Availability and tester monitoring | [Uptime Kuma](https://github.com/louislam/uptime-kuma) | A separate service alongside the browser checks | Needs a meaningful health/heartbeat signal for the scheduler |
+| Visual approval | [Argos](https://argos-ci.com/docs/playwright) | Playwright integration | The hosted service needs an account; the code is MIT, but self-hosting is complex |
+| Lighthouse history and budgets | [Lighthouse CI](https://github.com/GoogleChrome/lighthouse-ci) | CI or a separate audit process | Do not duplicate the current Lighthouse checks without need |
+| Shopify theme audit in CI | [Shopify Lighthouse CI Action](https://github.com/Shopify/lighthouse-ci-action) | In the theme repository's workflow | Assess suitability for the specific theme and environment |
+| Liquid and theme JSON checks | [Shopify Theme Check](https://shopify.dev/docs/storefronts/themes/tools/theme-check) | An additional module or the theme's workflow | Needs the theme files; does not work from a URL alone |
+| Real-visit performance | [CrUX API](https://developer.chrome.com/docs/crux/api) | Periodic retrieval of individual field metrics | 28-day window; data may be missing for a given URL or origin |
+| Shared configuration schema — implemented | [Ajv](https://github.com/ajv-validator/ajv) | Local JSON Schemas for sites/settings/Woo commerce; shared validation for files and the panel | Defaults and platform URL/Intl checks are kept; no coercion and no external APIs |
 
-**Избор на потребителя: добавяме само Ajv.** Запазваме Node/TypeScript стека; не добавяме Python, Apprise или другите предложени услуги. Ajv вече е интегриран във валидацията на store settings, списъците с магазини и Woo commerce структурата. Детайли: [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
+**User's choice: we add only Ajv.** We keep the Node/TypeScript stack; we add no Python, Apprise or the other proposed services. Ajv is already integrated into the validation of store settings, store lists and the Woo commerce structure. Details: [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
-### Проверка за локална интеграция без регистрации — 2026-10-10
+### Check for local integration without sign-ups — 2026-10-10
 
-**7 от 8 предложения имат open-source код.** CrUX API е външна Google услуга. Отвореният код сам по себе си не означава лесно разгръщане или работа без credentials.
+**7 of the 8 proposals have open-source code.** The CrUX API is an external Google service. Open source alone does not mean easy deployment or operation without credentials.
 
-Тук „без регистрации“ означава без външен SaaS акаунт. Собствена услуга може да изисква локален администратор и вътрешен token. Наличието на локален HTTP endpoint между наши контейнери не означава зависимост от чужд API. Ако искаме всичко в един Node процес, подходящите инструменти са главно Ajv, Lighthouse CI CLI и Theme Check при налична тема.
+Here "without sign-ups" means without an external SaaS account. A self-hosted service may require a local administrator and an internal token. A local HTTP endpoint between our own containers does not mean a dependency on someone else's API. If we want everything in a single Node process, the suitable tools are mainly Ajv, the Lighthouse CI CLI and Theme Check when a theme is available.
 
-| Инструмент | Лиценз | Без външна регистрация/API | Добавяне в проекта | Оценка за нашия проект |
+| Tool | License | No external sign-up/API | Adding it to the project | Assessment for our project |
 | --- | --- | --- | --- | --- |
-| [Ajv](https://github.com/ajv-validator/ajv) | MIT | Да | Node dependency и локални JSON schemas | Най-лесно за инсталиране; миграцията на defaults/валидациите е отделна работа |
-| [Uptime Kuma](https://github.com/louislam/uptime-kuma) | MIT | Да; собствен локален администратор | Незадължителна Compose услуга и постоянен volume | Лесно разгръщане; трябва health endpoint, който измерва свеж heartbeat на scheduler-а |
-| [Lighthouse CI](https://github.com/GoogleChrome/lighthouse-ci) | Apache-2.0 | Да, локален Chrome и filesystem изход | `@lhci/cli`; `collect`/`assert`, `upload.target=filesystem` | CLI сравнително лесно; история с готов интерфейс изисква собствен LHCI server |
-| [Apprise](https://github.com/caronc/apprise) | BSD-2-Clause | Да за самия инструмент; зависи от канала | Python CLI, извикан от runner-а; няма нужда от Apprise API service | Умерено лесно, но добавя Python. Desktop известия без акаунт; Slack/Telegram и други външни канали изискват съответните credentials |
-| [Theme Check](https://github.com/Shopify/theme-tools/tree/main/packages/theme-check-node) | MIT | Да за проверка на налични локални файлове | `@shopify/theme-check-node` и отделен Shopify source adapter | Подходящ само с папка/checkout на темата; няма как да проверява Liquid от storefront URL |
-| [Argos](https://github.com/argos-ci/argos) | MIT | Hosted услугата не; самостоятелният вариант изисква оценка/адаптация | Цяла платформа, а не само Playwright пакет | Не е лесна добавка: dev Compose включва PostgreSQL, RabbitMQ, Redis и DynamoDB; конфигурацията съдържа външни auth/storage интеграции |
-| [Shopify Lighthouse CI Action](https://github.com/Shopify/lighthouse-ci-action) | MIT | Не в стандартния си workflow | GitHub Action в theme repository | Изисква Shopify app authentication и достъп до магазин; не отговаря на условието за локален frontend-only tester |
-| [CrUX API](https://developer.chrome.com/docs/crux/api) | Външна услуга; не е локална библиотека с CrUX данните | Не | Google Cloud API key и заявки | Изключваме при изискване без външни API; локалният Lighthouse не може да произведе реалните CrUX field данни |
+| [Ajv](https://github.com/ajv-validator/ajv) | MIT | Yes | A Node dependency and local JSON schemas | Easiest to install; migrating the defaults/validations is separate work |
+| [Uptime Kuma](https://github.com/louislam/uptime-kuma) | MIT | Yes; its own local administrator | An optional Compose service and a persistent volume | Easy to deploy; needs a health endpoint that measures a fresh scheduler heartbeat |
+| [Lighthouse CI](https://github.com/GoogleChrome/lighthouse-ci) | Apache-2.0 | Yes, local Chrome and filesystem output | `@lhci/cli`; `collect`/`assert`, `upload.target=filesystem` | The CLI is relatively easy; a history with a ready interface needs our own LHCI server |
+| [Apprise](https://github.com/caronc/apprise) | BSD-2-Clause | Yes for the tool itself; depends on the channel | A Python CLI called by the runner; no need for the Apprise API service | Moderately easy, but adds Python. Desktop notifications need no account; Slack/Telegram and other external channels need their own credentials |
+| [Theme Check](https://github.com/Shopify/theme-tools/tree/main/packages/theme-check-node) | MIT | Yes, for checking available local files | `@shopify/theme-check-node` and a separate Shopify source adapter | Suitable only with a theme folder/checkout; it cannot check Liquid from a storefront URL |
+| [Argos](https://github.com/argos-ci/argos) | MIT | The hosted service no; the self-hosted variant needs assessment/adaptation | A whole platform, not just a Playwright package | Not an easy add-on: the dev Compose includes PostgreSQL, RabbitMQ, Redis and DynamoDB; the configuration contains external auth/storage integrations |
+| [Shopify Lighthouse CI Action](https://github.com/Shopify/lighthouse-ci-action) | MIT | Not in its standard workflow | A GitHub Action in the theme repository | Requires Shopify app authentication and store access; does not meet the requirement for a local frontend-only tester |
+| [CrUX API](https://developer.chrome.com/docs/crux/api) | External service; not a local library holding the CrUX data | No | A Google Cloud API key and requests | Excluded if there must be no external APIs; local Lighthouse cannot produce real CrUX field data |
 
-**Предложен ред, като инженерна оценка:** Ajv → Uptime Kuma при постоянно работещ scheduler → Lighthouse CI само ако готовите assertions/история добавят стойност над текущите Lighthouse проверки → Apprise при конкретна нужда от канали. Theme Check остава незадължителен source модул. Argos отлагаме: вече имаме локално изрично одобряване на baseline по магазин, без качване на изображения.
+**Proposed order, as an engineering estimate:** Ajv → Uptime Kuma when the scheduler runs continuously → Lighthouse CI only if its ready assertions/history add value over the current Lighthouse checks → Apprise when a concrete need for channels arises. Theme Check stays an optional source module. We defer Argos: we already have local explicit baseline approval per store, without uploading images.
 
-За Uptime Kuma не е достатъчно control server да връща HTTP 200: работещ UI и спрял scheduler трябва да дават неуспешен scheduler health. Умишлена пауза/празен график трябва да се различават от забил процес. На една машина Kuma не може да изпрати сигнал, ако самата машина спре; независима собствена машина решава това без външен SaaS.
+For Uptime Kuma, it is not enough for the control server to return HTTP 200: a working UI with a stopped scheduler must produce a failing scheduler health. A deliberate pause or an empty schedule must be distinguishable from a hung process. On a single machine, Kuma cannot send a signal if the machine itself stops; an independent machine of our own solves this without an external SaaS.
 
-За Apprise локални desktop известия са подходящи на работната машина, не в headless Docker контейнер без desktop session. Email може да използва собствен или вече наличен SMTP, но остава зависим от него. Не добавяме акаунти за notification услуги автоматично.
+For Apprise, local desktop notifications suit the workstation, not a headless Docker container without a desktop session. Email can use our own or an already available SMTP server, but remains dependent on it. We do not add notification service accounts automatically.
 
-За LHCI изрично използваме filesystem, а не `temporary-public-storage`. За готовата историческа графика има [собствен LHCI server](https://github.com/GoogleChrome/lighthouse-ci/blob/main/docs/server.md), с локално създаден project/token; това не е регистрация във външна услуга. Не стартираме втори Lighthouse audit за същата цел без причина.
+For LHCI we explicitly use the filesystem, not `temporary-public-storage`. For a ready historical chart there is [our own LHCI server](https://github.com/GoogleChrome/lighthouse-ci/blob/main/docs/server.md), with a locally created project/token; this is not a sign-up with an external service. We do not start a second Lighthouse audit for the same purpose without a reason.
 
-Източници за уточненията: [LHCI конфигурация](https://github.com/GoogleChrome/lighthouse-ci/blob/main/docs/configuration.md), [Shopify Action authentication](https://github.com/Shopify/lighthouse-ci-action#authentication), [актуалният Theme Check Node пакет](https://github.com/Shopify/theme-tools/tree/main/packages/theme-check-node), [Argos development setup](https://github.com/argos-ci/argos/blob/main/CONTRIBUTING.md), [Argos Compose](https://github.com/argos-ci/argos/blob/main/docker-compose.yml), [Argos license](https://github.com/argos-ci/argos/blob/main/LICENSE).
+Sources for the clarifications: [LHCI configuration](https://github.com/GoogleChrome/lighthouse-ci/blob/main/docs/configuration.md), [Shopify Action authentication](https://github.com/Shopify/lighthouse-ci-action#authentication), [the current Theme Check Node package](https://github.com/Shopify/theme-tools/tree/main/packages/theme-check-node), [Argos development setup](https://github.com/argos-ci/argos/blob/main/CONTRIBUTING.md), [Argos Compose](https://github.com/argos-ci/argos/blob/main/docker-compose.yml), [Argos license](https://github.com/argos-ci/argos/blob/main/LICENSE).
 
-Това е проучване по официалните repository/docs и оценка спрямо нашия проект. Инструментите не са инсталирани или пробвани в този преглед.
+This is research from the official repositories/docs and an assessment against our project. The tools were not installed or tried in this review.
 
-CrUX показателите трябва да се представят отделно от локалните синтетични измервания. Липсващи field данни не означават добър или лош резултат.
+CrUX metrics must be presented separately from local synthetic measurements. Missing field data does not mean a good or a bad result.
 
-## Нови проверки с практическа стойност
+## New checks with practical value
 
-**Цена и наличност: реализирани за Shopify чрез публичната витрина.** Новият `33-commerce-consistency` проверява избрания вариант, активна/compare-at цена, JSON-LD оферта или диапазон, реално добавяне през UI, API и UI на количката, отстъпки и unavailable варианти. Неясни източници, неподдържани теми/планове и промени на данните остават `unverified`, без автоматичен успех. Команда: `pnpm test:commerce --site=<slug>`. Подробности: [Commerce checks](docs/COMMERCE.md). Валидацията мина с 54 unit теста, 26 локални commerce сценария и общите acceptance проверки; няма изпълнение към реален магазин.
+**Price and availability: implemented for Shopify through the public storefront.** The new `33-commerce-consistency` checks the selected variant, the active/compare-at price, the JSON-LD offer or range, a real add through the UI, the API and UI of the cart, discounts and unavailable variants. Unclear sources, unsupported themes/plans and data changes stay `unverified`, with no automatic pass. Command: `pnpm test:commerce --site=<slug>`. Details: [Commerce checks](docs/COMMERCE.md). Validation passed with 54 unit tests, 26 local commerce scenarios and the shared acceptance checks; nothing was run against a real store.
 
-WooCommerce е проучен с отделен агент и вече е добавен чрез отделни платформени адаптери/тестове. Планът и официалните източници са в [WOOCOMMERCE-RESEARCH-TEMP.md](WOOCOMMERCE-RESEARCH-TEMP.md).
+WooCommerce was researched with a separate agent and has been added through separate platform adapters/tests. The plan and the official sources are in [WOOCOMMERCE-RESEARCH-TEMP.md](WOOCOMMERCE-RESEARCH-TEMP.md).
 
-| Проверка | Какво доказва | Предложен приоритет |
+| Check | What it proves | Proposed priority |
 | --- | --- | --- |
-| Цена между UI, JSON-LD и количка | Клиентът и търсачките виждат съгласувана цена за съответния вариант и валута | Висок |
-| Наличност между UI и продукта | Наличен вариант може да се добави; изчерпан вариант се показва правилно | Висок |
-| Analytics събития | Очакваните product view и add-to-cart събития се изпращат с правилни данни | Среден |
-| Tracking преди и след consent | Предварително определени trackers спазват очакваното поведение при accept/reject | Среден |
-| По-широко SEO inventory — реализирано | Canonical, title/description, JSON-LD, visible H1, og:url, дубликати и canonical цели в цялото inventory; Shopify/WooCommerce | Среден |
-| Markets сценарии | Очакван език, валута и цени в избрани пазари | Среден |
-| Тестова поръчка в тестова среда | Завършен checkout и потвърждение | По-късен, отделно конфигуриран |
+| Price across the UI, JSON-LD and cart | Customers and search engines see a consistent price for the relevant variant and currency | High |
+| Availability between the UI and the product | An available variant can be added; a sold-out variant is displayed correctly | High |
+| Analytics events | The expected product view and add-to-cart events are sent with correct data | Medium |
+| Tracking before and after consent | Predefined trackers respect the expected behavior on accept/reject | Medium |
+| Broader SEO inventory — implemented | Canonical, title/description, JSON-LD, visible H1, og:url, duplicates and canonical targets across the whole inventory; Shopify/WooCommerce | Medium |
+| Markets scenarios | Expected language, currency and prices in selected markets | Medium |
+| Test order in a test environment | A completed checkout and confirmation | Later, configured separately |
 
-Analytics и consent проверките изискват очаквания за конкретните интеграции. За начало проверяваме наблюдаваните network заявки и payload-и, без да променяме production настройките. Това не доказва пълна правна съвместимост.
+The analytics and consent checks require expectations for the specific integrations. To start, we check the observed network requests and payloads, without changing production settings. This does not prove full legal compliance.
 
-**SEO inventory: реализирано.** `35-seo-inventory` обхожда зададените и откритите страници, събира всички проблеми в `seo-inventory.json` и различава грешки от предупреждения за преглед. Cart/search/noindex имат отделна политика. Команда: `pnpm test:seo --site=<slug>`. Обхват и ограничения: [docs/SEO.md](docs/SEO.md). Валидация: 13 локални SEO проверки, без реален магазин.
+**SEO inventory: implemented.** `35-seo-inventory` walks the configured and discovered pages, collects all problems in `seo-inventory.json` and distinguishes errors from warnings for review. Cart/search/noindex have a separate policy. Command: `pnpm test:seo --site=<slug>`. Scope and limitations: [docs/SEO.md](docs/SEO.md). Validation: 13 local SEO checks, with no real store.
 
-## Подобрения на панела и историята
+## Panel and history improvements
 
-- „Пусни сега“, чрез същата опашка и ограничения като планираните изпълнения.
-- Прогрес по стъпки и достъп до текущите логове.
-- Проблеми по критичност: блокирана покупка, основна функционалност, качество и препоръки.
-- Филтри по магазин, проверка, браузър, статус и период.
-- Изрични действия за приемане на spelling finding и визуална промяна.
-- История на конфигурационните промени.
-- Retention по дни и размер вместо само последните 30 runs; запазване на доказателствата за отворени проблеми.
-- При нарастване на историята: SQLite за runs, резултати, проблеми и известия, като големите artifacts остават файлове.
+- "Run now", through the same queue and limits as scheduled runs.
+- Progress by step and access to the current logs.
+- Problems by severity: blocked purchase, core functionality, quality and recommendations.
+- Filters by store, check, browser, status and period.
+- Explicit actions to accept a spelling finding and a visual change.
+- A history of configuration changes.
+- Retention by days and size instead of only the last 30 runs; keep the evidence for open problems.
+- As the history grows: SQLite for runs, results, problems and notifications, with the large artifacts staying files.
 
-SQLite има смисъл, когато търсенето и lifecycle-ът на проблемите станат неудобни върху JSON файлове. Текущият scheduler не се нуждае веднага от Redis или нова distributed queue.
+SQLite makes sense when searching and the problem lifecycle become awkward over JSON files. The current scheduler does not immediately need Redis or a new distributed queue.
 
-Ако панелът ще се използва през интернет от екип, добавяме удостоверяване и роли или защитен reverse proxy. Сегашният same-origin token не е потребителски login. За локална употреба запазваме простото стартиране.
+If the panel will be used over the internet by a team, we add authentication and roles, or a protected reverse proxy. The current same-origin token is not a user login. For local use we keep the simple startup.
 
-## Предложен ред на изпълнение
+## Proposed order of execution
 
-### Етап 1: Достоверни резултати
+### Stage 1: Trustworthy results
 
-1. Поправяне на checkout и empty-cart assertions.
-2. Поправяне на визуалните baseline пътища.
-3. CI с локалните проверки и разширен lint обхват.
-4. Съпоставими сравнения и постоянни `checkId`.
+1. Fix the checkout and empty-cart assertions.
+2. Fix the visual baseline paths.
+3. CI with the local checks and a wider lint scope.
+4. Comparable comparisons and stable `checkId`s.
 
-### Етап 2: Полезен ежедневен мониторинг
+### Stage 2: Useful daily monitoring
 
-1. Цялостен покупателен сценарий.
-2. Състояние на проблемите, известия и възстановяване.
-3. „Пусни сега“ през съществуващия scheduler.
-4. Независимо наблюдение на tester-а.
+1. An end-to-end buyer scenario.
+2. Problem state, notifications and recovery.
+3. "Run now" through the existing scheduler.
+4. Independent monitoring of the tester.
 
-### Етап 3: По-лесна употреба за няколко магазина
+### Stage 3: Easier use with several stores
 
-1. Автоматично откриване и валидиране при настройка.
-2. Theme профили и изрични capabilities.
-3. Филтри, доказателства и одобряване на findings в панела.
-4. По-подходящ retention и при нужда SQLite.
+1. Automatic discovery and validation during setup.
+2. Theme profiles and explicit capabilities.
+3. Filters, evidence and approval of findings in the panel.
+4. More suitable retention and, if needed, SQLite.
 
-### Етап 4: По-дълбоки audit функции
+### Stage 4: Deeper audit features
 
-1. Съгласуваност на цена и наличност.
-2. Analytics и consent поведение.
-3. CrUX field показатели.
-4. Theme Check при достъп до theme repository.
-5. Допълнителни пазари и тестови checkout сценарии.
+1. Price and availability consistency.
+2. Analytics and consent behavior.
+3. CrUX field metrics.
+4. Theme Check when access to the theme repository exists.
+5. Additional markets and test checkout scenarios.
 
-## Какво да запазим просто засега
+## What to keep simple for now
 
-- Използваме съществуващите Playwright, axe, Lighthouse и Tesseract интеграции.
-- Надграждаме scheduler-а; concurrency между магазини добавяме само при доказана нужда и с ограничения по origin.
-- Започваме с един notification канал, после разширяваме.
-- Правим автоматично откриване с ръчен fallback, вместо да обещаваме универсална поддръжка на всяка тема.
-- AI обобщения на проблемите може да има по-късно, но източникът на резултата остава проверката и доказателството.
+- Use the existing Playwright, axe, Lighthouse and Tesseract integrations.
+- Build on the scheduler; add concurrency between stores only when proven necessary and with per-origin limits.
+- Start with one notification channel, then expand.
+- Do automatic discovery with a manual fallback, instead of promising universal support for every theme.
+- AI summaries of problems may come later, but the source of the result stays the check and the evidence.
 
-Първата реализация с най-голяма стойност е: точни критични проверки, един покупателен сценарий, известие при проблем и ясна връзка към доказателствата.
+The first implementation with the greatest value is: precise critical checks, one buyer scenario, a notification on a problem and a clear link to the evidence.
 
-Фирмени изображения: на 10 октомври 2026 г. по изрична заявка са изтрити 175 локални image файла на реалния тестван магазин, включително шестте стари snapshots и запазените trace изображения/ресурси. По-старите Git commit-и не са пренаписвани.
+Company images: on October 10, 2026, at an explicit request, 175 local image files of the real tested store were deleted, including the six old snapshots and the saved trace images/resources. Older Git commits were not rewritten.
 
-## Реализирана WooCommerce поддръжка
+## Implemented WooCommerce support
 
-Добавени са изричен platform избор, Woo URL/ID inventory, public Store API/cart adapter, отделни tax/discount/precision правила, simple/variable/AJAX и classic/block сценарии. Shopify запазва старите конфигурации и cart правила; Woo не изпълнява Shopify suites или cart endpoints. Общите отчети, scheduler и визуални одобрения остават общи, а baseline fingerprint включва платформата. Настройка: [WooCommerce](docs/WOOCOMMERCE.md). Валидацията е локална; реални магазини не са посещавани.
+Added: an explicit platform choice, Woo URL/ID inventory, a public Store API/cart adapter, separate tax/discount/precision rules, simple/variable/AJAX and classic/block scenarios. Shopify keeps its old configurations and cart rules; Woo does not run Shopify suites or cart endpoints. The shared reports, scheduler and visual approvals stay shared, and the baseline fingerprint includes the platform. Setup: [WooCommerce](docs/WOOCOMMERCE.md). Validation is local; real stores were not visited.
 
-WooCommerce валидация: `pnpm check` мина с 61 unit теста и без TypeScript/lint errors. Общият локален acceptance пакет мина, включително Shopify regression, панел и platform selection; последните Woo промени са проверени с 22 loopback сценария. Проверени са cookie/token/nonce carts, AJAX вариации, tax/precision правила, липса на Shopify заявки и отказ от промяна на друга количка при token race. Реални Shopify/Woo магазини не са посещавани.
+WooCommerce validation: `pnpm check` passed with 61 unit tests and no TypeScript/lint errors. The shared local acceptance suite passed, including the Shopify regression, the panel and platform selection; the latest Woo changes were verified with 22 loopback scenarios. Checked: cookie/token/nonce carts, AJAX variations, tax/precision rules, the absence of Shopify requests and the refusal to modify another cart on a token race. Real Shopify/Woo stores were not visited.

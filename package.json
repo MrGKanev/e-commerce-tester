@@ -53,6 +53,8 @@
     "test:seo:local": "playwright test --config=checks/seo.config.ts",
     "test:journey": "bash run.sh --mode full --grep @journey",
     "test:journey:local": "node scripts/check-journey.js",
+    "test:a11y": "bash run.sh --mode full --grep @a11y",
+    "test:a11y:local": "playwright test --config=checks/a11y.config.ts",
     "test:claims:local": "node scripts/check-claims.js",
     "test:monitoring:local": "node scripts/check-monitoring.js"
   },

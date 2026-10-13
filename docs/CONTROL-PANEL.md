@@ -103,7 +103,7 @@ Choose Reports, a store and a finished run. The visual section shows each captur
 
 Select WooCommerce in Platform, enter one public product URL per line and adjust catalogue/cart/checkout paths. Specify cart tax display if auto detection is unavailable. These stores use the same schedules, reports and approvals as Shopify stores, with separate platform suites and API behavior. See [WooCommerce](WOOCOMMERCE.md).
 
-**Checkout expectations** задава дали checkout е разпознаваем/очакван, блокиран или неподдържан и дали contact/shipping полетата са required, not applicable или not verified yet. Причината се запазва с настройките. Custom field selectors и списъкът на адресните полета се задават в конфигурацията; виж [Checkout очаквания](CONFIGURATION.md#checkout-очаквания).
+**Checkout expectations** sets whether checkout is recognizable/expected, blocked or unsupported, and whether the contact/shipping fields are required, not applicable or not verified yet. The reason is saved with the settings. Custom field selectors and the list of address fields are set in the configuration; see [Checkout expectations](CONFIGURATION.md#checkout-expectations).
 
 ## Monitoring
 
