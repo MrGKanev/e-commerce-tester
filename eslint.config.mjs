@@ -16,6 +16,12 @@ export default tseslint.config(
       'playwright/no-force-option': 'warn',
       'playwright/no-standalone-expect': 'error',
 
+      // Off by design: tests skip/branch when a store lacks an optional feature
+      'playwright/no-conditional-in-test': 'off',
+      'playwright/no-conditional-expect': 'off',
+      'playwright/no-skipped-test': 'off',
+      'playwright/expect-expect': 'off',
+
       // TypeScript
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],

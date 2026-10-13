@@ -17,6 +17,7 @@ let orders = 0;
 let deletions = 0;
 type State = { handle: string; id: number | null; nonce: string };
 const states = new Map<string, State>();
+const raceReady = new Set<string>();
 const handles: Record<string, number> = {
   simple: 10,
   variable: 20,
@@ -176,7 +177,7 @@ function productHtml(handle: string, key: string) {
  </div></main><script type="application/ld+json">${JSON.stringify({ '@type': 'Product', name: p.name, url: p.permalink, offers })}</script><script>
  const form=document.querySelector('form'),button=form.querySelector('button'),token=${JSON.stringify('secret-cart-token-' + contextToken)};
  ${handle === 'token' ? `fetch('${api}/cart',{headers:{'Cart-Token':token}});` : ''}
- ${handle === 'race-token' ? `setTimeout(()=>fetch('${api}/cart',{headers:{'Cart-Token':token}}),80);` : ''}
+ ${handle === 'race-token' ? `const swap=async()=>{if((await(await fetch('/wp/race-ready')).text())==='1')fetch('${api}/cart',{headers:{'Cart-Token':token}});else setTimeout(swap,20)};swap();` : ''}
  const picker=form.querySelector('select');if(picker)picker.onchange=async()=>{const map={small:201,large:202,unavailable:203};let chosen=map[picker.value];${handle === 'ajax' ? `const response=await fetch('/wp/?wc-ajax=get_variation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({size:picker.value})});chosen=(await response.json()).variation_id;` : ''}form.querySelector('[name="variation_id"]').value=String(chosen||0);button.disabled=chosen===203||!chosen;document.querySelector('.single_variation .amount').textContent=chosen===202?'€24.00':'€12.00';document.querySelector('.woocommerce-variation-availability').textContent=chosen===203?'Out of stock':'In stock';};
  form.onsubmit=async(event)=>{event.preventDefault();const selected=Number(form.querySelector('[name="variation_id"]')?.value||button.value);await fetch(${JSON.stringify(block ? api + '/cart/add-item' : '/wp/?wc-ajax=add_to_cart')},{method:'POST',headers:{'Content-Type':'application/json',${block ? "'Cart-Token':token" : ''}},body:JSON.stringify({id:selected,quantity:Number(form.querySelector('[name="quantity"]').value)})});};
  </script></body></html>`;
@@ -232,8 +233,11 @@ test.beforeAll(async () => {
       return;
     }
     if (url.pathname === api + '/cart' || url.pathname === api + '/cart/items') {
-      if (state.handle === 'race-token' && !token)
-        await new Promise(resolve => setTimeout(resolve, 180));
+      if (state.handle === 'race-token' && !token) {
+        // Deterministic race: the frontend swaps its token only once this cookie cart read is in flight.
+        raceReady.add(key);
+        await new Promise(resolve => setTimeout(resolve, 400));
+      }
       if (state.handle === 'nonce') res.setHeader('Nonce', state.nonce);
       else res.setHeader('Cart-Token', 'secret-cart-token-' + key);
       if (req.method === 'DELETE') {
@@ -286,6 +290,11 @@ test.beforeAll(async () => {
       state.handle = match[1];
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.end(productHtml(state.handle, key));
+      return;
+    }
+    if (url.pathname === '/wp/race-ready') {
+      res.setHeader('Content-Type', 'text/plain');
+      res.end(raceReady.has(key) ? '1' : '0');
       return;
     }
     if (url.pathname === '/wp/basket/') {
