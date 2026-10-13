@@ -46,22 +46,18 @@
     "scheduler:check": "node scripts/scheduler.js --check",
     "scheduler:status": "node scripts/scheduler.js --status",
     "control": "node scripts/control-server.js",
-    "test:control:local": "pnpm build:css && node scripts/check-control.js",
+    "test:control:local": "node scripts/check-control.js",
     "test:seo": "bash run.sh --mode full --grep @seo",
     "test:seo:local": "playwright test --config=checks/seo.config.ts",
     "test:journey": "bash run.sh --mode full --grep @journey",
     "test:journey:local": "node scripts/check-journey.js",
-    "test:claims:local": "node scripts/check-claims.js",
-    "build:css": "tailwindcss -i web/tailwind.input.css -o web/tailwind.css --minify",
-    "watch:css": "tailwindcss -i web/tailwind.input.css -o web/tailwind.css --watch",
-    "precontrol": "pnpm build:css"
+    "test:claims:local": "node scripts/check-claims.js"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
     "@faker-js/faker": "^10.6.0",
-    "@playwright/test": "1.63.0",
-    "@tailwindcss/cli": "^4.3.3",
+    "@playwright/test": "1.64.0",
     "@types/node": "^26.6.4",
     "@types/nspell": "2.1.6",
     "dictionary-bg": "2.0.0",
@@ -74,7 +70,6 @@
     "nspell": "2.1.5",
     "playwright-lighthouse": "^4.0.0",
     "prettier": "^3.9.9",
-    "tailwindcss": "^4.3.3",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.71.1"
   },
