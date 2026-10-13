@@ -39,7 +39,10 @@ for (const sample of samples) {
   }));
   fs.writeFileSync(path.join(dir, 'index.html'), '<html lang="bg"><meta charset="utf-8"><h1>Демонстрационен отчет</h1><p>Това са примерни данни. Не са изпълнявани заявки към магазин.</p></html>');
 }
-const result = spawnSync(process.execPath, [path.join(root, 'scripts/update-history.js')], { stdio: 'inherit' });
+const result = spawnSync(process.execPath, [path.join(root, 'scripts/update-history.js')], {
+  stdio: 'inherit',
+  env: { ...process.env, TAILWIND_CSS: path.join(__dirname, '..', 'web', 'tailwind.css') },
+});
 if (result.status !== 0) process.exit(result.status || 1);
 const file = path.join(root, 'reports/dashboard.html');
 fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(/Store Health Dashboard/g, 'DEMO — Store Health Dashboard'));

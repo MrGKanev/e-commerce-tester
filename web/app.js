@@ -27,9 +27,62 @@ const modes = {
   full: 'Full · all regular checks',
   audit: 'Audit · Lighthouse & throttling',
 };
+// Shared Tailwind class sets. Every class is written out in full so the Tailwind compiler can detect it.
+const focusRing =
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600';
+const buttonBase = `inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`;
+const buttonKinds = {
+  primary: 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700',
+  quiet: 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+  accent: 'border-blue-200 bg-white text-blue-700 hover:bg-blue-50',
+  danger: 'border-red-200 bg-white text-red-700 hover:bg-red-50',
+};
+const buttonSizes = { md: 'px-4 py-2 text-sm', sm: 'px-3 py-1.5 text-xs' };
+const button = (kind = 'quiet', size = 'md') =>
+  `${buttonBase} ${buttonKinds[kind]} ${buttonSizes[size]}`;
+const labelClass = 'flex flex-col gap-1.5 text-sm font-medium text-slate-700';
+const inputClass =
+  'block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-500 [&[readonly]]:bg-slate-100 [&[readonly]]:text-slate-600 focus-visible:outline-2 focus-visible:outline-blue-600';
+const checkLabelClass = 'inline-flex items-center gap-2 py-1 text-sm font-normal text-slate-700';
+const checkboxClass = `size-4 rounded border-slate-300 accent-blue-600 ${focusRing}`;
+const helpClass = 'mt-3 text-sm text-slate-600';
+const summaryClass = `cursor-pointer rounded text-sm font-semibold text-slate-800 ${focusRing}`;
+const noticeClasses = {
+  info: 'mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 empty:hidden',
+  error:
+    'mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 empty:hidden',
+};
+const badgeTones = {
+  green: 'bg-green-100 text-green-800',
+  amber: 'bg-amber-100 text-amber-900',
+  blue: 'bg-blue-100 text-blue-800',
+  red: 'bg-red-100 text-red-800',
+  slate: 'bg-slate-100 text-slate-700',
+};
+const badge = (text, tone = 'slate') =>
+  `<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap ${badgeTones[tone]}">${escapeHTML(text)}</span>`;
+const statusTone = status =>
+  ({
+    running: 'blue',
+    stopping: 'amber',
+    queued: 'slate',
+    passed: 'green',
+    completed: 'green',
+    failed: 'red',
+    cancelled: 'slate',
+  })[status] || 'slate';
+const grid = body => `<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${body}</div>`;
+const help = text => `<p class="${helpClass}">${text}</p>`;
+const sectionBlock = (title, body, actions = '') =>
+  `<section class="mt-8 border-t border-slate-200 pt-6"><div class="mb-4 flex flex-wrap items-center justify-between gap-3"><h2 class="text-lg font-semibold text-slate-900">${title}</h2>${actions}</div>${body}</section>`;
+const disclosure = (title, body) =>
+  `<details class="mt-8 border-t border-slate-200 pt-5"><summary class="${summaryClass}">${title}</summary><div class="mt-4">${body}</div></details>`;
+function setNotice(element, text, error = false) {
+  element.textContent = text;
+  element.className = noticeClasses[error ? 'error' : 'info'];
+}
 function message(text, error = false) {
-  $('#message').textContent = text;
-  $('#message').classList.toggle('error', error);
+  setNotice($('#message'), text, error);
 }
 function changed() {
   dirty = true;
@@ -47,10 +100,18 @@ function writePath(path, value) {
   changed();
 }
 function field(label, path, value, type = 'text', scale = 1, extra = '') {
-  return `<label>${escapeHTML(label)}<input data-path="${escapeHTML(path)}" data-scale="${scale}" type="${type}" value="${escapeHTML(type === 'number' && value !== '' ? value / scale : value)}" ${type === 'number' ? 'min="0" step="any"' : ''} ${extra}></label>`;
+  return `<label class="${labelClass}">${escapeHTML(label)}<input class="${inputClass}" data-path="${escapeHTML(path)}" data-scale="${scale}" type="${type}" value="${escapeHTML(type === 'number' && value !== '' ? value / scale : value)}" ${type === 'number' ? 'min="0" step="any"' : ''} ${extra}></label>`;
+}
+function selectField(label, path, choices, current, extra = '', wide = false) {
+  return `<label class="${labelClass} ${wide ? 'sm:col-span-2' : ''}">${escapeHTML(label)}<select class="${inputClass}" aria-label="${escapeHTML(label)}" data-path="${escapeHTML(path)}" ${extra}>${choices
+    .map(
+      ([value, text]) =>
+        `<option value="${escapeHTML(value)}" ${current === value ? 'selected' : ''}>${escapeHTML(text)}</option>`,
+    )
+    .join('')}</select></label>`;
 }
 function checkbox(label, path, value) {
-  return `<label class="check"><input type="checkbox" data-path="${escapeHTML(path)}" ${value ? 'checked' : ''}>${escapeHTML(label)}</label>`;
+  return `<label class="${checkLabelClass}"><input class="${checkboxClass}" type="checkbox" data-path="${escapeHTML(path)}" ${value ? 'checked' : ''}>${escapeHTML(label)}</label>`;
 }
 function storeSchedule(site) {
   return (data.scheduler.sites[site.slug] ??= {});
@@ -60,10 +121,10 @@ function storeJobs(site) {
 }
 function renderList() {
   $('#store-list').innerHTML = data.sites
-    .map(
-      site =>
-        `<button class="store-item ${site.slug === selected ? 'active' : ''}" data-select="${escapeHTML(site.slug)}">${escapeHTML(site.name || site.slug)}<small>${escapeHTML(site.url || 'Enter a store address')} · ${storeSchedule(site).enabled === false ? 'Paused' : 'Enabled'}</small></button>`,
-    )
+    .map(site => {
+      const active = site.slug === selected;
+      return `<button class="w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold break-words ${active ? 'bg-blue-50 text-blue-800' : 'text-slate-700 hover:bg-slate-50'} ${focusRing}" ${active ? 'aria-current="true"' : ''} data-select="${escapeHTML(site.slug)}">${escapeHTML(site.name || site.slug)}<small class="mt-1 block text-xs font-normal break-words text-slate-600">${escapeHTML(site.url || 'Enter a store address')} · ${storeSchedule(site).enabled === false ? 'Paused' : 'Enabled'}</small></button>`;
+    })
     .join('');
 }
 function render() {
@@ -88,70 +149,108 @@ function render() {
   const spelling = site.spelling || {};
   const woo = site.platform === 'woocommerce';
   const products = woo
-    ? `<label class="full">WooCommerce product URLs<textarea aria-label="WooCommerce product URLs" data-path="${base}.commerce.productUrls" data-list>${escapeHTML((site.commerce?.productUrls || []).join('\n'))}</textarea></label>${field('Catalog path', `${base}.commerce.routes.catalog`, site.commerce?.routes?.catalog || 'shop/')}${field('Cart path', `${base}.commerce.routes.cart`, site.commerce?.routes?.cart || 'cart/')}${field('Checkout path', `${base}.commerce.routes.checkout`, site.commerce?.routes?.checkout || 'checkout/')}<label>Cart prices include tax<select aria-label="Cart prices include tax" data-path="${base}.commerce.taxDisplay">${[
-        ['auto', 'Detect from frontend'],
-        ['including', 'Including tax'],
-        ['excluding', 'Excluding tax'],
-      ]
-        .map(
-          ([value, label]) =>
-            `<option value="${value}" ${(site.commerce?.taxDisplay || 'auto') === value ? 'selected' : ''}>${label}</option>`,
-        )
-        .join('')}</select></label>`
+    ? `<label class="${labelClass} sm:col-span-2">WooCommerce product URLs<textarea class="${inputClass} min-h-24" aria-label="WooCommerce product URLs" data-path="${base}.commerce.productUrls" data-list>${escapeHTML((site.commerce?.productUrls || []).join('\n'))}</textarea></label>${field('Catalog path', `${base}.commerce.routes.catalog`, site.commerce?.routes?.catalog || 'shop/')}${field('Cart path', `${base}.commerce.routes.cart`, site.commerce?.routes?.cart || 'cart/')}${field('Checkout path', `${base}.commerce.routes.checkout`, site.commerce?.routes?.checkout || 'checkout/')}${selectField(
+        'Cart prices include tax',
+        `${base}.commerce.taxDisplay`,
+        [
+          ['auto', 'Detect from frontend'],
+          ['including', 'Including tax'],
+          ['excluding', 'Excluding tax'],
+        ],
+        site.commerce?.taxDisplay || 'auto',
+      )}`
     : `${field('First product URL or handle', `${base}.productHandle`, site.productHandle)}${field('Second product URL or handle', `${base}.productHandle2`, site.productHandle2)}`;
-  editor.innerHTML = `<div class="section-heading"><h2>${escapeHTML(site.name || 'Store settings')}</h2><span class="badge">${schedule.enabled === false ? 'Paused' : 'Scheduled'}</span></div>
-    <div class="grid">${field('Store name', `${base}.name`, site.name)}${field('Store address', `${base}.url`, site.url, 'url')}<label>Platform<select aria-label="Platform" data-path="${base}.platform"><option value="shopify" ${!woo ? 'selected' : ''}>Shopify</option><option value="woocommerce" ${woo ? 'selected' : ''}>WooCommerce</option></select></label>${products}${field('Search term', `${base}.searchTerm`, site.searchTerm)}${field('Report ID', `${base}.slug`, site.slug, 'text', 1, 'readonly')}${field('Language / locale', `${base}.locale`, site.locale || 'bg-BG')}${field('Timezone', `${base}.timezoneId`, site.timezoneId || 'Europe/Sofia')}</div>
-    <p class="help">${woo ? 'Enter one public product URL per line. Adjust the store paths to match its WordPress installation. Checks use the public Store API and never submit an order.' : 'Paste product addresses or enter the part after /products/. Use two products suitable for cart checks.'}</p>
-    <div class="section"><div class="section-heading"><h2>Check schedule</h2><button class="quiet" data-action="add-job">+ Add check</button></div>${checkbox('Enable scheduled checks for this store', `scheduler.sites.${site.slug}.enabled`, schedule.enabled !== false)}<p class="help">Intervals start after a check finishes. Only one store runs at a time.</p>
-    ${jobs.map((job, j) => renderJob(job, `${jobBase}.${j}`, j, site.timezoneId || 'Europe/Sofia')).join('')}
-    ${jobs.length ? '' : '<p class="help">Add at least one check before enabling this store.</p>'}</div>
-    ${renderCookieConsent(site, base)}
-    ${renderCheckoutPolicy(site, base)}
-    <details class="section"><summary>Content and request settings</summary><div class="grid section"><label>Spelling behavior<select data-path="${base}.spelling.mode">${['off', 'report', 'strict'].map(mode => `<option value="${mode}" ${(spelling.mode || 'report') === mode ? 'selected' : ''}>${mode}</option>`).join('')}</select></label><label>Accepted brand names and terms<textarea data-path="${base}.spelling.allowWords" data-list>${escapeHTML((spelling.allowWords || []).join('\n'))}</textarea></label></div><p class="help">Enter one accepted term per line. Strict spelling can fail for brand names or unknown words.</p><div class="grid">${renderPacing(schedule.pacing || {}, `scheduler.sites.${site.slug}.pacing`, true)}</div><p class="help">Blank fields inherit the general pauses.</p></details>
-    <div class="footer"><p class="help">Existing reports remain when a store is removed.</p><button class="danger" data-action="remove-store">Remove store</button></div>`;
+  const heading = `<div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-xl font-semibold break-words text-slate-900">${escapeHTML(site.name || 'Store settings')}</h2>${schedule.enabled === false ? badge('Paused', 'amber') : badge('Scheduled', 'green')}</div>`;
+  const basics = `<div class="mt-5">${grid(
+    `${field('Store name', `${base}.name`, site.name)}${field('Store address', `${base}.url`, site.url, 'url')}${selectField(
+      'Platform',
+      `${base}.platform`,
+      [
+        ['shopify', 'Shopify'],
+        ['woocommerce', 'WooCommerce'],
+      ],
+      woo ? 'woocommerce' : 'shopify',
+    )}${products}${field('Search term', `${base}.searchTerm`, site.searchTerm)}${field('Report ID', `${base}.slug`, site.slug, 'text', 1, 'readonly')}${field('Language / locale', `${base}.locale`, site.locale || 'bg-BG')}${field('Timezone', `${base}.timezoneId`, site.timezoneId || 'Europe/Sofia')}`,
+  )}${help(woo ? 'Enter one public product URL per line. Adjust the store paths to match its WordPress installation. Checks use the public Store API and never submit an order.' : 'Paste product addresses or enter the part after /products/. Use two products suitable for cart checks.')}</div>`;
+  const schedulePart = sectionBlock(
+    'Check schedule',
+    `${checkbox('Enable scheduled checks for this store', `scheduler.sites.${site.slug}.enabled`, schedule.enabled !== false)}<p class="text-sm text-slate-600">Intervals start after a check finishes. Only one store runs at a time.</p>${jobs.map((job, j) => renderJob(job, `${jobBase}.${j}`, j, site.timezoneId || 'Europe/Sofia')).join('')}${jobs.length ? '' : '<p class="mt-3 text-sm text-slate-600">Add at least one check before enabling this store.</p>'}`,
+    `<button class="${button('quiet', 'sm')}" data-action="add-job">+ Add check</button>`,
+  );
+  const content = disclosure(
+    'Content and request settings',
+    `${grid(
+      `${selectField(
+        'Spelling behavior',
+        `${base}.spelling.mode`,
+        ['off', 'report', 'strict'].map(mode => [mode, mode]),
+        spelling.mode || 'report',
+      )}<label class="${labelClass}">Accepted brand names and terms<textarea class="${inputClass} min-h-24" data-path="${base}.spelling.allowWords" data-list>${escapeHTML((spelling.allowWords || []).join('\n'))}</textarea></label>`,
+    )}${help('Enter one accepted term per line. Strict spelling can fail for brand names or unknown words.')}<div class="mt-4">${grid(renderPacing(schedule.pacing || {}, `scheduler.sites.${site.slug}.pacing`, true))}</div>${help('Blank fields inherit the general pauses.')}`,
+  );
+  const footer = `<div class="mt-8 flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between"><p class="text-sm text-slate-600">Existing reports remain when a store is removed.</p><button class="${button('danger')}" data-action="remove-store">Remove store</button></div>`;
+  editor.innerHTML = `${heading}${basics}${schedulePart}${renderCookieConsent(site, base)}${renderCheckoutPolicy(site, base)}${content}${footer}`;
   renderJobStatus();
 }
 function renderCookieConsent(site, base) {
   const consent = site.cookieConsent || {};
-  const inputClass =
-    'mt-1 w-full rounded-lg border border-solid border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-blue-600';
-  return `<section class="mt-6 border-t border-solid border-slate-200 pt-5" aria-label="Cookie consent settings"><h2 class="mb-2 text-lg font-semibold">Cookie consent</h2><p class="mb-4 text-sm text-slate-600">Choose how normal tests handle cookie banners. Accepted cookies and local storage are reused across the run. GDPR checks use fresh sessions to test consent separately.</p><div class="grid grid-cols-1 gap-4 sm:grid-cols-2"><label class="text-sm font-semibold">Cookie consent behavior<select aria-label="Cookie consent behavior" class="${inputClass}" data-path="${base}.cookieConsent.mode"><option value="accept-all" ${consent.mode !== 'none' ? 'selected' : ''}>Accept all cookies</option><option value="none" ${consent.mode === 'none' ? 'selected' : ''}>Leave banner untouched</option></select></label><label class="text-sm font-semibold">Wait for cookie banner (seconds)<input class="${inputClass}" type="number" min="0" max="30" step="0.1" data-scale="1000" data-path="${base}.cookieConsent.waitMs" value="${(consent.waitMs ?? 5000) / 1000}"></label><label class="text-sm font-semibold">Accept all button selector (optional)<input class="${inputClass}" data-optional data-path="${base}.selectors.consentAccept" value="${escapeHTML(site.selectors?.consentAccept || '')}" placeholder="#accept-all-cookies"></label><label class="text-sm font-semibold">Consent iframe selector (optional)<input class="${inputClass}" data-path="${base}.cookieConsent.frameSelector" value="${escapeHTML(consent.frameSelector || '')}" placeholder="iframe#cookie-consent"></label></div><p class="mt-3 text-sm text-slate-600">Leave selectors blank for common banners. For a custom banner, use the CSS selector of its Accept all button. Activity records whether consent was accepted or no button was found.</p></section>`;
+  return sectionBlock(
+    'Cookie consent',
+    `<p class="mb-4 text-sm text-slate-600">Choose how normal tests handle cookie banners. Accepted cookies and local storage are reused across the run. GDPR checks use fresh sessions to test consent separately.</p>${grid(
+      `${selectField(
+        'Cookie consent behavior',
+        `${base}.cookieConsent.mode`,
+        [
+          ['accept-all', 'Accept all cookies'],
+          ['none', 'Leave banner untouched'],
+        ],
+        consent.mode === 'none' ? 'none' : 'accept-all',
+      )}<label class="${labelClass}">Wait for cookie banner (seconds)<input class="${inputClass}" type="number" min="0" max="30" step="0.1" data-scale="1000" data-path="${base}.cookieConsent.waitMs" value="${(consent.waitMs ?? 5000) / 1000}"></label><label class="${labelClass}">Accept all button selector (optional)<input class="${inputClass}" data-optional data-path="${base}.selectors.consentAccept" value="${escapeHTML(site.selectors?.consentAccept || '')}" placeholder="#accept-all-cookies"></label><label class="${labelClass}">Consent iframe selector (optional)<input class="${inputClass}" data-path="${base}.cookieConsent.frameSelector" value="${escapeHTML(consent.frameSelector || '')}" placeholder="iframe#cookie-consent"></label>`,
+    )}${help('Leave selectors blank for common banners. For a custom banner, use the CSS selector of its Accept all button. Activity records whether consent was accepted or no button was found.')}`,
+  );
 }
 function renderCheckoutPolicy(site, base) {
   const policy = site.checkout || {};
   const select = (label, key, choices, fallback) =>
-    `<label>${label}<select aria-label="${label}" data-path="${base}.checkout.${key}">${choices.map(([value, text]) => `<option value="${value}" ${(policy[key] || fallback) === value ? 'selected' : ''}>${text}</option>`).join('')}</select></label>`;
+    selectField(label, `${base}.checkout.${key}`, choices, policy[key] || fallback);
   const expected = [
     ['required', 'Required'],
     ['not-applicable', 'Not applicable'],
     ['unverified', 'Not verified yet'],
   ];
-  return `<details class="section"><summary>Checkout expectations</summary><div class="grid section">${select(
-    'Checkout interface',
-    'mode',
-    [
-      ['auto', 'Detect supported interface'],
-      ['supported', 'Expect configured interface'],
-      ['unsupported', 'Unsupported provider'],
-      ['blocked', 'Access blocked'],
-    ],
-    'auto',
-  )}${select('Contact field expectation', 'contact', expected, 'required')}${select('Shipping address expectation', 'shippingAddress', expected, 'required')}${field('Checkout expectation reason', `${base}.checkout.reason`, policy.reason || '')}</div><p class="help">Required fields must be visible and usable. For digital products, shipping can be marked not applicable. Staged or inaccessible fields can be marked not verified yet. Custom field selectors and address requirements are available in the configuration.</p></details>`;
+  return disclosure(
+    'Checkout expectations',
+    `${grid(
+      `${select(
+        'Checkout interface',
+        'mode',
+        [
+          ['auto', 'Detect supported interface'],
+          ['supported', 'Expect configured interface'],
+          ['unsupported', 'Unsupported provider'],
+          ['blocked', 'Access blocked'],
+        ],
+        'auto',
+      )}${select('Contact field expectation', 'contact', expected, 'required')}${select('Shipping address expectation', 'shippingAddress', expected, 'required')}${field('Checkout expectation reason', `${base}.checkout.reason`, policy.reason || '')}`,
+    )}${help('Required fields must be visible and usable. For digital products, shipping can be marked not applicable. Staged or inaccessible fields can be marked not verified yet. Custom field selectors and address requirements are available in the configuration.')}`,
+  );
 }
 
 function renderJob(job, base, index, timezone) {
   const checkedProjects = job.projects || ['Desktop Chrome'];
   const window = job.window;
-  return `<div class="job"><div class="job-heading"><h3>Check ${index + 1}</h3><button class="quiet" data-remove-job="${index}" aria-label="Remove check ${index + 1}">Remove</button></div><div class="grid"><label class="full">What to check<select data-path="${base}.mode">${Object.entries(
-    modes,
-  )
-    .map(
-      ([value, label]) =>
-        `<option value="${value}" ${job.mode === value ? 'selected' : ''}>${label}</option>`,
-    )
-    .join(
+  const weekdays = window?.weekdays || [1, 2, 3, 4, 5, 6, 7];
+  const group = body => `<div class="mt-3 flex flex-wrap gap-x-5 gap-y-1">${body}</div>`;
+  return `<div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4"><div class="mb-4 flex items-center justify-between gap-3"><h3 class="text-sm font-semibold text-slate-900">Check ${index + 1}</h3><button class="${button('quiet', 'sm')}" data-remove-job="${index}" aria-label="Remove check ${index + 1}">Remove</button></div>${grid(
+    `${selectField(
+      'What to check',
+      `${base}.mode`,
+      Object.entries(modes),
+      job.mode,
       '',
-    )}</select></label>${field('At least (hours between checks)', `${base}.intervalMinutes.0`, job.intervalMinutes[0], 'number', 60)}${field('At most (hours between checks)', `${base}.intervalMinutes.1`, job.intervalMinutes[1], 'number', 60)}${field('Maximum run duration (hours)', `${base}.maxRunMinutes`, job.maxRunMinutes || data.scheduler.maxRunMinutes || 120, 'number', 60)}</div><p class="help">The next interval is chosen randomly within this range. Equal values give a fixed interval.</p><div class="checks">${projects.map(project => `<label class="check"><input type="checkbox" data-project="${escapeHTML(project)}" data-job="${index}" ${checkedProjects.includes(project) ? 'checked' : ''}>${escapeHTML(project)}</label>`).join('')}</div><label class="check"><input type="checkbox" data-window="${index}" ${window ? 'checked' : ''}>Only start within a time window</label>${window ? `<div class="grid section">${field('Window timezone', `${base}.window.timezone`, window.timezone || timezone)}${field('Start time', `${base}.window.start`, window.start, 'time')}${field('End time', `${base}.window.end`, window.end, 'time')}</div><div class="checks">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, d) => `<label class="check"><input type="checkbox" data-day="${d + 1}" data-job="${index}" ${(window.weekdays || [1, 2, 3, 4, 5, 6, 7]).includes(d + 1) ? 'checked' : ''}>${day}</label>`).join('')}</div>` : ''}<p class="status-note" data-job-status="${escapeHTML(job.id)}"></p></div>`;
+      true,
+    )}${field('At least (hours between checks)', `${base}.intervalMinutes.0`, job.intervalMinutes[0], 'number', 60)}${field('At most (hours between checks)', `${base}.intervalMinutes.1`, job.intervalMinutes[1], 'number', 60)}${field('Maximum run duration (hours)', `${base}.maxRunMinutes`, job.maxRunMinutes || data.scheduler.maxRunMinutes || 120, 'number', 60)}`,
+  )}${help('The next interval is chosen randomly within this range. Equal values give a fixed interval.')}${group(projects.map(project => `<label class="${checkLabelClass}"><input class="${checkboxClass}" type="checkbox" data-project="${escapeHTML(project)}" data-job="${index}" ${checkedProjects.includes(project) ? 'checked' : ''}>${escapeHTML(project)}</label>`).join(''))}<div class="mt-2"><label class="${checkLabelClass}"><input class="${checkboxClass}" type="checkbox" data-window="${index}" ${window ? 'checked' : ''}>Only start within a time window</label></div>${window ? `<div class="mt-3">${grid(`${field('Window timezone', `${base}.window.timezone`, window.timezone || timezone)}${field('Start time', `${base}.window.start`, window.start, 'time')}${field('End time', `${base}.window.end`, window.end, 'time')}`)}</div>${group(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, d) => `<label class="${checkLabelClass}"><input class="${checkboxClass}" type="checkbox" data-day="${d + 1}" data-job="${index}" ${weekdays.includes(d + 1) ? 'checked' : ''}>${day}</label>`).join(''))}` : ''}<p class="mt-3 text-xs text-slate-600" data-job-status="${escapeHTML(job.id)}"></p></div>`;
 }
 function renderPacing(values, base, optional = false) {
   return [
@@ -176,7 +275,7 @@ function renderGeneral() {
   const scheduler = data.scheduler,
     cooldown = scheduler.cooldown || {};
   $('#editor').innerHTML =
-    `<h2>Scheduling & pauses</h2><p class="muted">These settings apply across all stores. Store-specific request pauses take precedence.</p><div class="grid">${field('Spread first checks over (hours)', 'scheduler.startupSpreadMinutes', scheduler.startupSpreadMinutes ?? 60, 'number', 60)}${field('Pause between store runs (minutes)', 'scheduler.minGapMinutes', scheduler.minGapMinutes ?? 5, 'number')}${field('Maximum run duration (hours)', 'scheduler.maxRunMinutes', scheduler.maxRunMinutes ?? 120, 'number', 60)}</div><div class="section"><h2>When a store limits requests</h2><div class="grid">${field('First cooldown (hours)', 'scheduler.cooldown.rateLimitMinutes', cooldown.rateLimitMinutes ?? 360, 'number', 60)}${field('Maximum cooldown (hours)', 'scheduler.cooldown.maxRateLimitMinutes', cooldown.maxRateLimitMinutes ?? 10080, 'number', 60)}${field('Pause after failed checks (minutes)', 'scheduler.cooldown.failureMinutes', cooldown.failureMinutes ?? 30, 'number')}${field('Maximum failure pause (hours)', 'scheduler.cooldown.maxFailureMinutes', cooldown.maxFailureMinutes ?? 1440, 'number', 60)}</div><p class="help">Repeated failures double the pause up to the maximum. A longer Retry-After from the store is always respected.</p></div><div class="section"><h2>Request pacing</h2><div class="grid">${renderPacing(scheduler.pacing || {}, 'scheduler.pacing')}</div><p class="help">These pauses apply to tests and paced navigations/API requests. Static assets load normally.</p></div>`;
+    `<h2 class="text-xl font-semibold text-slate-900">Scheduling &amp; pauses</h2><p class="mt-1 mb-5 text-sm text-slate-600">These settings apply across all stores. Store-specific request pauses take precedence.</p>${grid(`${field('Spread first checks over (hours)', 'scheduler.startupSpreadMinutes', scheduler.startupSpreadMinutes ?? 60, 'number', 60)}${field('Pause between store runs (minutes)', 'scheduler.minGapMinutes', scheduler.minGapMinutes ?? 5, 'number')}${field('Maximum run duration (hours)', 'scheduler.maxRunMinutes', scheduler.maxRunMinutes ?? 120, 'number', 60)}`)}${sectionBlock('When a store limits requests', `${grid(`${field('First cooldown (hours)', 'scheduler.cooldown.rateLimitMinutes', cooldown.rateLimitMinutes ?? 360, 'number', 60)}${field('Maximum cooldown (hours)', 'scheduler.cooldown.maxRateLimitMinutes', cooldown.maxRateLimitMinutes ?? 10080, 'number', 60)}${field('Pause after failed checks (minutes)', 'scheduler.cooldown.failureMinutes', cooldown.failureMinutes ?? 30, 'number')}${field('Maximum failure pause (hours)', 'scheduler.cooldown.maxFailureMinutes', cooldown.maxFailureMinutes ?? 1440, 'number', 60)}`)}${help('Repeated failures double the pause up to the maximum. A longer Retry-After from the store is always respected.')}`)}${sectionBlock('Request pacing', `${grid(renderPacing(scheduler.pacing || {}, 'scheduler.pacing'))}${help('These pauses apply to tests and paced navigations/API requests. Static assets load normally.')}`)}`;
 }
 function addStore() {
   let number = Date.now();
@@ -445,6 +544,7 @@ window.addEventListener('beforeunload', event => {
 });
 setInterval(refreshStatus, 10000);
 
+const chipClass = `inline-flex shrink-0 cursor-pointer items-center rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-sm font-semibold whitespace-nowrap text-slate-700 hover:bg-slate-50 aria-pressed:border-blue-600 aria-pressed:bg-blue-600 aria-pressed:text-white ${focusRing}`;
 let reportGroups = [],
   reportStore = 'overview',
   reportRun = null;
@@ -474,11 +574,9 @@ function showSection(section, navigate = true) {
   for (const name of ['runs', 'reports', 'settings']) {
     const active = section === name;
     $(`#${name}-view`).hidden = !active;
-    $(`#${name}-tab`).classList.toggle('active', active);
     if (active) $(`#${name}-tab`).setAttribute('aria-current', 'page');
     else $(`#${name}-tab`).removeAttribute('aria-current');
   }
-  $('#reports-submenu').hidden = section !== 'reports';
   $('#reload').hidden = section !== 'settings';
   if (section === 'reports') refreshReports();
   if (section === 'runs') loadRunStores();
@@ -502,11 +600,11 @@ function displayReport(url, title) {
 function renderReports() {
   $('#visual-review').hidden = true;
   $('#reports-submenu').innerHTML =
-    `<button data-report-store="overview" class="${reportStore === 'overview' ? 'active' : ''}" aria-pressed="${reportStore === 'overview'}">Overview</button>` +
+    `<button data-report-store="overview" class="${chipClass}" aria-pressed="${reportStore === 'overview'}">Overview</button>` +
     reportGroups
       .map(
         group =>
-          `<button data-report-store="${escapeHTML(group.id)}" class="${reportStore === group.id ? 'active' : ''}" aria-pressed="${reportStore === group.id}">${escapeHTML(group.name)} <span class="badge">${group.runs.length}</span></button>`,
+          `<button data-report-store="${escapeHTML(group.id)}" class="${chipClass}" aria-pressed="${reportStore === group.id}">${escapeHTML(group.name)} <span class="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">${group.runs.length}</span></button>`,
       )
       .join('');
   const group = reportGroups.find(group => group.id === reportStore);
@@ -515,7 +613,7 @@ function renderReports() {
   $('#reports-title').textContent = group ? group.name + ' reports' : 'All stores · run history';
   if (!group) {
     $('#report-list').innerHTML =
-      '<h2>Summary</h2><p class="help">Select a store in the submenu to browse its individual runs.</p>';
+      '<p class="text-sm text-slate-600">Select a store above to browse its individual runs.</p>';
     $('#reports-message').textContent = reportGroups.length
       ? `${reportGroups.length} stores with saved reports.`
       : 'No reports yet. They will appear here after the first check.';
@@ -527,7 +625,7 @@ function renderReports() {
   $('#report-list').innerHTML = group.runs
     .map(
       run =>
-        `<button class="report-choice ${reportRun === run.id ? 'active' : ''}" data-report-run="${escapeHTML(run.id)}" aria-pressed="${reportRun === run.id}">${escapeHTML(run.id.replace('_', ' · ').replace(/-(\d{2})-(\d{2})-(\d{3})$/, ':$1:$2.$3'))}<small>${escapeHTML(run.status.replaceAll('-', ' '))}${run.mode ? ' · ' + escapeHTML(run.mode) : ''}<br>${run.passed} passed · ${run.failed} failed${run.reportUrl ? '' : ' · No HTML report'}</small></button>`,
+        `<button class="block w-52 shrink-0 cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 aria-pressed:border-blue-300 aria-pressed:bg-blue-50 aria-pressed:text-blue-800 ${focusRing}" data-report-run="${escapeHTML(run.id)}" aria-pressed="${reportRun === run.id}">${escapeHTML(run.id.replace('_', ' · ').replace(/-(\d{2})-(\d{2})-(\d{3})$/, ':$1:$2.$3'))}<small class="mt-1 block text-xs font-normal text-slate-600">${escapeHTML(run.status.replaceAll('-', ' '))}${run.mode ? ' · ' + escapeHTML(run.mode) : ''}<br>${run.passed} passed · ${run.failed} failed${run.reportUrl ? '' : ' · No HTML report'}</small></button>`,
     )
     .join('');
   const run = group.runs.find(run => run.id === reportRun);
@@ -623,8 +721,8 @@ async function refreshVisual(site, run) {
       .map(entry => {
         const enabled = result.complete && entry.status !== 'error' && !entry.currentlyApproved;
         const figure = (title, url) =>
-          `<figure><figcaption>${title}</figcaption>${url ? `<a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHTML(url)}" alt="${escapeHTML(title + ': ' + entry.name)}" loading="lazy"></a>` : '<p>No image available</p>'}</figure>`;
-        return `<article class="visual-card"><label class="check"><input type="checkbox" data-visual-id="${escapeHTML(entry.id)}" ${enabled ? '' : 'disabled'}>${escapeHTML(entry.name)} · ${escapeHTML(entry.project)} · Run result: ${escapeHTML(entry.status)}${entry.currentlyApproved ? ' · Already approved' : ''}</label><p class="help">Compared with version: ${escapeHTML(entry.baselineRevision || 'none')} · Allowed difference: ${entry.maxDiffPixelRatio * 100}%</p><div class="visual-grid">${figure('Baseline used by this run', entry.baselineUrl)}${figure('Candidate', entry.currentUrl)}${figure('Difference', entry.diffUrl)}${entry.approvedUrl && entry.baselineRevision !== result.revision ? figure('Currently approved', entry.approvedUrl) : ''}</div></article>`;
+          `<figure class="min-w-0"><figcaption class="mb-2 text-sm font-semibold text-slate-800">${title}</figcaption>${url ? `<a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" class="block rounded ${focusRing}"><img class="h-auto w-full rounded border border-slate-300" src="${escapeHTML(url)}" alt="${escapeHTML(title + ': ' + entry.name)}" loading="lazy"></a>` : '<p class="text-sm text-slate-600">No image available</p>'}</figure>`;
+        return `<article class="rounded-lg border border-slate-300 p-4"><label class="${checkLabelClass}"><input class="${checkboxClass}" type="checkbox" data-visual-id="${escapeHTML(entry.id)}" ${enabled ? '' : 'disabled'}>${escapeHTML(entry.name)} · ${escapeHTML(entry.project)} · Run result: ${escapeHTML(entry.status)}${entry.currentlyApproved ? ' · Already approved' : ''}</label><p class="mt-2 text-sm text-slate-600">Compared with version: ${escapeHTML(entry.baselineRevision || 'none')} · Allowed difference: ${entry.maxDiffPixelRatio * 100}%</p><div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">${figure('Baseline used by this run', entry.baselineUrl)}${figure('Candidate', entry.currentUrl)}${figure('Difference', entry.diffUrl)}${entry.approvedUrl && entry.baselineRevision !== result.revision ? figure('Currently approved', entry.approvedUrl) : ''}</div></article>`;
       })
       .join('');
     $('#approve-visual').disabled = true;
@@ -677,12 +775,11 @@ $('#run-mode').innerHTML = Object.entries(modes)
 $('#run-projects').innerHTML = projects
   .map(
     (project, index) =>
-      `<label class="check"><input type="checkbox" name="run-project" value="${escapeHTML(project)}" ${index === 0 ? 'checked' : ''}>${escapeHTML(project)}</label>`,
+      `<label class="${checkLabelClass}"><input class="${checkboxClass}" type="checkbox" name="run-project" value="${escapeHTML(project)}" ${index === 0 ? 'checked' : ''}>${escapeHTML(project)}</label>`,
   )
   .join('');
 function runsMessage(text, error = false) {
-  $('#runs-message').textContent = text;
-  $('#runs-message').classList.toggle('error', error);
+  setNotice($('#runs-message'), text, error);
 }
 async function loadRunStores() {
   try {
@@ -703,8 +800,20 @@ async function loadRunStores() {
     runsMessage(error.message, true);
   }
 }
+const emptyNote = text => `<p class="py-1 text-sm text-slate-600">${text}</p>`;
 function runCard(run, action = '', canForce = false) {
-  return `<article class="run-card flex-wrap"><button class="quiet run-select w-full whitespace-normal sm:w-auto sm:flex-1" data-run-select="${escapeHTML(run.id)}">${escapeHTML(run.name || run.site)} · ${escapeHTML(run.mode)}<small>${escapeHTML(run.source)} · ${escapeHTML(run.status)} · ${escapeHTML(run.projects.join(', '))}${run.waitReason ? '<br>' + escapeHTML(run.waitReason) + ' · Eligible: ' + escapeHTML(new Date(run.eligibleAt).toLocaleString()) : ''}</small></button>${canForce && !run.forced ? `<button class="rounded-lg border border-solid border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" data-run-force="${escapeHTML(run.id)}">Run now</button>` : ''}${run.forced && run.status === 'queued' ? '<span class="rounded-lg bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">Forced</span>' : ''}${action ? `<button class="quiet run-stop" data-run-cancel="${escapeHTML(run.id)}" ${run.status === 'stopping' ? 'disabled' : ''}>${action}</button>` : ''}</article>`;
+  const waiting = run.waitReason
+    ? `<br>${escapeHTML(run.waitReason)} · Eligible: ${escapeHTML(new Date(run.eligibleAt).toLocaleString())}`
+    : '';
+  const forced = run.forced && run.status === 'queued' ? badge('Forced', 'blue') : '';
+  const force =
+    canForce && !run.forced
+      ? `<button class="${button('accent', 'sm')}" data-run-force="${escapeHTML(run.id)}">Run now</button>`
+      : '';
+  const stop = action
+    ? `<button class="${button('danger', 'sm')}" data-run-cancel="${escapeHTML(run.id)}" ${run.status === 'stopping' ? 'disabled' : ''}>${action}</button>`
+    : '';
+  return `<article class="flex flex-col gap-2 border-b border-slate-200 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"><button class="min-w-0 flex-1 cursor-pointer rounded-lg px-2 py-1 text-left break-words hover:bg-slate-50 aria-[current=true]:bg-blue-50 ${focusRing}" ${run.id === selectedRun ? 'aria-current="true"' : ''} data-run-select="${escapeHTML(run.id)}"><span class="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-900">${escapeHTML(run.name || run.site)} · ${escapeHTML(run.mode)} ${badge(run.status, statusTone(run.status))} ${forced}</span><small class="mt-1 block text-xs text-slate-600">${escapeHTML(run.source)} · ${escapeHTML(run.projects.join(', '))}${waiting}</small></button><div class="flex shrink-0 flex-wrap gap-2">${force}${stop}</div></article>`;
 }
 async function refreshRuns() {
   if (runPolling) return;
@@ -713,23 +822,23 @@ async function refreshRuns() {
     const [runs, status] = await Promise.all([api('/api/runs'), api('/api/status')]);
     $('#run-active').innerHTML = runs.active
       ? runCard(runs.active, runs.active.status === 'stopping' ? 'Stopping…' : 'Stop run')
-      : '<p class="muted">No active run</p>';
+      : emptyNote('No active run');
     $('#run-pending').innerHTML = runs.pending.length
       ? runs.pending.map(run => runCard(run, 'Remove', true)).join('')
-      : '<p class="muted">Queue is empty</p>';
+      : emptyNote('Queue is empty');
     $('#run-scheduled').innerHTML =
       [...status.jobs]
         .sort((a, b) => (a.nextAt || Infinity) - (b.nextAt || Infinity))
         .map(
           job =>
-            `<p>${escapeHTML(job.site)} · ${escapeHTML(job.mode)}<br><small>Next eligible: ${job.nextAt ? escapeHTML(new Date(job.nextAt).toLocaleString()) : 'Waiting for scheduler'}</small></p>`,
+            `<p class="border-b border-slate-200 py-2 text-sm text-slate-800 last:border-b-0">${escapeHTML(job.site)} · ${escapeHTML(job.mode)}<small class="block text-xs text-slate-600">Next eligible: ${job.nextAt ? escapeHTML(new Date(job.nextAt).toLocaleString()) : 'Waiting for scheduler'}</small></p>`,
         )
-        .join('') || '<p class="muted">No scheduled checks</p>';
+        .join('') || emptyNote('No scheduled checks');
     $('#run-history').innerHTML =
       runs.history
         .slice(0, 15)
         .map(run => runCard(run))
-        .join('') || '<p class="muted">No completed runs yet</p>';
+        .join('') || emptyNote('No completed runs yet');
     if (!selectedRun && runs.active) selectedRun = runs.active.id;
     const liveRun = runs.active || runs.history[0];
     let liveDetail = null;
@@ -752,13 +861,14 @@ async function refreshRuns() {
     runPolling = false;
   }
 }
+const eventRowClass = 'border-b border-slate-100 py-1.5 text-sm break-words text-slate-800 last:border-b-0';
 function renderRunDetails({ run, events, log }) {
   $('#run-detail-title').textContent = `${run.name || run.site} · ${run.mode} · ${run.status}`;
   const last = type => events.findLast(event => event.type === type);
   const progress = events.findLast(event => typeof event.total === 'number');
   $('#run-progress').innerHTML = progress
-    ? `<p>${progress.completed} / ${progress.total} checks completed</p><progress max="${Math.max(progress.total, 1)}" value="${progress.completed}" aria-label="Checks completed"></progress>`
-    : '<p class="muted">Waiting for test progress…</p>';
+    ? `<p>${progress.completed} / ${progress.total} checks completed</p><progress class="mt-2 h-2 w-full overflow-hidden rounded-full [&::-moz-progress-bar]:bg-blue-600 [&::-webkit-progress-bar]:bg-slate-200 [&::-webkit-progress-value]:bg-blue-600" max="${Math.max(progress.total, 1)}" value="${progress.completed}" aria-label="Checks completed"></progress>`
+    : emptyNote('Waiting for test progress…');
   const test = last('test'),
     step = events.findLast(event => event.type === 'step' && (!test || event.time >= test.time)),
     url = events.findLast(event => event.type === 'url' && (!test || event.time >= test.time));
@@ -771,7 +881,10 @@ function renderRunDetails({ run, events, log }) {
     ['Started', run.startedAt ? new Date(run.startedAt).toLocaleString() : ''],
     ['Finished', run.finishedAt ? new Date(run.finishedAt).toLocaleString() : ''],
   ]
-    .map(([label, value]) => `<dt>${label}</dt><dd>${escapeHTML(value || '—')}</dd>`)
+    .map(
+      ([label, value]) =>
+        `<div class="border-b border-slate-100 py-2 sm:grid sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-3"><dt class="font-semibold text-slate-700">${label}</dt><dd class="text-slate-900">${escapeHTML(value || '—')}</dd></div>`,
+    )
     .join('');
   const list = $('#run-events'),
     atBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 30;
@@ -780,9 +893,9 @@ function renderRunDetails({ run, events, log }) {
       .slice(-60)
       .map(
         event =>
-          `<p><time>${escapeHTML(new Date(event.time).toLocaleTimeString())}</time> ${escapeHTML(event.type)} · ${escapeHTML(event.url || event.title || `${event.completed || 0} / ${event.total || 0}`)}${event.status ? ' · ' + escapeHTML(event.status) : ''}</p>`,
+          `<p class="${eventRowClass}"><time class="tabular-nums text-slate-600">${escapeHTML(new Date(event.time).toLocaleTimeString())}</time> ${escapeHTML(event.type)} · ${escapeHTML(event.url || event.title || `${event.completed || 0} / ${event.total || 0}`)}${event.status ? ' · ' + escapeHTML(event.status) : ''}</p>`,
       )
-      .join('') || '<p class="muted">Activity appears when checks start.</p>';
+      .join('') || `<p class="${eventRowClass} text-slate-600">Activity appears when checks start.</p>`;
   if (atBottom) list.scrollTop = list.scrollHeight;
   $('#run-log').textContent = log || 'No runner output yet.';
 }
@@ -867,7 +980,7 @@ function renderActivity(runs, status, detail) {
   $('#activity-state').textContent =
     `${status.healthy ? '● Worker online' : '○ Worker offline'} · ${run ? `${run.name || run.site} · ${run.mode} · ${run.status}` : 'No active run'} · ${runs.pending.length} queued`;
   $('#activity-controls').innerHTML = run
-    ? `<button class="quiet run-stop" data-run-cancel="${escapeHTML(run.id)}" ${run.status === 'stopping' ? 'disabled' : ''}>${run.status === 'stopping' ? 'Stopping…' : 'Stop run'}</button>`
+    ? `<button class="${button('danger', 'sm')}" data-run-cancel="${escapeHTML(run.id)}" ${run.status === 'stopping' ? 'disabled' : ''}>${run.status === 'stopping' ? 'Stopping…' : 'Stop run'}</button>`
     : '';
   const events = detail?.events || [];
   const test = events.findLast(event => event.type === 'test');
@@ -883,12 +996,23 @@ function renderActivity(runs, status, detail) {
       .slice(-30)
       .map(
         event =>
-          `<p><time>${escapeHTML(new Date(event.time).toLocaleTimeString())}</time> ${escapeHTML(event.url || event.title || `${event.completed || 0}/${event.total || 0} checks`)}${event.status ? ' · ' + escapeHTML(event.status) : ''}</p>`,
+          `<p class="${eventRowClass}"><time class="tabular-nums text-slate-600">${escapeHTML(new Date(event.time).toLocaleTimeString())}</time> ${escapeHTML(event.url || event.title || `${event.completed || 0}/${event.total || 0} checks`)}${event.status ? ' · ' + escapeHTML(event.status) : ''}</p>`,
       )
-      .join('') || '<p class="muted">Activity will appear here when a run starts.</p>';
+      .join('') || `<p class="${eventRowClass} text-slate-600">Activity will appear here when a run starts.</p>`;
   if (atBottom) feed.scrollTop = feed.scrollHeight;
 }
 $('#activity-open').addEventListener('click', () => showSection('runs'));
+function setActivityDetails(open) {
+  $('#activity-details').hidden = !open;
+  $('#activity-toggle').setAttribute('aria-expanded', String(open));
+  $('#activity-toggle').textContent = open ? 'Hide details' : 'Show details';
+  localStorage.setItem('activity-details', open ? 'open' : 'closed');
+}
+$('#activity-toggle').addEventListener('click', () =>
+  setActivityDetails($('#activity-details').hidden),
+);
+// Collapsed by default so the persistent bar keeps the page usable; the choice is remembered.
+setActivityDetails(localStorage.getItem('activity-details') === 'open');
 
 for (const section of ['settings', 'reports', 'runs']) {
   $(`#${section}-tab`).addEventListener('click', event => {

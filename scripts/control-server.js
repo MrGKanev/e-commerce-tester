@@ -261,7 +261,7 @@ function createControlServer({
         )
       )
         return staticFile(response, webDir, 'index.html');
-      if (['/app.js', '/style.css', '/tailwind.css'].includes(decoded))
+      if (['/app.js', '/tailwind.css'].includes(decoded))
         return staticFile(response, webDir, decoded.slice(1));
       return json(response, 404, { error: 'File not found' });
     } catch (error) {

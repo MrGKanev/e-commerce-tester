@@ -4,173 +4,356 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Store Health</title>
-    <link rel="stylesheet" href="/style.css" />
+    <link rel="icon" href="data:," />
     <link rel="stylesheet" href="/tailwind.css" />
     <script src="/app.js" defer></script>
   </head>
-  <body>
-    <header>
-      <a class="brand" href="/">● Store Health</a>
-      <nav>
-        <a id="runs-tab" class="nav-tab" href="/runs">Runs</a>
-        <a id="reports-tab" class="nav-tab" href="/reports" aria-controls="reports-submenu"
-          >Reports</a
+  <body class="flex min-h-screen flex-col bg-slate-50 text-base text-slate-900 antialiased">
+    <header class="border-b border-slate-200 bg-white">
+      <div
+        class="mx-auto flex w-full max-w-screen-2xl flex-wrap items-center gap-x-6 px-4 sm:px-6 lg:px-8"
+      >
+        <a
+          class="flex items-center gap-2 py-3 text-base font-bold tracking-tight text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          href="/"
+          ><span class="size-2.5 rounded-full bg-blue-600" aria-hidden="true"></span>Store
+          Health</a
         >
-        <a id="settings-tab" class="nav-tab" href="/settings">Settings</a>
-        <button id="reload" class="quiet">Reload settings</button>
-      </nav>
+        <nav
+          aria-label="Main"
+          class="order-last -mx-1 flex w-full gap-1 overflow-x-auto sm:order-none sm:mx-0 sm:w-auto"
+        >
+          <a
+            id="runs-tab"
+            class="inline-flex items-center border-b-2 border-transparent px-3 py-3.5 text-sm font-semibold text-slate-600 hover:text-slate-900 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-600 aria-[current=page]:border-blue-600 aria-[current=page]:text-blue-700"
+            href="/runs"
+            >Runs</a
+          >
+          <a
+            id="reports-tab"
+            class="inline-flex items-center border-b-2 border-transparent px-3 py-3.5 text-sm font-semibold text-slate-600 hover:text-slate-900 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-600 aria-[current=page]:border-blue-600 aria-[current=page]:text-blue-700"
+            href="/reports"
+            aria-controls="reports-submenu"
+            >Reports</a
+          >
+          <a
+            id="settings-tab"
+            class="inline-flex items-center border-b-2 border-transparent px-3 py-3.5 text-sm font-semibold text-slate-600 hover:text-slate-900 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-600 aria-[current=page]:border-blue-600 aria-[current=page]:text-blue-700"
+            href="/settings"
+            >Settings</a
+          >
+        </nav>
+        <button
+          id="reload"
+          class="ml-auto inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Reload settings
+        </button>
+      </div>
     </header>
-    <nav id="reports-submenu" class="report-submenu" aria-label="Report stores" hidden></nav>
-    <main>
+    <main class="mx-auto w-full max-w-screen-2xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
       <section id="runs-view" hidden aria-label="Manual runs and queue">
-        <div class="heading">
-          <div>
-            <p class="eyebrow">RUN CONTROL</p>
-            <h1>Runs & queue</h1>
-            <p class="muted">Run saved stores manually, follow each check and stop when needed.</p>
-          </div>
-        </div>
-        <p id="runs-message" role="status" aria-live="polite"></p>
-        <form id="run-form" class="panel">
-          <div class="grid">
-            <label>Saved store<select id="run-store" required></select></label
-            ><label>Checks<select id="run-mode"></select></label>
-          </div>
-          <fieldset>
-            <legend>Browsers</legend>
-            <div id="run-projects" class="checks"></div>
-          </fieldset>
-          <p class="help">
-            Manual runs also work for paused stores. Save store edits in Settings first. Runs
-            execute one at a time and respect request pauses, gaps and cooldowns.
+        <div class="min-w-0">
+          <p class="text-xs font-semibold tracking-widest text-blue-700 uppercase">Run control</p>
+          <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            Runs &amp; queue
+          </h1>
+          <p class="mt-1 text-sm text-slate-600">
+            Run saved stores manually, follow each check and stop when needed.
           </p>
-          <div class="flex flex-wrap gap-2">
-            <button id="enqueue-run" type="submit">Add to queue</button>
+        </div>
+        <p
+          id="runs-message"
+          role="status"
+          aria-live="polite"
+          class="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 empty:hidden"
+        ></p>
+        <form
+          id="run-form"
+          class="mt-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
+        >
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label class="flex flex-col gap-1.5 text-sm font-medium text-slate-700"
+              >Saved store<select
+                id="run-store"
+                required
+                class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:outline-2 focus-visible:outline-blue-600"
+              ></select></label
+            ><label class="flex flex-col gap-1.5 text-sm font-medium text-slate-700"
+              >Checks<select
+                id="run-mode"
+                class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus-visible:outline-2 focus-visible:outline-blue-600"
+              ></select
+            ></label>
+          </div>
+          <fieldset class="mt-4 min-w-0">
+            <legend class="text-sm font-medium text-slate-700">Browsers</legend>
+            <div id="run-projects" class="mt-2 flex flex-wrap gap-x-5 gap-y-2"></div>
+          </fieldset>
+          <p class="mt-4 text-sm text-slate-600">
+            Manual runs also work for paused stores. Save store edits in Settings first. Runs
+            execute one at a time and respect request pauses, gaps and cooldowns. “Run now” skips
+            the pauses and cooldowns and starts as soon as the current run finishes.
+          </p>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button
+              id="enqueue-run"
+              type="submit"
+              class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Add to queue
+            </button>
             <button
               id="run-now"
               type="submit"
-              class="rounded-lg border border-solid border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 disabled:opacity-50"
+              class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Run now
             </button>
           </div>
         </form>
-        <div class="run-layout">
-          <section class="panel">
-            <h2>Active run</h2>
-            <div id="run-active">No active run</div>
-            <h2>Queue</h2>
-            <div id="run-pending"></div>
-            <details>
-              <summary>Upcoming scheduled checks</summary>
-              <div id="run-scheduled"></div>
+        <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+          <section
+            class="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
+            aria-label="Queue"
+          >
+            <h2 class="text-base font-semibold text-slate-900">Active run</h2>
+            <div id="run-active" class="mt-2 text-sm">No active run</div>
+            <h2 class="mt-6 text-base font-semibold text-slate-900">Queue</h2>
+            <div id="run-pending" class="mt-2 text-sm"></div>
+            <details class="mt-4">
+              <summary
+                class="cursor-pointer rounded text-sm font-semibold text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+              >
+                Upcoming scheduled checks
+              </summary>
+              <div id="run-scheduled" class="mt-2 text-sm"></div>
             </details>
-            <h2>Recent runs</h2>
-            <div id="run-history"></div>
+            <h2 class="mt-6 text-base font-semibold text-slate-900">Recent runs</h2>
+            <div id="run-history" class="mt-2 text-sm"></div>
           </section>
-          <section class="panel" aria-label="Run details">
-            <h2 id="run-detail-title">Live details</h2>
-            <div id="run-progress"></div>
-            <dl id="run-current"></dl>
-            <section>
-              <h3>Activity</h3>
-              <div id="run-events" class="run-events"></div>
+          <section
+            class="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
+            aria-label="Run details"
+          >
+            <h2 id="run-detail-title" class="text-base font-semibold break-words text-slate-900">
+              Live details
+            </h2>
+            <div id="run-progress" class="mt-3 text-sm text-slate-700"></div>
+            <dl id="run-current" class="mt-3 text-sm break-words"></dl>
+            <section class="mt-6">
+              <h3 class="text-sm font-semibold text-slate-900">Activity</h3>
+              <div
+                id="run-events"
+                class="mt-2 max-h-80 overflow-auto rounded-lg border border-slate-200 px-3"
+                tabindex="0"
+                aria-label="Run activity"
+              ></div>
             </section>
-            <details>
-              <summary>Runner output</summary>
-              <pre id="run-log" tabindex="0"></pre>
+            <details class="mt-4">
+              <summary
+                class="cursor-pointer rounded text-sm font-semibold text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+              >
+                Runner output
+              </summary>
+              <pre
+                id="run-log"
+                tabindex="0"
+                class="mt-2 max-h-80 overflow-auto rounded-lg bg-slate-100 p-3 text-xs break-words whitespace-pre-wrap text-slate-800"
+              ></pre>
             </details>
           </section>
         </div>
       </section>
       <section id="reports-view" hidden aria-label="Reports">
-        <div class="heading">
-          <div>
-            <p class="eyebrow">REPORTS</p>
-            <h1 id="reports-title">Run history</h1>
-            <p class="muted">Choose a store above and a report below.</p>
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div class="min-w-0">
+            <h1
+              id="reports-title"
+              class="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl"
+            >
+              Run history
+            </h1>
+            <p id="reports-message" role="status" class="mt-1 text-sm text-slate-600"></p>
           </div>
           <div class="flex flex-wrap items-center gap-2">
-            <button id="refresh-reports" class="quiet">Refresh reports</button>
+            <button
+              id="refresh-reports"
+              class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Refresh reports
+            </button>
             <button
               id="delete-report"
-              class="rounded-lg border border-solid border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:opacity-50"
+              class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:cursor-not-allowed disabled:opacity-50"
               disabled
             >
               Delete report
             </button>
             <button
               id="delete-store-reports"
-              class="rounded-lg border border-solid border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:opacity-50"
+              class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:cursor-not-allowed disabled:opacity-50"
               disabled
             >
               Delete all store reports
             </button>
           </div>
         </div>
-        <p id="reports-message" role="status"></p>
-        <div class="report-layout">
-          <aside id="report-list" aria-label="Available reports"></aside>
-          <section class="report-viewer">
-            <section id="visual-review" hidden aria-label="Visual baseline approval">
-              <h2>Visual baseline</h2>
-              <p id="visual-summary" class="help"></p>
-              <p>
+        <nav
+          id="reports-submenu"
+          aria-label="Report stores"
+          class="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0"
+        ></nav>
+        <div class="mt-3 grid grid-cols-1 gap-3">
+          <div
+            id="report-list"
+            aria-label="Available reports"
+            class="flex min-w-0 gap-2 overflow-x-auto pb-1"
+          ></div>
+          <section
+            class="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+          >
+            <section
+              id="visual-review"
+              hidden
+              aria-label="Visual baseline approval"
+              class="border-b border-slate-200 p-4 sm:p-6"
+            >
+              <h2 class="text-base font-semibold text-slate-900">Visual baseline</h2>
+              <p id="visual-summary" class="mt-1 text-sm text-slate-600"></p>
+              <p class="mt-1 text-sm text-slate-600">
                 Only explicitly approved images become the reference for this store. Runs never
                 replace them automatically.
               </p>
-              <div id="visual-images"></div>
-              <button id="approve-visual" disabled>Approve selected screenshots</button>
-              <p id="visual-message" role="status" aria-live="polite"></p>
+              <div id="visual-images" class="mt-4 space-y-4"></div>
+              <button
+                id="approve-visual"
+                class="mt-4 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled
+              >
+                Approve selected screenshots
+              </button>
+              <p
+                id="visual-message"
+                role="status"
+                aria-live="polite"
+                class="mt-3 text-sm text-slate-700"
+              ></p>
             </section>
-            <p id="report-empty" class="welcome">Choose a report to preview.</p>
-            <iframe id="report-frame" title="Report preview" hidden></iframe>
+            <p id="report-empty" class="px-6 py-16 text-center text-sm text-slate-600">
+              Choose a report to preview.
+            </p>
+            <iframe
+              id="report-frame"
+              title="Report preview"
+              class="block h-[calc(100vh_-_17rem)] min-h-[32rem] w-full border-0 bg-white"
+              hidden
+            ></iframe>
           </section>
         </div>
       </section>
       <div id="settings-view" hidden>
-        <div class="heading">
-          <div>
-            <p class="eyebrow">CONTROL PANEL</p>
-            <h1>Stores & schedules</h1>
-            <p class="muted">Choose what to check and when. Changes apply after the current run.</p>
+        <div
+          class="sticky top-0 z-20 -mx-4 border-b border-slate-200 bg-slate-50/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+        >
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
+              <p
+                class="hidden text-xs font-semibold tracking-widest text-blue-700 uppercase sm:block"
+              >
+                Control panel
+              </p>
+              <h1 class="text-xl font-bold tracking-tight text-slate-900 sm:mt-1 sm:text-3xl">
+                Stores &amp; schedules
+              </h1>
+              <p class="mt-1 hidden text-sm text-slate-600 sm:block">
+                Choose what to check and when. Changes apply after the current run.
+              </p>
+            </div>
+            <button
+              id="save"
+              disabled
+              class="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Save changes
+            </button>
           </div>
-          <button id="save" disabled>Save changes</button>
         </div>
-        <p id="message" role="status" aria-live="polite"></p>
-        <section class="status-strip" aria-label="Scheduler status">
+        <p
+          id="message"
+          role="status"
+          aria-live="polite"
+          class="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 empty:hidden"
+        ></p>
+        <section
+          class="mt-4 flex flex-col gap-1 rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-700 sm:flex-row sm:justify-between"
+          aria-label="Scheduler status"
+        >
           <span id="worker">Connecting…</span><span id="active">No active check</span>
         </section>
-        <div class="layout">
-          <aside>
-            <div class="list-heading">
-              <h2>Stores</h2>
-              <button id="add-store" class="quiet">+ Add</button>
+        <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
+          <aside
+            class="self-start rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-28"
+          >
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <h2 class="text-sm font-semibold text-slate-900">Stores</h2>
+              <button
+                id="add-store"
+                class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                + Add
+              </button>
             </div>
-            <div id="store-list"></div>
-            <button id="general" class="general quiet">Scheduling & pauses</button>
-            <details class="import">
-              <summary>Import existing configuration</summary>
-              <p class="muted">Optional: choose your existing store and scheduler files.</p>
-              <label
-                >Store file<input
-                  id="import-sites"
-                  type="file"
-                  accept=".json,application/json" /></label
-              ><label
-                >Scheduler file<input
-                  id="import-scheduler"
-                  type="file"
-                  accept=".json,application/json" /></label
-              ><button id="import" class="quiet">Load files into editor</button>
+            <div id="store-list" class="flex flex-col gap-1"></div>
+            <button
+              id="general"
+              class="mt-4 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Scheduling &amp; pauses
+            </button>
+            <details class="mt-4">
+              <summary
+                class="cursor-pointer rounded text-sm font-semibold text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+              >
+                Import existing configuration
+              </summary>
+              <p class="mt-3 text-sm text-slate-600">
+                Optional: choose your existing store and scheduler files.
+              </p>
+              <div class="mt-3 space-y-3">
+                <label class="flex flex-col gap-1.5 text-sm font-medium text-slate-700"
+                  >Store file<input
+                    id="import-sites"
+                    type="file"
+                    accept=".json,application/json"
+                    class="block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border file:border-slate-300 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-slate-700" /></label
+                ><label class="flex flex-col gap-1.5 text-sm font-medium text-slate-700"
+                  >Scheduler file<input
+                    id="import-scheduler"
+                    type="file"
+                    accept=".json,application/json"
+                    class="block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border file:border-slate-300 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-slate-700"
+                /></label>
+                <button
+                  id="import"
+                  class="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Load files into editor
+                </button>
+              </div>
             </details>
           </aside>
-          <section id="editor" class="panel" aria-label="Settings editor"></section>
+          <section
+            id="editor"
+            class="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
+            aria-label="Settings editor"
+          ></section>
         </div>
       </div>
-      <footer class="project-footer">
+      <footer class="mt-10 text-center text-sm text-slate-600">
         Built by Gabriel Kanev ·
         <a
+          class="rounded text-blue-700 underline underline-offset-2 hover:text-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
           href="https://github.com/MrGKanev/e-commerce-tester"
           target="_blank"
           rel="noopener noreferrer"
@@ -178,29 +361,67 @@
         >
       </footer>
     </main>
-    <section id="activity-dock" aria-label="Live activity">
-      <div class="activity-overview">
-        <div class="activity-heading">
-          <strong>Activity</strong><button id="activity-open" class="quiet">Open queue</button>
-          <div id="activity-controls"></div>
+    <section
+      id="activity-dock"
+      aria-label="Live activity"
+      class="sticky bottom-0 z-30 border-t border-slate-300 bg-white shadow-[0_-4px_16px_rgba(15,23,42,0.08)]"
+    >
+      <div class="mx-auto w-full max-w-screen-2xl px-4 py-2 sm:px-6 lg:px-8">
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <strong class="text-sm text-slate-900">Activity</strong>
+          <div class="min-w-0 flex-1 basis-48 text-sm">
+            <p id="activity-state" class="break-words text-slate-800">Connecting…</p>
+            <p id="activity-test" class="truncate text-xs text-slate-600">No active test</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <div id="activity-controls" class="flex gap-2"></div>
+            <button
+              id="activity-open"
+              class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Open queue
+            </button>
+            <button
+              id="activity-toggle"
+              aria-expanded="false"
+              aria-controls="activity-details"
+              class="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Show details
+            </button>
+          </div>
         </div>
-        <p id="activity-state">Connecting…</p>
-        <p id="activity-test" class="help">No active test</p>
-        <p id="activity-url" class="help"></p>
-      </div>
-      <div id="activity-feed" class="run-events" aria-label="Latest activity" tabindex="0">
-        <p class="muted">Activity will appear here when a run starts.</p>
+        <div id="activity-details" hidden class="mt-2 grid grid-cols-1 gap-3 pb-1 md:grid-cols-2">
+          <p id="activity-url" class="min-w-0 text-xs break-words text-slate-600"></p>
+          <div
+            id="activity-feed"
+            tabindex="0"
+            aria-label="Latest activity"
+            class="max-h-40 overflow-auto rounded-lg border border-slate-200 px-3 md:col-span-2"
+          >
+            <p class="py-1.5 text-sm text-slate-600">Activity will appear here when a run starts.</p>
+          </div>
+        </div>
       </div>
     </section>
     <template id="welcome"
-      ><div class="welcome">
-        <span class="welcome-icon">＋</span>
-        <h2>Add your first store</h2>
-        <p>
-          Enter its address and two product handles, then choose a schedule.<br />Nothing runs until
-          you save an enabled schedule.
+      ><div class="px-4 py-16 text-center">
+        <span
+          class="inline-grid size-14 place-items-center rounded-2xl bg-blue-50 text-3xl text-blue-700"
+          aria-hidden="true"
+          >＋</span
+        >
+        <h2 class="mt-4 text-xl font-semibold text-slate-900">Add your first store</h2>
+        <p class="mx-auto mt-2 max-w-md text-sm text-slate-600">
+          Enter its address and two product handles, then choose a schedule. Nothing runs until you
+          save an enabled schedule.
         </p>
-        <button id="welcome-add">Add a store</button>
+        <button
+          id="welcome-add"
+          class="mt-5 inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Add a store
+        </button>
       </div></template
     >
   </body>
