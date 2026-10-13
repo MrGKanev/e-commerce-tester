@@ -7,6 +7,7 @@ const { randomUUID } = require('node:crypto');
 const { spawn } = require('node:child_process');
 const { loadSites } = require('./site-config');
 const model = require('./scheduler-model');
+const queueStore = require('./run-queue');
 const { readConfiguration } = require('./managed-config');
 const root = path.join(__dirname, '..');
 function atomicWrite(file, value) {
@@ -112,7 +113,7 @@ function signalGroup(child, signal) {
 async function runChild(job, settings, control) {
   return new Promise(resolve => {
     const args = [
-      path.join(root, 'scripts/run-sites.js'),
+      settings.runnerFile || path.join(root, 'scripts/run-sites.js'),
       '--sites-file',
       settings.sitesFile,
       '--site',
@@ -123,10 +124,24 @@ async function runChild(job, settings, control) {
     ];
     const child = spawn(process.execPath, args, {
       cwd: root,
-      stdio: 'inherit',
+      stdio: ['ignore', 'pipe', 'pipe'],
       detached: process.platform !== 'win32',
-      env: { ...process.env, ...job.pacing, RATE_LIMIT_DIR: settings.limitDir },
+      env: {
+        ...process.env,
+        ...job.pacing,
+        RATE_LIMIT_DIR: settings.limitDir,
+        CONTROL_EVENTS_FILE: settings.eventsFile,
+      },
     });
+    for (const [stream, output] of [
+      [child.stdout, process.stdout],
+      [child.stderr, process.stderr],
+    ]) {
+      stream.on('data', chunk => {
+        output.write(chunk);
+        if (settings.logFile) fs.appendFileSync(settings.logFile, chunk);
+      });
+    }
     let outcome = '';
     let killTimer;
     let settled = false;
@@ -152,9 +167,10 @@ async function runChild(job, settings, control) {
     child.once('exit', code => settle(code));
   });
 }
-async function main(args = process.argv.slice(2)) {
+async function main(args = process.argv.slice(2), { runnerFile } = {}) {
   if (fs.existsSync(path.join(root, '.env'))) process.loadEnvFile(path.join(root, '.env'));
   const settings = options(args);
+  settings.runnerFile = runnerFile;
   let managed = settings.managedConfig ? readConfiguration(settings.managedConfig) : null;
   let sites = managed
     ? managed.sites
@@ -242,6 +258,71 @@ async function main(args = process.argv.slice(2)) {
     });
   }
   let heartbeatTimer;
+  let commandTimer;
+  const queueFile = path.join(settings.stateDir, 'runs.json');
+  const runs = queueStore.readQueue(settings.stateDir);
+  const logDirectory = path.join(settings.stateDir, 'run-logs');
+  fs.mkdirSync(logDirectory, { recursive: true });
+  function saveRuns() {
+    atomicWrite(queueFile, runs);
+  }
+  function completeRun(status) {
+    delete runs.active.job;
+    delete runs.active.sites;
+    runs.active.status = status;
+    runs.active.finishedAt = Date.now();
+    runs.history.unshift(runs.active);
+    runs.history = runs.history.slice(0, 50);
+    runs.active = null;
+    saveRuns();
+  }
+  if (runs.active) completeRun('interrupted');
+  function commands() {
+    const directory = path.join(settings.stateDir, 'commands');
+    if (!fs.existsSync(directory)) return;
+    const files = fs.readdirSync(directory).filter(file => file.endsWith('.json'));
+    const inputs = files
+      .map(file => ({
+        file,
+        command: JSON.parse(fs.readFileSync(path.join(directory, file), 'utf8')),
+      }))
+      .sort(
+        (a, b) => a.command.submittedAt - b.command.submittedAt || a.file.localeCompare(b.file),
+      );
+    for (const { file, command } of inputs) {
+      if (
+        command.action === 'enqueue' &&
+        ![runs.active, ...runs.pending, ...runs.history].some(run => run?.id === command.run.id)
+      ) {
+        runs.pending.push(command.run);
+      } else if (command.action === 'cancel') {
+        if (runs.active?.id === command.id) {
+          runs.active.status = 'stopping';
+          control.stopChild?.('cancelled');
+        } else {
+          const index = runs.pending.findIndex(run => run.id === command.id);
+          if (index >= 0) {
+            const [run] = runs.pending.splice(index, 1);
+            delete run.job;
+            delete run.sites;
+            runs.history.unshift({ ...run, status: 'cancelled', finishedAt: Date.now() });
+            runs.history = runs.history.slice(0, 50);
+          }
+        }
+      }
+      saveRuns();
+      fs.unlinkSync(path.join(directory, file));
+    }
+    if (inputs.length) control.wake?.();
+  }
+  function pollCommands() {
+    try {
+      commands();
+    } catch (error) {
+      console.error(`[scheduler] Queue: ${error.message}`);
+      stop();
+    }
+  }
   try {
     // Read again after taking the lock, in case another scheduler just finished.
     state = loadState(stateFile);
@@ -249,6 +330,8 @@ async function main(args = process.argv.slice(2)) {
     save();
     ingestLimits();
     heartbeat();
+    saveRuns();
+    commandTimer = setInterval(pollCommands, 500);
     heartbeatTimer = setInterval(() => {
       try {
         heartbeat();
@@ -290,7 +373,8 @@ async function main(args = process.argv.slice(2)) {
           continue;
         }
       }
-      if (!config.jobs.length) {
+      commands();
+      if (!config.jobs.length && !runs.pending.length) {
         await new Promise(resolve => {
           const timer = setTimeout(done, 5000);
           function done() {
@@ -303,8 +387,28 @@ async function main(args = process.argv.slice(2)) {
         continue;
       }
       ingestLimits();
-      const job = model.nextJob(state, config, Date.now());
-      const due = model.readyAt(state, job, Date.now());
+      const manual = runs.pending[0];
+      const job = manual ? manual.job : model.nextJob(state, config, Date.now());
+      if (manual && !state.origins[job.origin])
+        state.origins[job.origin] = {
+          blockedUntil: 0,
+          rateLimitStreak: 0,
+          failureStreak: 0,
+          marker: '',
+        };
+      const due = manual
+        ? Math.max(state.origins[job.origin].blockedUntil, state.nextDispatchAt)
+        : model.readyAt(state, job, Date.now());
+      if (manual && manual.eligibleAt !== due) {
+        manual.eligibleAt = due;
+        manual.waitReason =
+          state.origins[job.origin].blockedUntil > Date.now()
+            ? 'Store cooldown'
+            : state.nextDispatchAt > Date.now()
+              ? 'Pause between runs'
+              : '';
+        saveRuns();
+      }
       if (due > Date.now()) {
         await new Promise(resolve => {
           const timer = setTimeout(
@@ -320,30 +424,55 @@ async function main(args = process.argv.slice(2)) {
         });
         continue;
       }
+      runs.active = manual
+        ? runs.pending.shift()
+        : {
+            id: randomUUID(),
+            source: 'scheduled',
+            site: job.site,
+            name: job.site,
+            mode: job.mode,
+            projects: job.projects,
+            queuedAt: Date.now(),
+          };
+      runs.active.status = 'running';
+      runs.active.startedAt = Date.now();
+      saveRuns();
       state.running = { key: job.key, origin: job.origin, startedAt: Date.now() };
       save();
       console.log(`[scheduler] ${job.key}: starting ${job.mode}`);
       const before = state.origins[job.origin].marker;
-      let runSettings = settings;
+      let runSettings = {
+        ...settings,
+        logFile: path.join(logDirectory, `${runs.active.id}.log`),
+        eventsFile: path.join(logDirectory, `${runs.active.id}.events`),
+      };
       if (settings.managedConfig) {
         const snapshot = path.join(settings.stateDir, 'run-sites.json');
         atomicWrite(
           snapshot,
-          sites.map(({ settings: ignored, ...site }) => site),
+          manual ? manual.sites : sites.map(({ settings: ignored, ...site }) => site),
         );
-        runSettings = { ...settings, sitesFile: snapshot };
+        runSettings = { ...runSettings, sitesFile: snapshot };
       }
       const outcome = await runChild(job, runSettings, control);
       ingestLimits();
       const rateLimited = before !== state.origins[job.origin].marker;
-      model.finish(state, job, config, Date.now(), outcome, rateLimited);
+      if (manual) {
+        const previous = state.jobs[job.key];
+        model.finish(state, job, config, Date.now(), outcome, rateLimited);
+        if (previous) state.jobs[job.key] = previous;
+        else delete state.jobs[job.key];
+      } else model.finish(state, job, config, Date.now(), outcome, rateLimited);
+      completeRun(rateLimited ? 'rate-limit' : outcome);
       save();
       console.log(
-        `[scheduler] ${job.key}: ${state.jobs[job.key].lastOutcome}; next eligible ${new Date(model.readyAt(state, job, Date.now())).toISOString()}`,
+        `[scheduler] ${job.key}: ${outcome}${manual ? '' : '; next eligible ' + new Date(model.readyAt(state, job, Date.now())).toISOString()}`,
       );
     }
   } finally {
     clearInterval(heartbeatTimer);
+    clearInterval(commandTimer);
     process.off('SIGTERM', stop);
     process.off('SIGINT', stop);
     lock.release();

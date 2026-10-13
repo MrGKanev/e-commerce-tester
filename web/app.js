@@ -216,6 +216,7 @@ async function load() {
   message('');
   render();
   await refreshStatus();
+  await refreshRuns();
 }
 function renderJobStatus() {
   if (!schedulerStatus) return;
@@ -435,23 +436,45 @@ window.addEventListener('beforeunload', event => {
     event.returnValue = '';
   }
 });
-load().catch(error => message(error.message, true));
 setInterval(refreshStatus, 10000);
 
 let reportGroups = [],
   reportStore = 'overview',
   reportRun = null;
-function showSection(section) {
-  const reports = section === 'reports';
-  $('#settings-view').hidden = reports;
-  $('#reports-view').hidden = !reports;
-  $('#reports-submenu').hidden = !reports;
-  $('#settings-tab').classList.toggle('active', !reports);
-  $('#reports-tab').classList.toggle('active', reports);
-  $('#settings-tab').setAttribute('aria-pressed', String(!reports));
-  $('#reports-tab').setAttribute('aria-pressed', String(reports));
-  $('#reload').hidden = reports;
-  if (reports) refreshReports();
+function sectionURL(section) {
+  const url = new URL(`/${section}`, location.origin);
+  if (section === 'reports' && reportStore !== 'overview') {
+    url.searchParams.set('store', reportStore);
+    if (reportRun) url.searchParams.set('run', reportRun);
+  }
+  if (section === 'runs' && selectedRun) url.searchParams.set('run', selectedRun);
+  return url.pathname + url.search;
+}
+function updateLocation(section) {
+  const url = sectionURL(section);
+  if (location.pathname + location.search !== url) history.pushState(null, '', url);
+}
+function restoreLocation() {
+  const url = new URL(location.href);
+  const section = url.pathname.split('/')[1] || 'settings';
+  reportStore = url.searchParams.get('store') || 'overview';
+  reportRun = url.searchParams.get('run');
+  selectedRun = section === 'runs' ? url.searchParams.get('run') : null;
+  showSection(section, false);
+}
+function showSection(section, navigate = true) {
+  if (navigate) updateLocation(section);
+  for (const name of ['settings', 'reports', 'runs']) {
+    const active = section === name;
+    $(`#${name}-view`).hidden = !active;
+    $(`#${name}-tab`).classList.toggle('active', active);
+    if (active) $(`#${name}-tab`).setAttribute('aria-current', 'page');
+    else $(`#${name}-tab`).removeAttribute('aria-current');
+  }
+  $('#reports-submenu').hidden = section !== 'reports';
+  $('#reload').hidden = section !== 'settings';
+  if (section === 'reports') refreshReports();
+  if (section === 'runs') loadRunStores();
 }
 function displayReport(url, title) {
   const frame = $('#report-frame');
@@ -513,14 +536,14 @@ async function refreshReports() {
     $('#reports-message').textContent = error.message;
   }
 }
-$('#reports-tab').addEventListener('click', () => showSection('reports'));
-$('#settings-tab').addEventListener('click', () => showSection('settings'));
+
 $('#refresh-reports').addEventListener('click', refreshReports);
 $('#reports-submenu').addEventListener('click', event => {
   const button = event.target.closest('[data-report-store]');
   if (button) {
     reportStore = button.dataset.reportStore;
     reportRun = null;
+    updateLocation('reports');
     renderReports();
   }
 });
@@ -528,6 +551,7 @@ $('#report-list').addEventListener('click', event => {
   const button = event.target.closest('[data-report-run]');
   if (button) {
     reportRun = button.dataset.reportRun;
+    updateLocation('reports');
     renderReports();
   }
 });
@@ -599,3 +623,215 @@ $('#approve-visual').addEventListener('click', async () => {
     $('#approve-visual').disabled = false;
   }
 });
+
+let selectedRun = null,
+  runPolling = false;
+$('#run-mode').innerHTML = Object.entries(modes)
+  .map(([mode, title]) => `<option value="${mode}">${title}</option>`)
+  .join('');
+$('#run-projects').innerHTML = projects
+  .map(
+    (project, index) =>
+      `<label class="check"><input type="checkbox" name="run-project" value="${escapeHTML(project)}" ${index === 0 ? 'checked' : ''}>${escapeHTML(project)}</label>`,
+  )
+  .join('');
+function runsMessage(text, error = false) {
+  $('#runs-message').textContent = text;
+  $('#runs-message').classList.toggle('error', error);
+}
+async function loadRunStores() {
+  try {
+    const saved = await api('/api/config');
+    const previous = $('#run-store').value;
+    $('#run-store').innerHTML = saved.sites.length
+      ? saved.sites
+          .map(
+            site =>
+              `<option value="${escapeHTML(site.slug)}">${escapeHTML(site.name || site.slug)}</option>`,
+          )
+          .join('')
+      : '<option value="">Add and save a store in Settings first</option>';
+    if (saved.sites.some(site => site.slug === previous)) $('#run-store').value = previous;
+    $('#enqueue-run').disabled = !saved.sites.length;
+    await refreshRuns();
+  } catch (error) {
+    runsMessage(error.message, true);
+  }
+}
+function runCard(run, action = '') {
+  return `<article class="run-card"><button class="quiet run-select" data-run-select="${escapeHTML(run.id)}">${escapeHTML(run.name || run.site)} · ${escapeHTML(run.mode)}<small>${escapeHTML(run.source)} · ${escapeHTML(run.status)} · ${escapeHTML(run.projects.join(', '))}${run.waitReason ? '<br>' + escapeHTML(run.waitReason) + ' · Eligible: ' + escapeHTML(new Date(run.eligibleAt).toLocaleString()) : ''}</small></button>${action ? `<button class="quiet run-stop" data-run-cancel="${escapeHTML(run.id)}" ${run.status === 'stopping' ? 'disabled' : ''}>${action}</button>` : ''}</article>`;
+}
+async function refreshRuns() {
+  if (runPolling) return;
+  runPolling = true;
+  try {
+    const [runs, status] = await Promise.all([api('/api/runs'), api('/api/status')]);
+    $('#run-active').innerHTML = runs.active
+      ? runCard(runs.active, runs.active.status === 'stopping' ? 'Stopping…' : 'Stop run')
+      : '<p class="muted">No active run</p>';
+    $('#run-pending').innerHTML = runs.pending.length
+      ? runs.pending.map(run => runCard(run, 'Remove')).join('')
+      : '<p class="muted">Queue is empty</p>';
+    $('#run-scheduled').innerHTML =
+      [...status.jobs]
+        .sort((a, b) => (a.nextAt || Infinity) - (b.nextAt || Infinity))
+        .map(
+          job =>
+            `<p>${escapeHTML(job.site)} · ${escapeHTML(job.mode)}<br><small>Next eligible: ${job.nextAt ? escapeHTML(new Date(job.nextAt).toLocaleString()) : 'Waiting for scheduler'}</small></p>`,
+        )
+        .join('') || '<p class="muted">No scheduled checks</p>';
+    $('#run-history').innerHTML =
+      runs.history
+        .slice(0, 15)
+        .map(run => runCard(run))
+        .join('') || '<p class="muted">No completed runs yet</p>';
+    if (!selectedRun && runs.active) selectedRun = runs.active.id;
+    const liveRun = runs.active || runs.history[0];
+    let liveDetail = null;
+    if (liveRun) liveDetail = await api(`/api/runs/details?id=${encodeURIComponent(liveRun.id)}`);
+    renderActivity(runs, status, liveDetail);
+    const selected = [runs.active, ...runs.pending, ...runs.history].find(
+      run => run?.id === selectedRun,
+    );
+    if (selected && !$('#runs-view').hidden) {
+      const detail =
+        selectedRun === liveRun?.id
+          ? liveDetail
+          : await api(`/api/runs/details?id=${encodeURIComponent(selectedRun)}`);
+      renderRunDetails(detail);
+    }
+  } catch (error) {
+    runsMessage(`Live updates unavailable: ${error.message}`, true);
+    $('#activity-state').textContent = 'Connection unavailable · reconnecting…';
+  } finally {
+    runPolling = false;
+  }
+}
+function renderRunDetails({ run, events, log }) {
+  $('#run-detail-title').textContent = `${run.name || run.site} · ${run.mode} · ${run.status}`;
+  const last = type => events.findLast(event => event.type === type);
+  const progress = events.findLast(event => typeof event.total === 'number');
+  $('#run-progress').innerHTML = progress
+    ? `<p>${progress.completed} / ${progress.total} checks completed</p><progress max="${Math.max(progress.total, 1)}" value="${progress.completed}" aria-label="Checks completed"></progress>`
+    : '<p class="muted">Waiting for test progress…</p>';
+  const test = last('test'),
+    step = events.findLast(event => event.type === 'step' && (!test || event.time >= test.time)),
+    url = events.findLast(event => event.type === 'url' && (!test || event.time >= test.time));
+  $('#run-current').innerHTML = [
+    ['Test', test?.title],
+    ['Browser / file', test ? `${test.project} / ${test.file}` : ''],
+    ['Step', step?.title],
+    ['URL / API', url?.url],
+    ['Last result', last('result')?.status],
+    ['Started', run.startedAt ? new Date(run.startedAt).toLocaleString() : ''],
+    ['Finished', run.finishedAt ? new Date(run.finishedAt).toLocaleString() : ''],
+  ]
+    .map(([label, value]) => `<dt>${label}</dt><dd>${escapeHTML(value || '—')}</dd>`)
+    .join('');
+  const list = $('#run-events'),
+    atBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 30;
+  list.innerHTML =
+    events
+      .slice(-60)
+      .map(
+        event =>
+          `<p><time>${escapeHTML(new Date(event.time).toLocaleTimeString())}</time> ${escapeHTML(event.type)} · ${escapeHTML(event.url || event.title || `${event.completed || 0} / ${event.total || 0}`)}${event.status ? ' · ' + escapeHTML(event.status) : ''}</p>`,
+      )
+      .join('') || '<p class="muted">Activity appears when checks start.</p>';
+  if (atBottom) list.scrollTop = list.scrollHeight;
+  $('#run-log').textContent = log || 'No runner output yet.';
+}
+
+$('#run-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const button = $('#enqueue-run');
+  button.disabled = true;
+  try {
+    const selectedProjects = [...document.querySelectorAll('[name="run-project"]:checked')].map(
+      input => input.value,
+    );
+    if (!selectedProjects.length) throw new Error('Select at least one browser');
+    await api('/api/runs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Control-Token': token },
+      body: JSON.stringify({
+        site: $('#run-store').value,
+        mode: $('#run-mode').value,
+        projects: selectedProjects,
+      }),
+    });
+    runsMessage('Run submitted. It will appear in the queue within a second.');
+    selectedRun = null;
+    await refreshRuns();
+  } catch (error) {
+    runsMessage(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+});
+document.addEventListener('click', async event => {
+  const select = event.target.closest('[data-run-select]');
+  if (select) {
+    selectedRun = select.dataset.runSelect;
+    updateLocation('runs');
+    await refreshRuns();
+  }
+  const cancel = event.target.closest('[data-run-cancel]');
+  if (cancel) {
+    cancel.disabled = true;
+    try {
+      await api('/api/runs/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Control-Token': token },
+        body: JSON.stringify({ id: cancel.dataset.runCancel }),
+      });
+      runsMessage('Stop/remove requested.');
+      await refreshRuns();
+    } catch (error) {
+      runsMessage(error.message, true);
+      cancel.disabled = false;
+    }
+  }
+});
+setInterval(refreshRuns, 1000);
+
+function renderActivity(runs, status, detail) {
+  const run = runs.active;
+  $('#activity-state').textContent =
+    `${status.healthy ? '● Worker online' : '○ Worker offline'} · ${run ? `${run.name || run.site} · ${run.mode} · ${run.status}` : 'No active run'} · ${runs.pending.length} queued`;
+  $('#activity-controls').innerHTML = run
+    ? `<button class="quiet run-stop" data-run-cancel="${escapeHTML(run.id)}" ${run.status === 'stopping' ? 'disabled' : ''}>${run.status === 'stopping' ? 'Stopping…' : 'Stop run'}</button>`
+    : '';
+  const events = detail?.events || [];
+  const test = events.findLast(event => event.type === 'test');
+  const url = events.findLast(event => event.type === 'url' && (!test || event.time >= test.time));
+  const progress = events.findLast(event => typeof event.total === 'number');
+  $('#activity-test').textContent =
+    `${run ? 'Current' : 'Last run'}: ${test?.title || (run ? 'Starting checks…' : detail ? detail.run.status : 'No activity yet')}${progress ? ` · ${progress.completed}/${progress.total}` : ''}`;
+  $('#activity-url').textContent = url?.url || '';
+  const feed = $('#activity-feed');
+  const atBottom = feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 30;
+  feed.innerHTML =
+    events
+      .slice(-30)
+      .map(
+        event =>
+          `<p><time>${escapeHTML(new Date(event.time).toLocaleTimeString())}</time> ${escapeHTML(event.url || event.title || `${event.completed || 0}/${event.total || 0} checks`)}${event.status ? ' · ' + escapeHTML(event.status) : ''}</p>`,
+      )
+      .join('') || '<p class="muted">Activity will appear here when a run starts.</p>';
+  if (atBottom) feed.scrollTop = feed.scrollHeight;
+}
+$('#activity-open').addEventListener('click', () => showSection('runs'));
+
+for (const section of ['settings', 'reports', 'runs']) {
+  $(`#${section}-tab`).addEventListener('click', event => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0)
+      return;
+    event.preventDefault();
+    showSection(section);
+  });
+}
+window.addEventListener('popstate', restoreLocation);
+load()
+  .then(restoreLocation)
+  .catch(error => message(error.message, true));

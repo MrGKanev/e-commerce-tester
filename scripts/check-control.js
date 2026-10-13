@@ -154,7 +154,7 @@ const { digest, approved } = require('./visual-baselines');
       );
     }
     await page.getByLabel('Store name', { exact: true }).fill('Unsaved store edit');
-    await page.getByRole('button', { name: 'Reports', exact: true }).click();
+    await page.getByRole('link', { name: 'Reports', exact: true }).click();
     await expect(page.locator('#reports-submenu')).toBeVisible();
     await page
       .locator('#reports-submenu')
@@ -177,7 +177,7 @@ const { digest, approved } = require('./visual-baselines');
       await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
       false,
     );
-    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.getByRole('link', { name: 'Settings', exact: true }).click();
     await expect(page.getByLabel('Store name', { exact: true })).toHaveValue('Unsaved store edit');
     await expect(page.getByRole('button', { name: 'Save changes', exact: true })).toBeEnabled();
     // Visual candidates require a deliberate selection and confirmation.
@@ -208,7 +208,7 @@ const { digest, approved } = require('./visual-baselines');
       path.join(reportRoot, storeId, visualRun, 'run-metadata.json'),
       JSON.stringify({ phase: 'finished' }),
     );
-    await page.getByRole('button', { name: 'Reports', exact: true }).click();
+    await page.getByRole('link', { name: 'Reports', exact: true }).click();
     await page.locator('#report-list').getByRole('button').first().click();
     await expect(page.locator('#visual-review')).toBeVisible();
     await expect(page.locator('#approve-visual')).toBeDisabled();
@@ -223,7 +223,7 @@ const { digest, approved } = require('./visual-baselines');
     assert.ok(approved(path.join(directory, 'visual-baselines'), storeId).revision);
     await expect(page.locator('[data-visual-id]')).toBeDisabled();
     await page.reload();
-    await page.getByRole('button', { name: 'Reports', exact: true }).click();
+    await page.getByRole('link', { name: 'Reports', exact: true }).click();
     await page
       .locator('#reports-submenu')
       .getByRole('button', { name: /Updated Shop/ })
@@ -245,7 +245,7 @@ const { digest, approved } = require('./visual-baselines');
       false,
     );
     assert.deepEqual(errors, []);
-    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.getByRole('link', { name: 'Settings', exact: true }).click();
     await page.locator('#add-store').click();
     await page.getByLabel('Platform', { exact: true }).selectOption('woocommerce');
     await page.getByLabel('Store name', { exact: true }).fill('Woo fixture');
@@ -268,8 +268,129 @@ const { digest, approved } = require('./visual-baselines');
     await expect(page.getByLabel('WooCommerce product URLs', { exact: true })).toHaveValue(
       '/wp/goods/item/',
     );
+    // Exercise manual enqueue and persistent activity without external traffic.
+    const stateDirectory = path.join(directory, 'state');
+    fs.mkdirSync(stateDirectory, { recursive: true });
+    await page.getByRole('link', { name: 'Runs', exact: true }).click();
+    await page.getByLabel('Saved store', { exact: true }).selectOption(storeId);
+    await page.getByRole('button', { name: 'Add to queue', exact: true }).click();
+    await expect(page.locator('#runs-message')).toContainText('Run submitted');
+    const commandDirectory = path.join(stateDirectory, 'commands');
+    const request = JSON.parse(
+      fs.readFileSync(path.join(commandDirectory, fs.readdirSync(commandDirectory)[0])),
+    );
+    assert.equal(request.run.site, storeId);
+    assert.equal(request.run.mode, 'smoke');
+    const active = { ...request.run, status: 'running', startedAt: Date.now() };
+    const waiting = { ...active, id: require('node:crypto').randomUUID(), status: 'queued' };
+    const queueFile = path.join(stateDirectory, 'runs.json');
+    const { atomicWrite } = require('./scheduler');
+    atomicWrite(queueFile, { active, pending: [waiting], history: [] });
+    const logs = path.join(stateDirectory, 'run-logs');
+    fs.mkdirSync(logs, { recursive: true });
+    fs.writeFileSync(path.join(logs, active.id + '.log'), 'Fixture browser output');
+    fs.writeFileSync(
+      path.join(logs, active.id + '.events'),
+      [
+        {
+          type: 'test',
+          title: 'Checking product price',
+          project: 'Desktop Chrome',
+          file: 'product.spec.ts',
+          total: 9,
+          completed: 2,
+        },
+        { type: 'url', url: 'https://example.test/products/one' },
+        { type: 'step', title: 'Compare displayed price' },
+      ]
+        .map(event => JSON.stringify({ ...event, time: Date.now() }))
+        .join('\n') + '\n',
+    );
+    await expect(page.locator('#run-active')).toContainText('running');
+    await expect(page.locator('#run-events')).toContainText('Compare displayed price');
+    await expect(page.locator('#run-progress')).toContainText('2 / 9');
+    await expect(page.locator('#activity-test')).toContainText('Checking product price');
+    await expect(page.locator('#activity-url')).toContainText('/products/one');
+    await page.locator('#run-pending').getByRole('button', { name: 'Remove', exact: true }).click();
+    await expect(page.locator('#runs-message')).toContainText('Stop/remove requested');
+    assert.ok(
+      fs
+        .readdirSync(commandDirectory)
+        .some(
+          file => JSON.parse(fs.readFileSync(path.join(commandDirectory, file))).id === waiting.id,
+        ),
+    );
+    await page.getByRole('link', { name: 'Settings', exact: true }).click();
+    await expect(page.locator('#activity-dock')).toBeVisible();
+    await page.getByRole('link', { name: 'Reports', exact: true }).click();
+    await expect(page.locator('#activity-feed')).toContainText('Compare displayed price');
+    await Promise.all([
+      page.waitForResponse(
+        response => response.url().endsWith('/api/runs/cancel') && response.status() === 202,
+      ),
+      page
+        .locator('#activity-controls')
+        .getByRole('button', { name: 'Stop run', exact: true })
+        .click(),
+    ]);
+    assert.ok(
+      fs
+        .readdirSync(commandDirectory)
+        .some(
+          file => JSON.parse(fs.readFileSync(path.join(commandDirectory, file))).id === active.id,
+        ),
+    );
+    await page.getByRole('button', { name: 'Open queue', exact: true }).click();
+    await page.setViewportSize({ width: 1280, height: 900 });
+    const runsAxe = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+      .analyze();
+    assert.deepEqual(
+      runsAxe.violations.map(violation => ({
+        id: violation.id,
+        nodes: violation.nodes.map(node => node.html),
+      })),
+      [],
+    );
+    await page.screenshot({
+      path: path.join(os.tmpdir(), 'store-control-runs-desktop.png'),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(
+      await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+      false,
+    );
+    await page.screenshot({
+      path: path.join(os.tmpdir(), 'store-control-runs-mobile.png'),
+      fullPage: true,
+    });
+    atomicWrite(queueFile, {
+      active: null,
+      pending: [],
+      history: [{ ...active, status: 'cancelled', finishedAt: Date.now() }],
+    });
+    await expect(page.locator('#activity-state')).toContainText('No active run');
+    await expect(page.locator('#activity-feed')).toContainText('Compare displayed price');
+    assert.deepEqual(errors, []);
+    for (const section of ['settings', 'reports', 'runs']) {
+      await page.goto(`${origin}/${section}`);
+      await expect(page.locator(`#${section}-view`)).toBeVisible();
+      await expect(page.locator(`#${section}-tab`)).toHaveAttribute('aria-current', 'page');
+      await page.reload();
+      await expect(page.locator(`#${section}-view`)).toBeVisible();
+      assert.equal(new URL(page.url()).pathname, `/${section}`);
+      await expect(page.locator('#activity-dock')).toBeVisible();
+    }
+    await page.getByRole('link', { name: 'Settings', exact: true }).click();
+    await page.getByRole('link', { name: 'Reports', exact: true }).click();
+    await page.goBack();
+    await expect(page.locator('#settings-view')).toBeVisible();
+    await page.goForward();
+    await expect(page.locator('#reports-view')).toBeVisible();
+    assert.deepEqual(errors, []);
     console.log(
-      'Control panel browser checks passed: onboarding, schedule/window edits, save/reload, advanced setting preservation, pause, mobile layout and axe. No store requests made.',
+      'Control panel browser checks passed: onboarding, schedule/window edits, save/reload, advanced setting preservation, pause, manual queue controls, persistent activity, direct section URLs, reload/back/forward navigation, mobile layout and axe. No store requests made.',
     );
   } finally {
     await browser?.close();

@@ -222,3 +222,13 @@ test('report catalog lists newest runs, supports legacy HTML and remains embedda
   assert.equal(direct.runs[0].status, 'incomplete');
   assert.match(direct.runs[0].reportUrl, /index.html$/);
 });
+
+test('section URLs serve the control app directly while report assets retain their routes', async t => {
+  const f = await fixture(t);
+  for (const route of ['/settings', '/reports', '/runs', '/settings/', '/reports/', '/runs/']) {
+    const response = await fetch(f.origin + route);
+    assert.equal(response.status, 200, route);
+    assert.match(await response.text(), /id="activity-dock"/);
+  }
+  assert.equal((await fetch(f.origin + '/reports/missing.html')).status, 404);
+});

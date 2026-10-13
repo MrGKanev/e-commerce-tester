@@ -1,3 +1,4 @@
+import { controlEvent } from '../config/control-events';
 import fs from 'node:fs';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -60,6 +61,7 @@ export function paceAPI(request: APIRequestContext): void {
   const original = request.fetch.bind(request);
   request.fetch = async (...args: Parameters<APIRequestContext['fetch']>) => {
     await paceRequest();
+    controlEvent({ type: 'url', url: typeof args[0] === 'string' ? args[0] : args[0].url() });
     const response = await original(...args);
     recordRateLimit(response.status(), response.url(), response.headers()['retry-after'] ?? null);
     return response;

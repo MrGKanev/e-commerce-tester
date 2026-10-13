@@ -1,3 +1,4 @@
+import { controlEvent } from './control-events';
 import type { VitalDocument } from '../tests/web-vitals';
 import { readSiteSettings } from './site-settings';
 import { mergeFindings, type Finding } from '../scripts/spelling-model';
@@ -52,6 +53,8 @@ type Scenario = {
 
 export default class RunMetadataReporter implements Reporter {
   private file: string;
+  private completed = 0;
+  private total = 0;
   private metadata: Record<string, unknown> = {};
   private scenarios = new Map<string, Scenario>();
   private errors: string[] = [];
@@ -97,6 +100,8 @@ export default class RunMetadataReporter implements Reporter {
     fs.renameSync(temporary, this.file);
   }
   onBegin(config: FullConfig, suite: Suite) {
+    this.total = suite.allTests().length;
+    controlEvent({ type: 'begin', total: this.total, completed: 0 });
     const selectedProjects = new Set(suite.allTests().map(test => test.parent.project()?.name));
     this.metadata = {
       ...this.metadata,
@@ -159,13 +164,37 @@ export default class RunMetadataReporter implements Reporter {
     }
     this.write();
   }
+  onStepBegin(
+    _test: TestCase,
+    _result: TestResult,
+    step: import('@playwright/test/reporter').TestStep,
+  ) {
+    if (step.category === 'test.step' || step.category === 'pw:api')
+      controlEvent({ type: 'step', title: step.title });
+  }
   onTestBegin(test: TestCase, result: TestResult) {
+    controlEvent({
+      type: 'test',
+      title: test.titlePath().slice(1).join(' › '),
+      project: test.parent.project()?.name,
+      file: path.basename(test.location.file),
+      total: this.total,
+      completed: this.completed,
+    });
     const scenario = this.scenarios.get(test.id)!;
     scenario.outcome = 'running';
     scenario.activeRetry = result.retry;
     this.write();
   }
   onTestEnd(test: TestCase, result: TestResult) {
+    this.completed++;
+    controlEvent({
+      type: 'result',
+      title: test.title,
+      status: result.status,
+      total: this.total,
+      completed: this.completed,
+    });
     const scenario = this.scenarios.get(test.id)!;
     delete scenario.activeRetry;
     const annotations = [...test.annotations, ...result.annotations];

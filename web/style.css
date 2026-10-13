@@ -396,6 +396,9 @@ details button {
   display: none !important;
 }
 .nav-tab {
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
   border: 0;
   background: transparent;
   color: #cbd5e1;
@@ -530,4 +533,151 @@ details button {
   .visual-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.run-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr);
+  gap: 20px;
+  margin-top: 20px;
+}
+.run-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 10px 0;
+}
+.run-select {
+  text-align: left;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.run-select small {
+  display: block;
+  font-weight: normal;
+  margin-top: 4px;
+}
+.run-stop {
+  color: #b91c1c;
+  flex-shrink: 0;
+}
+#run-current {
+  overflow-wrap: anywhere;
+}
+#run-current dt {
+  font-weight: 600;
+  margin-top: 12px;
+}
+#run-current dd {
+  margin: 4px 0;
+}
+#run-progress progress {
+  width: 100%;
+}
+.run-events,
+#run-log {
+  max-height: 340px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+.run-events p {
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 13px;
+  padding: 6px 0;
+  margin: 0;
+}
+.run-events time {
+  color: #64748b;
+}
+#run-log {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 12px;
+  white-space: pre-wrap;
+  font-size: 12px;
+}
+#run-form fieldset {
+  border: 0;
+  padding: 12px 0;
+  margin: 0;
+}
+@media (max-width: 800px) {
+  .run-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+body {
+  padding-bottom: 210px;
+}
+#activity-dock {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  height: 190px;
+  background: #fff;
+  border-top: 2px solid #cbd5e1;
+  box-shadow: 0 -4px 20px #0f172a12;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  padding: 12px 24px;
+}
+.activity-overview {
+  min-width: 0;
+  overflow: auto;
+}
+.activity-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#activity-state,
+#activity-test,
+#activity-url {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+#activity-dock .run-events {
+  max-height: none;
+}
+#activity-dock button {
+  padding: 5px 10px;
+}
+@media (max-width: 700px) {
+  body {
+    padding-bottom: 245px;
+  }
+  #activity-dock {
+    height: 225px;
+    padding: 8px 12px;
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) 60px;
+  }
+}
+#run-form {
+  min-height: 0;
+}
+.run-layout > .panel {
+  min-width: 0;
+}
+@media (max-width: 800px) {
+  .run-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.activity-heading {
+  gap: 8px;
+}
+.activity-heading strong {
+  margin-right: auto;
+}
+#activity-controls {
+  flex-shrink: 0;
 }

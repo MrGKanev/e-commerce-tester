@@ -10,6 +10,7 @@ const { atomicWrite, loadState } = require('./scheduler');
 const model = require('./scheduler-model');
 const { catalog } = require('./report-catalog');
 const visual = require('./visual-baselines');
+const queue = require('./run-queue');
 const root = path.join(__dirname, '..');
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -89,7 +90,9 @@ function createControlServer({
       if (
         (request.method === 'PUT' && url.pathname === '/api/config') ||
         (request.method === 'POST' &&
-          ['/api/validate', '/api/visual/approve'].includes(url.pathname))
+          ['/api/validate', '/api/visual/approve', '/api/runs', '/api/runs/cancel'].includes(
+            url.pathname,
+          ))
       ) {
         const origin = request.headers.origin;
         if (
@@ -100,6 +103,20 @@ function createControlServer({
         if (!request.headers['content-type']?.startsWith('application/json'))
           return json(response, 415, { error: 'Expected JSON configuration' });
         const input = await body(request);
+        if (url.pathname === '/api/runs') {
+          const run = queue.manualRun(readConfiguration(configFile), input);
+          if (queue.readQueue(stateDir).pending.length >= 100)
+            return json(response, 409, { error: 'Queue is full (100 runs)' });
+          queue.submit(stateDir, { action: 'enqueue', run });
+          return json(response, 202, { id: run.id });
+        }
+        if (url.pathname === '/api/runs/cancel') {
+          const runs = queue.readQueue(stateDir);
+          if (input.id !== runs.active?.id && !runs.pending.some(run => run.id === input.id))
+            return json(response, 409, { error: 'This run is no longer active or queued' });
+          queue.submit(stateDir, { action: 'cancel', id: input.id });
+          return json(response, 202, { ok: true });
+        }
         if (url.pathname === '/api/visual/approve')
           return json(
             response,
@@ -129,6 +146,10 @@ function createControlServer({
         atomicWrite(configFile, data);
         return json(response, 200, { revision: readConfiguration(configFile).revision });
       }
+      if (request.method === 'GET' && url.pathname === '/api/runs')
+        return json(response, 200, queue.publicQueue(stateDir));
+      if (request.method === 'GET' && url.pathname === '/api/runs/details')
+        return json(response, 200, queue.details(stateDir, url.searchParams.get('id') || ''));
       if (request.method === 'GET' && url.pathname === '/api/reports')
         return json(response, 200, {
           groups: catalog(reportsDir, readConfiguration(configFile).sites),
@@ -212,11 +233,15 @@ function createControlServer({
         response.end(content.replace('</body>', navigation + '</body>'));
         return;
       }
-      if (decoded.startsWith('/reports/'))
+      if (decoded.startsWith('/reports/') && decoded !== '/reports/')
         return staticFile(response, reportsDir, decoded.slice('/reports/'.length));
-      if (decoded === '/' || decoded === '/settings')
+      if (
+        ['/', '/settings', '/reports', '/runs', '/settings/', '/reports/', '/runs/'].includes(
+          decoded,
+        )
+      )
         return staticFile(response, webDir, 'index.html');
-      if (['/app.js', '/style.css'].includes(decoded))
+      if (['/app.js', '/style.css', '/tailwind.css'].includes(decoded))
         return staticFile(response, webDir, decoded.slice(1));
       return json(response, 404, { error: 'File not found' });
     } catch (error) {

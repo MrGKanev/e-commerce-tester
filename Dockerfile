@@ -19,5 +19,6 @@ RUN pnpm install --frozen-lockfile
 
 # Copy source (browsers are already installed in the base image)
 COPY . .
+RUN pnpm build:css
 
 CMD ["pnpm", "test"]

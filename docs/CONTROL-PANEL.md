@@ -44,6 +44,16 @@ CONTROL_BIND_ADDRESS=0.0.0.0 CONTROL_PORT=8081 \
 
 This makes the editor available to clients that can reach that address; access control, if needed, belongs to your network or reverse proxy. The service itself remains password-free.
 
+Settings, Reports and Runs have direct links at `/settings`, `/reports` and `/runs`. Reloading keeps the current section; browser Back and Forward follow your navigation. Report links also retain the selected store and run.
+
+## Manual runs and live activity
+
+Open **Runs** to select a saved store, check mode and browsers, then **Add to queue**. Manual runs work even when the store's automatic schedule is paused. Save edits in Settings before enqueueing; each queued run retains the saved store settings from that moment.
+
+The scheduler executes one run at a time. Manual requests use FIFO order and take priority over upcoming scheduled checks after the current run ends. Request pacing, the gap between runs and store cooldowns still apply; the queue shows the eligibility time and reason when waiting. **Remove** cancels a waiting request. **Stop run** interrupts an active manual or scheduled run and closes its runner/browser process group; stopping does not pause future scheduled checks. Deliberate cancellation does not add a failure cooldown.
+
+The **Activity** panel remains visible in Settings, Reports and Runs. It updates every second with the current test, browser, page/API URL and recent steps/results. The Runs detail panel also shows completed/total checks and runner output. Activity is retained after completion, and the latest 50 runs are available in the local control history. Full generated reports remain in Reports. Queued runs survive worker restarts; an active run interrupted by a restart is marked interrupted rather than rerun automatically.
+
 ## Existing configurations
 
 Stop the file-based scheduler before starting the control service; both use the same scheduler state and reports:

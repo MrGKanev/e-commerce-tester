@@ -18,3 +18,5 @@ scheduler-state/
 
 managed-config/
 visual-baselines/
+
+web/tailwind.css

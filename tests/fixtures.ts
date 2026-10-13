@@ -1,3 +1,4 @@
+import { controlEvent } from '../config/control-events';
 import { installWebVitals, attachWebVitals, type VitalsSession } from './web-vitals';
 let vitalSessions: VitalsSession[] = [];
 import path from 'node:path';
@@ -22,8 +23,10 @@ function paceBrowser(browser: Browser): Browser {
     vitalSessions.push(await installWebVitals(context));
     context.on('page', page =>
       page.on('framenavigated', frame => {
-        if (frame === page.mainFrame() && /^https?:/.test(frame.url()))
+        if (frame === page.mainFrame() && /^https?:/.test(frame.url())) {
           visitedUrls.add(frame.url());
+          controlEvent({ type: 'url', url: frame.url() });
+        }
       }),
     );
     return context;
@@ -54,7 +57,10 @@ export const test = base.extend<{ politeRun: void }>({
       vitalSessions = [];
       const file = path.basename(testInfo.file);
       if (!compatibleSpec(file, settings.platform)) {
-        testInfo.annotations.push({ type: 'not-applicable', description: `${file} is not a ${settings.platform} suite` });
+        testInfo.annotations.push({
+          type: 'not-applicable',
+          description: `${file} is not a ${settings.platform} suite`,
+        });
         base.skip(true, 'This test belongs to another commerce platform');
       }
       if (file === '29-content.spec.ts' && settings.spelling.mode === 'off') {

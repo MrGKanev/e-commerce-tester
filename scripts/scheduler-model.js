@@ -344,7 +344,7 @@ function nextJob(state, config, now = 0) {
 }
 function finish(state, job, config, now, outcome, rateLimited = false, random = Math.random) {
   const entry = originState(state, job.origin);
-  if (!rateLimited) {
+  if (!rateLimited && outcome !== 'cancelled') {
     if (outcome === 'passed') {
       entry.failureStreak = 0;
       entry.rateLimitStreak = 0;

@@ -133,7 +133,7 @@ function runtimeFixture(t, behavior = 'success') {
   fs.cpSync(path.join(__dirname, '../config/schemas'), path.join(root, 'config/schemas'), { recursive: true });
   fs.copyFileSync(path.join(__dirname, '../config/config-validation.js'), path.join(root, 'config/config-validation.js'));
   fs.symlinkSync(path.join(__dirname, '../node_modules'), path.join(root, 'node_modules'), 'dir');
-  for (const file of ['scheduler.js', 'scheduler-model.js', 'site-config.js', 'platform-config.js', 'managed-config.js'])
+  for (const file of ['scheduler.js', 'scheduler-model.js', 'run-queue.js', 'site-config.js', 'platform-config.js', 'managed-config.js'])
     fs.copyFileSync(path.join(__dirname, file), path.join(root, 'scripts', file));
   fs.copyFileSync(
     path.join(__dirname, '../config/site-settings.js'),
