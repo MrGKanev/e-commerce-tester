@@ -33,6 +33,8 @@ jobs:
         run: pnpm check
       - name: Install Chromium and system dependencies
         run: pnpm exec playwright install --with-deps chromium
+      - name: Build Tailwind CSS
+        run: pnpm build:css
       - name: Local browser acceptance checks
         run: pnpm test:acceptance:local
       - name: Upload local failure artifacts

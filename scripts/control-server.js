@@ -9,6 +9,7 @@ const { readConfiguration, validateConfiguration } = require('./managed-config')
 const { atomicWrite, loadState } = require('./scheduler');
 const model = require('./scheduler-model');
 const { catalog } = require('./report-catalog');
+const { compareReports } = require('./monitoring');
 const visual = require('./visual-baselines');
 const queue = require('./run-queue');
 const { deleteReports } = require('./report-deletion');
@@ -168,6 +169,39 @@ function createControlServer({
         return json(response, 200, queue.publicQueue(stateDir));
       if (request.method === 'GET' && url.pathname === '/api/runs/details')
         return json(response, 200, queue.details(stateDir, url.searchParams.get('id') || ''));
+      if (request.method === 'GET' && url.pathname === '/api/reports/compare') {
+        const groups = catalog(reportsDir, readConfiguration(configFile).sites);
+        const find = prefix =>
+          groups
+            .find(g => g.id === url.searchParams.get(prefix + 'Store'))
+            ?.runs.find(r => r.id === url.searchParams.get(prefix + 'Run'));
+        const production = find('production'),
+          candidate = find('candidate');
+        if (!production || !candidate)
+          return json(response, 404, { error: 'Select two saved runs' });
+        if (
+          !production.platform ||
+          production.platform !== candidate.platform ||
+          !production.mode ||
+          production.mode !== candidate.mode ||
+          !production.projects.length ||
+          JSON.stringify(production.projects) !== JSON.stringify(candidate.projects)
+        )
+          return json(response, 400, {
+            error: 'Platform, mode and browser selection must match and be recorded',
+          });
+        return json(response, 200, {
+          checks: compareReports(candidate, production),
+          passRateDelta:
+            production.passRate !== null && candidate.passRate !== null
+              ? candidate.passRate - production.passRate
+              : null,
+          lcpDelta:
+            production.lcp !== null && candidate.lcp !== null
+              ? candidate.lcp - production.lcp
+              : null,
+        });
+      }
       if (request.method === 'GET' && url.pathname === '/api/reports')
         return json(response, 200, {
           groups: catalog(reportsDir, readConfiguration(configFile).sites),

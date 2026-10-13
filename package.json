@@ -19,7 +19,7 @@
     "format": "prettier --write \"tests/**/*.ts\" \"*.ts\"",
     "format:check": "prettier --check \"tests/**/*.ts\" \"*.ts\"",
     "test:unit": "node --test scripts/*.test.js",
-    "test:acceptance:local": "pnpm test:pacing && pnpm test:readiness && pnpm test:reporting && pnpm test:control:local && pnpm test:pages:local && pnpm test:vitals:local && pnpm test:visual:local && pnpm test:commerce:local && pnpm test:woocommerce:local && pnpm test:seo:local && pnpm test:journey:local && pnpm test:claims:local",
+    "test:acceptance:local": "pnpm test:pacing && pnpm test:readiness && pnpm test:reporting && pnpm test:control:local && pnpm test:pages:local && pnpm test:vitals:local && pnpm test:visual:local && pnpm test:commerce:local && pnpm test:woocommerce:local && pnpm test:seo:local && pnpm test:journey:local && pnpm test:claims:local && pnpm test:monitoring:local",
     "check": "pnpm run type-check && pnpm run lint && pnpm run test:unit && pnpm run check:toolchain",
     "test:pacing": "STORE_URL=http://127.0.0.1:45679 SITE_SLUG=pacing-local REQUEST_DELAY_MS=60 REQUEST_JITTER_MS=0 TEST_DELAY_MS=0 TEST_JITTER_MS=0 playwright test --config=checks/pacing.config.ts",
     "build:css": "tailwindcss -i web/tailwind.input.css -o web/tailwind.css --minify",
@@ -53,7 +53,8 @@
     "test:seo:local": "playwright test --config=checks/seo.config.ts",
     "test:journey": "bash run.sh --mode full --grep @journey",
     "test:journey:local": "node scripts/check-journey.js",
-    "test:claims:local": "node scripts/check-claims.js"
+    "test:claims:local": "node scripts/check-claims.js",
+    "test:monitoring:local": "node scripts/check-monitoring.js"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

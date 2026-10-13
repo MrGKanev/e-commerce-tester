@@ -12,6 +12,13 @@ export type Capability =
   | 'mobileMenu'
   | 'commerceConsistency';
 export interface SiteSettings {
+  expectations: {
+    minProducts: number;
+    currency: string;
+    paymentSelector: string;
+    paymentPath: string;
+  };
+  monitorScripts: boolean;
   platform: 'shopify' | 'woocommerce';
   cookieConsent: { mode: 'accept-all' | 'none'; waitMs: number; frameSelector: string };
   commerce: {

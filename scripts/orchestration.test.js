@@ -17,7 +17,7 @@ function fixture(t) {
   fs.symlinkSync(path.join(__dirname, '../node_modules'), path.join(root, 'node_modules'), 'dir');
   fs.copyFileSync(path.join(__dirname, '../config/site-settings.js'), path.join(root, 'config/site-settings.js'));
   fs.mkdirSync(path.join(root, 'reports'));
-  for (const name of ['run-sites.js', 'site-config.js', 'platform-config.js', 'update-history.js', 'report-model.js']) {
+  for (const name of ['run-sites.js', 'site-config.js', 'platform-config.js', 'update-history.js', 'report-model.js', 'monitoring.js', 'notify-run.js']) {
     fs.copyFileSync(path.join(__dirname, name), path.join(root, 'scripts', name));
   }
   const bin = path.join(root, 'bin');

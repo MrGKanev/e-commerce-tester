@@ -248,6 +248,25 @@ export default class RunMetadataReporter implements Reporter {
         path: path.relative(path.dirname(this.file), a.path!),
         contentType: a.contentType,
       }));
+    for (const attachment of result.attachments.filter(
+      a => a.name === 'third-party-scripts.json',
+    )) {
+      const report = JSON.parse(
+        attachment.body ? attachment.body.toString() : fs.readFileSync(attachment.path!, 'utf8'),
+      );
+      const file = path.join(path.dirname(this.file), 'third-party-scripts.json');
+      const prior = fs.existsSync(file)
+        ? JSON.parse(fs.readFileSync(file, 'utf8'))
+        : { scripts: [] };
+      fs.writeFileSync(
+        file,
+        JSON.stringify(
+          { complete: true, scripts: [...new Set([...prior.scripts, ...report.scripts])].sort() },
+          null,
+          2,
+        ),
+      );
+    }
     for (const attachment of result.attachments.filter(a => a.name === 'buyer-journey.json')) {
       const report = JSON.parse(
         attachment.body ? attachment.body.toString() : fs.readFileSync(attachment.path!, 'utf8'),

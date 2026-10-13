@@ -29,6 +29,10 @@ const { digest, approved } = require('./visual-baselines');
       new URL(route.request().url()).origin === origin ? route.continue() : route.abort(),
     );
     await page.goto(`${origin}/settings`);
+    await expect(page.locator('body'), 'Tailwind CSS must be built with pnpm build:css').toHaveCSS(
+      'display',
+      'flex',
+    );
     await page.getByRole('button', { name: 'Add a store', exact: true }).click();
     await page.getByLabel('Store name', { exact: true }).fill('Example Shop');
     await page.getByLabel('Store address', { exact: true }).fill('https://example.test');
@@ -62,6 +66,19 @@ const { digest, approved } = require('./visual-baselines');
     saved = JSON.parse(fs.readFileSync(configFile));
     assert.deepEqual(saved.sites[0].spelling.acceptedFindings, ['reviewed-id']);
     assert.equal(saved.sites[0].selectors.price, '.custom-price');
+    await page.getByText('Store expectations and monitoring', { exact: true }).click();
+    await page.getByLabel('Minimum public products (0 disables)', { exact: true }).fill('3');
+    await page.getByLabel('Expected currency (ISO code)', { exact: true }).fill('BGN');
+    await page.getByLabel('Monitor third-party scripts', { exact: true }).check();
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('Settings saved');
+    await page.reload();
+    await page.getByText('Store expectations and monitoring', { exact: true }).click();
+    await expect(page.getByLabel('Expected currency (ISO code)', { exact: true })).toHaveValue(
+      'BGN',
+    );
+    assert.equal(JSON.parse(fs.readFileSync(configFile)).sites[0].expectations.minProducts, 3);
+    await expect(page.getByLabel('Monitor third-party scripts', { exact: true })).toBeChecked();
     await page.getByText('Checkout expectations', { exact: true }).click();
     await page
       .getByLabel('Shipping address expectation', { exact: true })
@@ -206,7 +223,21 @@ const { digest, approved } = require('./visual-baselines');
     );
     fs.writeFileSync(
       path.join(reportRoot, storeId, visualRun, 'run-metadata.json'),
-      JSON.stringify({ phase: 'finished' }),
+      JSON.stringify({
+        phase: 'finished',
+        mode: 'smoke',
+        site: { platform: 'shopify' },
+        projects: [{ name: 'Desktop Chrome' }],
+        scenarios: [
+          {
+            name: 'cart',
+            file: 'cart.ts',
+            project: 'Desktop Chrome',
+            outcome: 'passed',
+            attempts: [],
+          },
+        ],
+      }),
     );
     await page.getByRole('link', { name: 'Reports', exact: true }).click();
     await page.locator('#report-list').getByRole('button').first().click();
@@ -229,6 +260,44 @@ const { digest, approved } = require('./visual-baselines');
       .getByRole('button', { name: /Updated Shop/ })
       .click();
     await expect(page.locator('#visual-summary')).toContainText('Approved version:');
+    const candidateDir = path.join(reportRoot, 'candidate-fixture', visualRun);
+    fs.mkdirSync(candidateDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(candidateDir, 'run-metadata.json'),
+      JSON.stringify({
+        phase: 'finished',
+        mode: 'smoke',
+        site: { platform: 'shopify' },
+        projects: [{ name: 'Desktop Chrome' }],
+        scenarios: [
+          {
+            name: 'cart',
+            file: 'cart.ts',
+            project: 'Desktop Chrome',
+            outcome: 'failed',
+            attempts: [{ errors: ['Expected: cart contents'] }],
+          },
+        ],
+      }),
+    );
+    fs.writeFileSync(
+      path.join(candidateDir, 'results.json'),
+      JSON.stringify({ stats: { unexpected: 1 } }),
+    );
+    await page.locator('#refresh-reports').click();
+    await expect(page.locator('#comparison-candidate option')).toHaveCount(2);
+    await page.locator('#comparison-candidate').selectOption('0');
+    await expect(page.locator('#comparison-result')).toContainText('regression: cart');
+    await expect(
+      page.getByText('Trends for the selected check scope', { exact: true }),
+    ).toBeVisible();
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.screenshot({
+      path: path.join(os.tmpdir(), 'store-control-monitoring-desktop.png'),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    fs.rmSync(path.join(reportRoot, 'candidate-fixture'), { recursive: true, force: true });
     const visualAxe = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
       .analyze();

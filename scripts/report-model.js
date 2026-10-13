@@ -1,4 +1,5 @@
 'use strict';
+const { classification } = require('./monitoring');
 
 const percent = (numerator, denominator) => denominator > 0 ? Math.round(numerator / denominator * 100) : null;
 const errorText = error => typeof error === 'string' ? error : error?.message || error?.value || error?.stack || 'Unspecified error';
@@ -45,6 +46,7 @@ function summarizeRun(results = {}, metadata = {}, issue = null) {
     ...[...planned.values()].flat(),
   ];
   for (const scenario of selected) {
+    scenario.classification = classification(scenario);
     if (scenario.outcome === 'running') scenario.outcome = metadata.status === 'interrupted' || metadata.signal ? 'interrupted' : 'unfinished';
   }
   const stats = results.stats || {};

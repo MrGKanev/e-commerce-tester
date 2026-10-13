@@ -189,9 +189,23 @@ function render() {
     )}${help('Enter one accepted term per line. Strict spelling can fail for brand names or unknown words.')}<div class="mt-4">${grid(renderPacing(schedule.pacing || {}, `scheduler.sites.${site.slug}.pacing`, true))}</div>${help('Blank fields inherit the general pauses.')}`,
   );
   const footer = `<div class="mt-8 flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between"><p class="text-sm text-slate-600">Existing reports remain when a store is removed.</p><button class="${button('danger')}" data-action="remove-store">Remove store</button></div>`;
-  editor.innerHTML = `${heading}${basics}${schedulePart}${renderCookieConsent(site, base)}${renderCheckoutPolicy(site, base)}${content}${footer}`;
+  editor.innerHTML = `${heading}${basics}${schedulePart}${renderCookieConsent(site, base)}${renderCheckoutPolicy(site, base)}${renderMonitoring(site, base)}${content}${footer}`;
   renderJobStatus();
 }
+function renderMonitoring(site, base) {
+  const expected = site.expectations || {};
+  return disclosure(
+    'Store expectations and monitoring',
+    `${grid(
+      `${field('Minimum public products (0 disables)', `${base}.expectations.minProducts`, expected.minProducts || 0, 'number', 1, 'max="100"')}${field('Expected currency (ISO code)', `${base}.expectations.currency`, expected.currency || '')}${field('Expected payment control selector', `${base}.expectations.paymentSelector`, expected.paymentSelector || '')}${field('Payment check path', `${base}.expectations.paymentPath`, expected.paymentPath || '/checkout')}`,
+    )}${help('Payment checks require one visible, enabled control on this path; they never submit a payment. Product minimum is limited to 100.')}
+  ${checkbox('Monitor third-party scripts', `${base}.monitorScripts`, site.monitorScripts || false)}
+  ${checkbox('Enable change notifications', `${base}.notifications.enabled`, site.notifications?.enabled || false)}
+  ${field('Webhook environment variable', `${base}.notifications.webhookEnv`, site.notifications?.webhookEnv || 'MONITORING_WEBHOOK_URL')}
+  ${help('Set the webhook URL in the runner environment. Maintenance windows use notifications.maintenance with UTC start/end timestamps in the configuration. Delivery failures appear in Reports.')}`,
+  );
+}
+
 function renderCookieConsent(site, base) {
   const consent = site.cookieConsent || {};
   return sectionBlock(
@@ -599,6 +613,7 @@ function displayReport(url, title) {
 }
 function renderReports() {
   $('#visual-review').hidden = true;
+  $('#monitoring-history').innerHTML = '';
   $('#reports-submenu').innerHTML =
     `<button data-report-store="overview" class="${chipClass}" aria-pressed="${reportStore === 'overview'}">Overview</button>` +
     reportGroups
@@ -629,6 +644,7 @@ function renderReports() {
     )
     .join('');
   const run = group.runs.find(run => run.id === reportRun);
+  renderMonitoringHistory(group, run);
   displayReport(run?.reportUrl, group.name + ' · ' + (run?.id || 'report'));
   if (group.id.startsWith('site:') && run) refreshVisual(group.id.slice(5), run.id);
 }
@@ -861,7 +877,8 @@ async function refreshRuns() {
     runPolling = false;
   }
 }
-const eventRowClass = 'border-b border-slate-100 py-1.5 text-sm break-words text-slate-800 last:border-b-0';
+const eventRowClass =
+  'border-b border-slate-100 py-1.5 text-sm break-words text-slate-800 last:border-b-0';
 function renderRunDetails({ run, events, log }) {
   $('#run-detail-title').textContent = `${run.name || run.site} · ${run.mode} · ${run.status}`;
   const last = type => events.findLast(event => event.type === type);
@@ -895,7 +912,8 @@ function renderRunDetails({ run, events, log }) {
         event =>
           `<p class="${eventRowClass}"><time class="tabular-nums text-slate-600">${escapeHTML(new Date(event.time).toLocaleTimeString())}</time> ${escapeHTML(event.type)} · ${escapeHTML(event.url || event.title || `${event.completed || 0} / ${event.total || 0}`)}${event.status ? ' · ' + escapeHTML(event.status) : ''}</p>`,
       )
-      .join('') || `<p class="${eventRowClass} text-slate-600">Activity appears when checks start.</p>`;
+      .join('') ||
+    `<p class="${eventRowClass} text-slate-600">Activity appears when checks start.</p>`;
   if (atBottom) list.scrollTop = list.scrollHeight;
   $('#run-log').textContent = log || 'No runner output yet.';
 }
@@ -998,7 +1016,8 @@ function renderActivity(runs, status, detail) {
         event =>
           `<p class="${eventRowClass}"><time class="tabular-nums text-slate-600">${escapeHTML(new Date(event.time).toLocaleTimeString())}</time> ${escapeHTML(event.url || event.title || `${event.completed || 0}/${event.total || 0} checks`)}${event.status ? ' · ' + escapeHTML(event.status) : ''}</p>`,
       )
-      .join('') || `<p class="${eventRowClass} text-slate-600">Activity will appear here when a run starts.</p>`;
+      .join('') ||
+    `<p class="${eventRowClass} text-slate-600">Activity will appear here when a run starts.</p>`;
   if (atBottom) feed.scrollTop = feed.scrollHeight;
 }
 $('#activity-open').addEventListener('click', () => showSection('runs'));
@@ -1026,3 +1045,73 @@ window.addEventListener('popstate', restoreLocation);
 load()
   .then(restoreLocation)
   .catch(error => message(error.message, true));
+
+function renderMonitoringHistory(group, run) {
+  if (!run) return;
+  const history = group.runs
+    .filter(item => item.scope === run.scope)
+    .slice(0, 30)
+    .reverse();
+  const chart = (label, key, unit) => {
+    const values = history.map(item => item[key]).filter(Number.isFinite);
+    const maximum = Math.max(key === 'passRate' ? 100 : 1, ...values);
+    const points = history
+      .map((item, index) =>
+        Number.isFinite(item[key])
+          ? `<circle cx="${20 + (index * 560) / Math.max(1, history.length - 1)}" cy="${110 - (item[key] * 90) / maximum}" r="4"><title>${escapeHTML(item.id)}: ${item[key]}${unit}</title></circle>`
+          : '',
+      )
+      .join('');
+    const segments = history
+      .slice(1)
+      .map((item, index) =>
+        Number.isFinite(item[key]) && Number.isFinite(history[index][key])
+          ? `<line class="stroke-blue-700" x1="${20 + (index * 560) / Math.max(1, history.length - 1)}" y1="${110 - (history[index][key] * 90) / maximum}" x2="${20 + ((index + 1) * 560) / Math.max(1, history.length - 1)}" y2="${110 - (item[key] * 90) / maximum}" />`
+          : '',
+      )
+      .join('');
+    return `<figure class="min-w-0 rounded-lg border border-slate-200 bg-white p-4"><figcaption class="font-semibold">${label}</figcaption>${values.length ? `<svg class="mt-2 h-32 w-full fill-blue-700" viewBox="0 0 600 130" role="img" aria-label="${label}, oldest to newest; range 0–${Math.round(maximum)}${unit}"><line class="stroke-slate-300" x1="20" y1="110" x2="580" y2="110" />${segments}${points}</svg><p class="text-xs text-slate-600">Oldest → newest · 0–${Math.round(maximum)}${unit}</p>` : '<p class="mt-4 text-sm text-slate-600">Unmeasured: no samples in this scope.</p>'}</figure>`;
+  };
+  const candidates = reportGroups
+    .flatMap(g => g.runs.map(r => ({ group: g, run: r })))
+    .filter(item => item.group.id !== group.id);
+  const failures = run.scenarios.filter(s => s.outcome === 'failed');
+  $('#monitoring-history').innerHTML =
+    `<h2 class="text-base font-semibold">Trends for the selected check scope</h2><p class="text-sm text-slate-600">Up to 30 comparable runs. LCP is the median of measured synthetic documents; missing values remain unmeasured.</p><div class="grid gap-4 md:grid-cols-2">${chart('Pass rate', 'passRate', '%')}${chart('Synthetic LCP', 'lcp', ' ms')}</div>
+  <details><summary class="cursor-pointer rounded text-sm font-semibold ${focusRing}">Trend values</summary><div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr><th class="p-2">Run</th><th class="p-2">Pass rate</th><th class="p-2">Coverage</th><th class="p-2">LCP (ms)</th></tr></thead><tbody>${history.map(r => `<tr><td class="p-2">${escapeHTML(r.id)}</td><td class="p-2">${r.passRate ?? 'Unmeasured'}</td><td class="p-2">${r.coverage ?? 'Unmeasured'}</td><td class="p-2">${r.lcp ?? 'Unmeasured'}</td></tr>`).join('')}</tbody></table></div></details>
+  <p class="text-sm text-slate-700">Notification delivery: ${escapeHTML(run.notifications.status || 'No delivery record')}${run.notifications.suppressed ? ' · Maintenance suppression' : ''}</p>
+  ${failures.map(s => `<p class="text-sm text-red-800">${escapeHTML(s.classification)}: ${escapeHTML(s.name)}</p>`).join('')}
+  ${['added', 'removed'].map(key => (run.scriptChanges[key] || []).map(url => `<p class="break-all text-sm text-slate-700">Script ${key}: ${escapeHTML(url)}</p>`).join('')).join('')}
+  <label class="${labelClass}">Compare selected production run with candidate<select id="comparison-candidate" class="${inputClass}"><option value="">Select a saved candidate run</option>${candidates.map((item, index) => `<option value="${index}">${escapeHTML(item.group.name)} · ${escapeHTML(item.run.id)}</option>`).join('')}</select></label><div id="comparison-result" role="status" class="space-y-2 text-sm"></div>`;
+  $('#comparison-candidate').addEventListener('change', async event => {
+    const chosen = candidates[event.target.value];
+    const output = $('#comparison-result');
+    if (!chosen) {
+      output.textContent = '';
+      return;
+    }
+    const value = event.target.value;
+    try {
+      const result = await api(
+        '/api/reports/compare?' +
+          new URLSearchParams({
+            productionStore: group.id,
+            productionRun: run.id,
+            candidateStore: chosen.group.id,
+            candidateRun: chosen.run.id,
+          }),
+      );
+      if (!output.isConnected || $('#comparison-candidate').value !== value) return;
+      output.innerHTML =
+        `<p>Matching checks only. Review store settings and data differences before attributing a regression to a theme change.</p><p>Candidate minus production: pass rate ${result.passRateDelta ?? 'unmeasured'} percentage points; synthetic LCP ${result.lcpDelta ?? 'unmeasured'} ms.</p>` +
+        result.checks
+          .map(
+            check =>
+              `<p>${escapeHTML(check.change)}: ${escapeHTML(check.check)} · ${escapeHTML(check.production)} → ${escapeHTML(check.candidate)}</p>`,
+          )
+          .join('');
+    } catch (error) {
+      if (output.isConnected) output.textContent = error.message;
+    }
+  });
+}

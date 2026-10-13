@@ -1,7 +1,9 @@
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
+const { scope } = require('./monitoring');
 const { summarizeRun } = require('./report-model');
+const array = value => (Array.isArray(value) ? value : []);
 const count = value => (Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0);
 const RUN = /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}(?:-\d{2}-\d{3})?$/;
 function catalog(reportsDir, sites = []) {
@@ -44,7 +46,41 @@ function catalog(reportsDir, sites = []) {
           metadata.issue ||
           (!safe(path.join(dir, 'results.json')) ? 'No final results' : null);
         const summary = summarizeRun(results.data, metadata.data, issue);
+        const vitals = read(path.join(dir, 'web-vitals.json')).data;
+        const lcp = array(vitals.documents)
+          .filter(d => d?.metrics?.lcp?.status === 'measured')
+          .map(d => d.metrics.lcp.value)
+          .filter(value => Number.isFinite(value) && value >= 0)
+          .sort((a, b) => a - b);
+        const notification = read(path.join(dir, 'notifications.json')).data;
+        const changes = read(path.join(dir, 'script-changes.json')).data;
         return {
+          passRate: summary.passRate,
+          coverage: summary.coverage,
+          lcp: lcp.length
+            ? (lcp[Math.floor((lcp.length - 1) / 2)] + lcp[Math.floor(lcp.length / 2)]) / 2
+            : null,
+          scope: scope(summary),
+          platform: metadata.data.configuration?.platform || metadata.data.site?.platform || null,
+          projects: array(metadata.data.projects)
+            .map(p => p?.name)
+            .filter(name => typeof name === 'string')
+            .sort(),
+          scenarios: summary.scenarios.map(s => ({
+            name: s.name,
+            title: s.title,
+            file: s.file,
+            project: s.project,
+            outcome: s.outcome,
+            classification: s.classification,
+          })),
+          notifications: notification,
+          scriptChanges: Object.fromEntries(
+            ['added', 'removed'].map(key => [
+              key,
+              array(changes[key]).filter(value => typeof value === 'string'),
+            ]),
+          ),
           id: entry.name,
           storeName:
             typeof metadata.data.site?.name === 'string' ? metadata.data.site.name : undefined,

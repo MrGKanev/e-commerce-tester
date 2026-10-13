@@ -115,6 +115,11 @@ for (const site of sites) {
     errors: [...(metadata.errors || []), ...(result.error ? [result.error.message] : [])],
   });
 
+  const notification = spawnSync(process.execPath, ['scripts/notify-run.js', runDir], {
+    cwd: root, stdio: 'inherit', env: { ...process.env, NOTIFICATION_SETTINGS: JSON.stringify(site.notifications || {}) },
+  });
+  if (notification.status !== 0) console.error('Monitoring post-processing failed; test results are preserved.');
+
   if (result.error) console.error(`Could not start Playwright: ${result.error.message}`);
   if ((result.status ?? 1) !== 0) {
     overallExit = 1;

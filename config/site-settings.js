@@ -3,6 +3,8 @@ const { validateConfigShape } = require('./config-validation');
 const { commerceSettings } = require('../scripts/platform-config');
 
 const DEFAULTS = {
+  expectations: { minProducts: 0, currency: '', paymentSelector: '', paymentPath: '/checkout' },
+  monitorScripts: false,
   locale: 'bg-BG',
   timezoneId: 'Europe/Sofia',
   performanceMetrics: {
@@ -74,6 +76,16 @@ function resolveSiteSettings(input = {}) {
   result.timezoneId = input.timezoneId ?? result.timezoneId;
   if (Intl.getCanonicalLocales(result.locale).length !== 1) throw new Error('Invalid locale');
   new Intl.DateTimeFormat(result.locale, { timeZone: result.timezoneId });
+  Object.assign(result.expectations, input.expectations);
+  result.monitorScripts = input.monitorScripts ?? false;
+  for (const window of input.notifications?.maintenance || []) {
+    if (
+      !Number.isFinite(Date.parse(window.start)) ||
+      !Number.isFinite(Date.parse(window.end)) ||
+      Date.parse(window.end) <= Date.parse(window.start)
+    )
+      throw new Error('Maintenance requires valid start and end timestamps with end after start');
+  }
   Object.assign(result.performanceMetrics, input.performanceMetrics);
   const metrics = result.performanceMetrics;
   if (

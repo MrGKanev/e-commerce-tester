@@ -455,6 +455,61 @@
           "maxLength": 1000
         }
       }
+    },
+    "expectations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "minProducts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^([A-Z]{3})?$"
+        },
+        "paymentSelector": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "paymentPath": {
+          "type": "string",
+          "pattern": "^/(?!/)[^\\\\]*$"
+        }
+      }
+    },
+    "monitorScripts": {
+      "type": "boolean"
+    },
+    "notifications": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "webhookEnv": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$"
+        },
+        "maintenance": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "start": {
+                "type": "string"
+              },
+              "end": {
+                "type": "string"
+              }
+            },
+            "required": ["start", "end"]
+          }
+        }
+      }
     }
   }
 }
