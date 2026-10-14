@@ -1,7 +1,8 @@
 import { expect, type Page, type TestInfo } from '@playwright/test';
 import { test } from './fixtures';
 import { assertCheckoutField, CheckNotApplicable } from './storefront-assertions';
-import { readSiteSettings } from '../config/site-settings';
+import { readSiteSettings, type Market } from '../config/site-settings';
+import { applyFields, verifyCheckoutTotals, observeAnalytics } from './commerce-expectations';
 import { CommerceUnverified, parseMoney } from '../scripts/storefront-model';
 import { waitForContent, dismissCookieConsent, BASE } from './helpers';
 import { pageInventory, type InventoryPage } from './inventory';
@@ -26,8 +27,14 @@ export async function runBuyerJourney(
   page: Page,
   info: TestInfo,
   inventory: InventoryPage[] = pageInventory(),
+  market?: Market,
 ) {
   const steps: Step[] = [];
+  const analytics =
+    !market && settings.analytics?.enabled
+      ? await observeAnalytics(page, settings.analytics)
+      : undefined;
+  const totals = market?.checkoutTotals || settings.checkoutTotals;
   let adapter: JourneyAdapter | undefined;
   let mutated = false;
   let failure: unknown;
@@ -83,6 +90,18 @@ export async function runBuyerJourney(
     });
   };
   try {
+    if (market)
+      await step(
+        'market',
+        { name: market.name, language: market.language, currency: market.currency },
+        async () => {
+          await page.goto(new URL(market.path, BASE).href, { waitUntil: 'domcontentloaded' });
+          expect(new URL(page.url()).origin).toBe(new URL(BASE).origin);
+          await applyFields(page, market.fields || []);
+          await expect(page.locator('html')).toHaveAttribute('lang', market.language);
+          return { name: market.name, language: await page.locator('html').getAttribute('lang') };
+        },
+      );
     await step(
       'plan',
       'Available product, quantity 1 → 2; prefer a product with variants',
@@ -134,6 +153,7 @@ export async function runBuyerJourney(
           );
         await fields.fill(selected.target.title);
         await fields.press('Enter');
+        if (analytics) analytics.events.length = 0;
         const links = page
           .locator(settings.selectors.searchResults || 'main a[href], [role="main"] a[href]')
           .filter({ visible: true });
@@ -171,12 +191,26 @@ export async function runBuyerJourney(
           })
           .toBe(true);
         await waitForContent(page);
+        if (market) await expect(page.locator('html')).toHaveAttribute('lang', market.language);
         return { url: page.url() };
       },
     );
     await step('variant', selected.target, async () => {
       await selected.select();
       await selected.stable();
+      if (market) {
+        expect(selected.target.currency, 'Market currency').toBe(market.currency);
+        expect(selected.target.unitPrice, 'Market unit price').toBe(market.unitPrice);
+      }
+      if (analytics)
+        await analytics.verify(
+          'view',
+          1,
+          selected.target.unitPrice,
+          selected.target.currency,
+          selected.target.unitPrice,
+          selected.target.precision,
+        );
       return {
         variantId: selected.target.variantId,
         variantSelection: selected.target.hasVariants
@@ -199,6 +233,15 @@ export async function runBuyerJourney(
         await showCart(page, selected);
         cart = await selected.cart(1);
         await selected.cartUI(cart);
+        if (analytics)
+          await analytics.verify(
+            'add',
+            1,
+            cart.linePrice,
+            cart.currency,
+            selected.target.unitPrice,
+            selected.target.precision,
+          );
         return cart;
       },
     );
@@ -309,6 +352,16 @@ export async function runBuyerJourney(
           throw new CommerceUnverified(
             'Checkout attempted an order mutation; request blocked, no order submitted',
           );
+        if (market) await expect(page.locator('html')).toHaveAttribute('lang', market.language);
+        if (analytics)
+          await analytics.verify(
+            'checkout',
+            2,
+            cart!.linePrice,
+            cart!.currency,
+            selected.target.unitPrice,
+            selected.target.precision,
+          );
         return {
           quantity: 2,
           linePrice: money.amount,
@@ -317,6 +370,23 @@ export async function runBuyerJourney(
         };
       },
     );
+    if (totals)
+      await step(
+        'checkout-totals',
+        { currency: totals.currency, total: totals.total },
+        async () => {
+          expect(selected.target.currency).toBe(totals.currency);
+          const observed = await verifyCheckoutTotals(
+            page,
+            totals,
+            market?.locale || settings.locale,
+            selected.target.precision,
+          );
+          if (checkoutMutationBlocked)
+            throw new CommerceUnverified('Checkout attempted an order mutation; request blocked');
+          return observed;
+        },
+      );
   } catch (error) {
     failure = error;
   } finally {
@@ -336,6 +406,8 @@ export async function runBuyerJourney(
         {
           schemaVersion: 1,
           platform: settings.platform,
+          market: market?.name,
+          analytics: analytics?.events,
           project: info.project.name,
           status: failure
             ? failure instanceof CommerceUnverified

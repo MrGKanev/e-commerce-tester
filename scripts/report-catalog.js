@@ -81,6 +81,7 @@ function catalog(reportsDir, sites = []) {
               array(changes[key]).filter(value => typeof value === 'string'),
             ]),
           ),
+          pinned: fs.existsSync(path.join(dir, '.pinned')),
           id: entry.name,
           storeName:
             typeof metadata.data.site?.name === 'string' ? metadata.data.site.name : undefined,

@@ -100,8 +100,21 @@ function cart(state: { quantity: number; variant: number; mode: string }) {
           : [],
       };
 }
+function eventScript(stage: string, quantity = 1, mode = 'good') {
+  const event = {
+    event: stage,
+    ecommerce: {
+      value: quantity * 29.9,
+      currency: mode === 'analytics-currency' ? 'USD' : 'EUR',
+      items: [{ item_id: '10', price: 29.9, quantity }],
+    },
+  };
+  if (mode === 'analytics-missing') return '';
+  const push = `window.dataLayer=window.dataLayer||[];window.dataLayer.push(${JSON.stringify(event)});`;
+  return push + (mode === 'analytics-duplicate' ? push : '');
+}
 const shell = (body: string) =>
-  `<!doctype html><html><head><title>Journey fixture</title></head><body><main>${body}</main><script>window.Shopify={routes:{root:'/en/'}}</script></body></html>`;
+  `<!doctype html><html lang="en"><head><title>Journey fixture</title></head><body><main>${body}</main><script>window.Shopify={routes:{root:'/en/'}}</script></body></html>`;
 test.beforeAll(async () => {
   server = createServer(async (req, res) => {
     const url = new URL(req.url!, origin);
@@ -173,7 +186,7 @@ test.beforeAll(async () => {
         : `<form action="/en/cart/add"><select name="id">${state.mode === 'simple' ? '' : '<option value="12">Small</option>'}<option value="11">${state.mode === 'simple' ? 'Default Title' : 'Large'}</option></select><button type="button" name="add">Add</button>`;
       res.end(
         shell(
-          `<div data-woo-product data-product-root><h1>Journey product</h1><span data-product-price data-woo-price>${money(state.mode === 'ui-price' ? 3090 : 2990)}</span>${form}<input name="quantity" type="number" min="1" value="1"></form></div><script>const picker=document.querySelector('select');if(picker)picker.onchange=()=>{const field=document.querySelector('[name=variation_id]');if(field)field.value='11'};document.querySelector('button').onclick=async()=>{await fetch('/ui-add',{method:'POST',body:JSON.stringify({id:document.querySelector('[name=variation_id]')?.value||document.querySelector('[name=id]')?.value||document.querySelector('[name=add-to-cart]').value,quantity:1})})};</script>`,
+          `<div data-woo-product data-product-root><h1>Journey product</h1><span data-product-price data-woo-price>${money(state.mode === 'ui-price' ? 3090 : 2990)}</span>${form}<input name="quantity" type="number" min="1" value="1"></form></div><script>${eventScript('view_item', 1, state.mode)}const picker=document.querySelector('select');if(picker)picker.onchange=()=>{const field=document.querySelector('[name=variation_id]');if(field)field.value='11'};document.querySelector('button').onclick=async()=>{await fetch('/ui-add',{method:'POST',body:JSON.stringify({id:document.querySelector('[name=variation_id]')?.value||document.querySelector('[name=id]')?.value||document.querySelector('[name=add-to-cart]').value,quantity:1})});${eventScript('add_to_cart', 1, state.mode)}};</script>`,
         ),
       );
       return;
@@ -206,7 +219,7 @@ test.beforeAll(async () => {
         shell(
           state.mode === 'checkout-hidden'
             ? 'Checkout is protected'
-            : `<form class="checkout"><input type="email"><div data-checkout-line-item>Journey product Large<span data-checkout-quantity>${state.mode === 'checkout-quantity' ? 1 : state.quantity}</span><span data-checkout-line-price>${money(state.quantity * 2990 + (state.mode === 'checkout-price' ? 100 : 0))}</span></div><button>Place order</button></form>${automaticOrder}`,
+            : `<form class="checkout"><input type="email"><div data-checkout-line-item>Journey product Large<span data-checkout-quantity>${state.mode === 'checkout-quantity' ? 1 : state.quantity}</span><span data-checkout-line-price>${money(state.quantity * 2990 + (state.mode === 'checkout-price' ? 100 : 0))}</span></div><select id="country"><option value="">Choose</option><option value="BG">Bulgaria</option></select><input id="postal"><input type="radio" id="standard" name="shipping-method"><span id="subtotal">€59.80</span><span id="shipping">${state.mode === 'shipping-fee' ? '€5.00' : '€0.00'}</span><span id="tax">€0.00</span><span id="discount">€0.00</span><span id="total">${state.mode === 'wrong-total' ? '€60.80' : '€59.80'}</span><button>Place order</button></form><script>${eventScript('begin_checkout', 2, state.mode)}</script>${automaticOrder}`,
         ),
       );
       return;
@@ -237,6 +250,11 @@ for (const [mode, expectedStage, unverified] of [
   ['checkout-hidden', 'checkout', true],
   ['max-one', 'quantity', true],
   ['automatic-order', 'checkout', true],
+  ['shipping-fee', 'checkout-totals', false],
+  ['wrong-total', 'checkout-totals', false],
+  ['analytics-missing', 'variant', false],
+  ['analytics-duplicate', 'variant', false],
+  ['analytics-currency', 'variant', false],
 ] as const) {
   test(`journey ${mode}`, async ({ page }, info) => {
     const start = seen.length;
@@ -261,5 +279,35 @@ for (const [mode, expectedStage, unverified] of [
       requests.some(request => (woo ? request.includes('/en/') : request.includes('/wp/'))),
     ).toBe(false);
     expect([...sessions.values()].every(session => session.quantity === 0)).toBe(true);
+  });
+}
+
+for (const mismatch of ['none', 'language', 'currency', 'price'] as const) {
+  test(`market journey ${mismatch}`, async ({ page }, info) => {
+    const market = {
+      name: 'Bulgaria',
+      path: '/case?mode=good',
+      locale: 'en-US',
+      language: mismatch === 'language' ? 'bg' : 'en',
+      currency: mismatch === 'currency' ? 'USD' : 'EUR',
+      unitPrice: mismatch === 'price' ? 3000 : 2990,
+      checkoutTotals: readSiteSettings().checkoutTotals!,
+    };
+    let failure: unknown;
+    try {
+      await runBuyerJourney(page, info, inventory, market);
+    } catch (error) {
+      failure = error;
+    }
+    expect(Boolean(failure)).toBe(mismatch !== 'none');
+    const evidence = JSON.parse(
+      info.attachments.find(item => item.name === 'buyer-journey.json')!.body!.toString(),
+    );
+    expect(evidence.market).toBe('Bulgaria');
+    if (mismatch === 'none')
+      expect(
+        evidence.steps.find((step: { name: string }) => step.name === 'checkout-totals').actual
+          .total,
+      ).toBe(5980);
   });
 }

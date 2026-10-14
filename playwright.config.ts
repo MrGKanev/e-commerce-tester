@@ -5,7 +5,7 @@ import { pin, baselineRoot } from './scripts/visual-baselines';
 import { readSiteSettings } from './config/site-settings';
 const platform = readSiteSettings().platform;
 const wooMatch =
-  /(?:12-performance|29-content|30-inventory-visual|32-shared-pages|35-seo-inventory|36-buyer-journey|39-a11y-extras|40-a11y-dynamic|34-woocommerce)\.spec\.ts/;
+  /(?:12-performance|29-content|30-inventory-visual|32-shared-pages|35-seo-inventory|36-buyer-journey|39-a11y-extras|40-a11y-dynamic|41-markets|42-tracking-consent|37-store-expectations|38-third-party-scripts|34-woocommerce)\.spec\.ts/;
 
 const runDate =
   process.env.TEST_RUN_DATE ||
@@ -91,7 +91,7 @@ export default defineConfig({
       testMatch:
         platform === 'woocommerce'
           ? wooMatch
-          : /(?:07-mobile|10-visual|11-accessibility|24-keyboard|29-content|30-inventory-visual|32-shared-pages|35-seo-inventory|36-buyer-journey|33-commerce-consistency|40-a11y-dynamic)\.spec\.ts/,
+          : /(?:07-mobile|10-visual|11-accessibility|24-keyboard|29-content|30-inventory-visual|32-shared-pages|35-seo-inventory|36-buyer-journey|33-commerce-consistency|40-a11y-dynamic|41-markets|42-tracking-consent)\.spec\.ts/,
       use: { ...devices['Pixel 7'] },
     },
     {
@@ -99,7 +99,7 @@ export default defineConfig({
       testMatch:
         platform === 'woocommerce'
           ? wooMatch
-          : /(?:07-mobile|10-visual|11-accessibility|24-keyboard|29-content|30-inventory-visual|32-shared-pages|35-seo-inventory|36-buyer-journey|33-commerce-consistency|40-a11y-dynamic)\.spec\.ts/,
+          : /(?:07-mobile|10-visual|11-accessibility|24-keyboard|29-content|30-inventory-visual|32-shared-pages|35-seo-inventory|36-buyer-journey|33-commerce-consistency|40-a11y-dynamic|41-markets|42-tracking-consent)\.spec\.ts/,
       use: { ...devices['iPhone 13'] },
     },
   ],

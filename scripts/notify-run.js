@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { summarizeRun } = require('./report-model');
 const { scope, transition, scriptChanges } = require('./monitoring');
+const { annotations, issueId } = require('./issues');
 function read(file, fallback) {
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : fallback;
 }
@@ -38,23 +39,30 @@ async function processRun(runDir, options = {}, env = process.env) {
   const suppressed = (options.maintenance || []).some(
     window => Date.now() >= Date.parse(window.start) && Date.now() < Date.parse(window.end),
   );
+  const site = path.basename(path.dirname(runDir));
+  const notes = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(site)
+    ? annotations(path.resolve(runDir, '../..'), site)
+    : {};
   const pending = [...(previous.pending || []), ...events];
+  const deliverable = pending.filter(
+    event => !event.key || !(Date.parse(notes[issueId(key, event.key)]?.mutedUntil) > Date.now()),
+  );
   state.pending = options.enabled ? pending : [];
   const reportPath = `/reports/${encodeURIComponent(metadata.site?.slug || path.basename(path.dirname(runDir)))}/${encodeURIComponent(run)}/html/index.html`;
   const payload = {
     site: metadata.site?.slug,
     run,
     reportUrl: env.REPORT_BASE_URL ? new URL(reportPath, env.REPORT_BASE_URL).href : reportPath,
-    events: pending,
+    events: deliverable,
   };
   // Persist before delivery: repeat runner invocations must not resend the same transition.
   write(stateFile, state);
   const delivery = {
-    events: pending,
+    events: deliverable,
     suppressed,
     status: suppressed ? 'suppressed' : options.enabled ? 'no-changes' : 'disabled',
   };
-  if (options.enabled && pending.length && !suppressed) {
+  if (options.enabled && deliverable.length && !suppressed) {
     try {
       const endpoint = new URL(env[options.webhookEnv || 'MONITORING_WEBHOOK_URL']);
       if (
@@ -72,7 +80,7 @@ async function processRun(runDir, options = {}, env = process.env) {
       });
       if (!response.ok) throw new Error(`Webhook HTTP ${response.status}`);
       delivery.status = 'delivered';
-      state.pending = [];
+      state.pending = pending.filter(event => !deliverable.includes(event));
       write(stateFile, state);
     } catch {
       delivery.status = 'failed';

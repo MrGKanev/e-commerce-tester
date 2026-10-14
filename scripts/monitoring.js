@@ -46,16 +46,26 @@ function transition(previous = {}, summary, run) {
     const category = classification(scenario);
     if (scenario.outcome === 'failed') {
       const consecutive = old?.category === category ? old.count + 1 : 1;
-      incidents[key] = { category, count: consecutive, name: scenario.name };
+      incidents[key] = {
+        category,
+        count: consecutive,
+        name: scenario.name,
+        firstSeen: old?.firstSeen || summary.metadata?.startedAt || new Date().toISOString(),
+        lastSeen: summary.metadata?.startedAt || new Date().toISOString(),
+        firstRun: old?.firstRun || run,
+        lastRun: run,
+        project: scenario.project,
+      };
       if (consecutive <= 2)
         events.push({
           state: consecutive === 1 ? 'new' : 'confirmed',
           category,
           check: scenario.name,
+          key,
         });
     } else if (old && scenario.outcome === 'passed') {
       delete incidents[key];
-      events.push({ state: 'recovered', category: old.category, check: scenario.name });
+      events.push({ state: 'recovered', category: old.category, check: scenario.name, key });
     }
   }
   let runnerIncident = previous.runnerIncident || false;
@@ -73,6 +83,7 @@ function transition(previous = {}, summary, run) {
         state: 'new',
         category: category === 'unverified' ? 'infrastructure' : category,
         check: 'Run could not complete',
+        key: 'runner',
       });
     runnerIncident = true;
   } else if (
@@ -86,7 +97,24 @@ function transition(previous = {}, summary, run) {
     });
     runnerIncident = false;
   }
-  return { state: { run, incidents, runnerIncident }, events };
+  return {
+    state: {
+      run,
+      incidents,
+      runnerIncident,
+      ...(runnerIncident
+        ? {
+            runnerEvidence: {
+              firstRun: previous.runnerEvidence?.firstRun || run,
+              lastRun: run,
+              firstSeen: previous.runnerEvidence?.firstSeen || new Date().toISOString(),
+              lastSeen: new Date().toISOString(),
+            },
+          }
+        : {}),
+    },
+    events,
+  };
 }
 function compareReports(candidate, production) {
   const old = new Map(production.scenarios.map(s => [checkKey(s), s]));

@@ -59,3 +59,5 @@ To compare staging with production, configure staging as a separate store, run t
 ## Local verification
 
 `pnpm test:monitoring:local` exercises successful and deliberately failing expectations and external script capture against local Shopify/Woo fixtures. Node tests cover incident transitions, maintenance, webhook delivery failures/retries, script changes and comparisons. `pnpm test:control:local` covers settings persistence, candidate comparison, desktop/mobile layout and accessibility. No real-store or external notification delivery is needed.
+
+Open problems now have a cross-store panel, first/latest evidence, ownership, severity, notes and expiring mutes. See [operations](OPERATIONS-AND-COMMERCE.md#open-problems).

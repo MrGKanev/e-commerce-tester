@@ -6,13 +6,22 @@
   "additionalProperties": true,
   "properties": {
     "platform": {
-      "enum": ["shopify", "woocommerce"]
+      "enum": [
+        "shopify",
+        "woocommerce"
+      ]
     },
     "locale": {
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "timezoneId": {
-      "type": ["string", "null"]
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "performanceMetrics": {
       "type": "object",
@@ -22,7 +31,10 @@
           "type": "boolean"
         },
         "mode": {
-          "enum": ["report", "strict"]
+          "enum": [
+            "report",
+            "strict"
+          ]
         },
         "afterDomMs": {
           "type": "number",
@@ -333,14 +345,24 @@
                 "pattern": "^/(?!/)[^\\\\]*$"
               },
               "type": {
-                "enum": ["home", "product", "collection", "search", "cart", "static"]
+                "enum": [
+                  "home",
+                  "product",
+                  "collection",
+                  "search",
+                  "cart",
+                  "static"
+                ]
               },
               "language": {
                 "type": "string",
                 "pattern": "\\S"
               }
             },
-            "required": ["path", "type"]
+            "required": [
+              "path",
+              "type"
+            ]
           }
         }
       }
@@ -350,13 +372,20 @@
       "additionalProperties": false,
       "properties": {
         "mode": {
-          "enum": ["off", "report", "strict"]
+          "enum": [
+            "off",
+            "report",
+            "strict"
+          ]
         },
         "languages": {
           "type": "array",
           "minItems": 1,
           "items": {
-            "enum": ["bg", "en"]
+            "enum": [
+              "bg",
+              "en"
+            ]
           }
         },
         "allowWords": {
@@ -417,23 +446,41 @@
       "additionalProperties": false,
       "properties": {
         "mode": {
-          "enum": ["auto", "supported", "unsupported", "blocked"]
+          "enum": [
+            "auto",
+            "supported",
+            "unsupported",
+            "blocked"
+          ]
         },
         "reason": {
           "type": "string"
         },
         "contact": {
-          "enum": ["required", "not-applicable", "unverified"]
+          "enum": [
+            "required",
+            "not-applicable",
+            "unverified"
+          ]
         },
         "shippingAddress": {
-          "enum": ["required", "not-applicable", "unverified"]
+          "enum": [
+            "required",
+            "not-applicable",
+            "unverified"
+          ]
         },
         "requiredAddressFields": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
           "items": {
-            "enum": ["addressLine1", "city", "postalCode", "country"]
+            "enum": [
+              "addressLine1",
+              "city",
+              "postalCode",
+              "country"
+            ]
           }
         }
       }
@@ -443,7 +490,10 @@
       "additionalProperties": false,
       "properties": {
         "mode": {
-          "enum": ["accept-all", "none"]
+          "enum": [
+            "accept-all",
+            "none"
+          ]
         },
         "waitMs": {
           "type": "integer",
@@ -506,8 +556,309 @@
                 "type": "string"
               }
             },
-            "required": ["start", "end"]
+            "required": [
+              "start",
+              "end"
+            ]
           }
+        }
+      }
+    },
+    "checkoutTotals": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fields": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "selector": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "value": {
+                "type": "string",
+                "maxLength": 500
+              },
+              "kind": {
+                "enum": [
+                  "fill",
+                  "select",
+                  "check"
+                ]
+              }
+            },
+            "required": [
+              "selector",
+              "kind"
+            ]
+          }
+        },
+        "shippingMethod": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "subtotalSelector": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "shippingSelector": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "taxSelector": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "discountSelector": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "totalSelector": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "subtotal": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "shipping": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "tax": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "discount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "taxIncluded": {
+          "type": "boolean"
+        },
+        "freeShippingThreshold": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        }
+      },
+      "required": [
+        "fields",
+        "shippingMethod",
+        "subtotalSelector",
+        "shippingSelector",
+        "taxSelector",
+        "discountSelector",
+        "totalSelector",
+        "subtotal",
+        "shipping",
+        "tax",
+        "discount",
+        "total",
+        "currency",
+        "taxIncluded"
+      ]
+    },
+    "markets": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^/(?!/)[^\\\\]*$"
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "unitPrice": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000000
+          },
+          "fields": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "selector": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                },
+                "value": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "kind": {
+                  "enum": [
+                    "fill",
+                    "select",
+                    "check"
+                  ]
+                }
+              },
+              "required": [
+                "selector",
+                "kind"
+              ]
+            }
+          },
+          "checkoutTotals": {
+            "$ref": "#/properties/checkoutTotals"
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "locale",
+          "language",
+          "currency",
+          "unitPrice",
+          "checkoutTotals"
+        ]
+      }
+    },
+    "analytics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "layer": {
+          "type": "string",
+          "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*$"
+        },
+        "productId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "observeMs": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 10000
+        },
+        "acceptSelector": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "rejectSelector": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "trackers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[a-zA-Z0-9.-]+$"
+          }
+        },
+        "events": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "view": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "add": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "checkout": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            }
+          },
+          "required": [
+            "view",
+            "add",
+            "checkout"
+          ]
+        }
+      },
+      "required": [
+        "enabled",
+        "productId",
+        "acceptSelector",
+        "rejectSelector",
+        "trackers",
+        "events"
+      ]
+    },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxRuns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "maxDays": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 36500
+        },
+        "maxBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000000000000
         }
       }
     }

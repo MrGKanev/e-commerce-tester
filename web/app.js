@@ -189,7 +189,7 @@ function render() {
     )}${help('Enter one accepted term per line. Strict spelling can fail for brand names or unknown words.')}<div class="mt-4">${grid(renderPacing(schedule.pacing || {}, `scheduler.sites.${site.slug}.pacing`, true))}</div>${help('Blank fields inherit the general pauses.')}`,
   );
   const footer = `<div class="mt-8 flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between"><p class="text-sm text-slate-600">Existing reports remain when a store is removed.</p><button class="${button('danger')}" data-action="remove-store">Remove store</button></div>`;
-  editor.innerHTML = `${heading}${basics}${schedulePart}${renderCookieConsent(site, base)}${renderCheckoutPolicy(site, base)}${renderMonitoring(site, base)}${content}${footer}`;
+  editor.innerHTML = `${heading}${basics}${renderDiscovery()}${schedulePart}${renderCookieConsent(site, base)}${renderCheckoutPolicy(site, base)}${renderMonitoring(site, base)}${renderCommerceSettings(site, base)}${content}${footer}`;
   renderJobStatus();
 }
 function renderMonitoring(site, base) {
@@ -585,7 +585,7 @@ function restoreLocation() {
 }
 function showSection(section, navigate = true) {
   if (navigate) updateLocation(section);
-  for (const name of ['runs', 'reports', 'settings']) {
+  for (const name of ['runs', 'reports', 'issues', 'settings']) {
     const active = section === name;
     $(`#${name}-view`).hidden = !active;
     if (active) $(`#${name}-tab`).setAttribute('aria-current', 'page');
@@ -593,6 +593,7 @@ function showSection(section, navigate = true) {
   }
   $('#reload').hidden = section !== 'settings';
   if (section === 'reports') refreshReports();
+  if (section === 'issues') refreshIssues();
   if (section === 'runs') loadRunStores();
 }
 function displayReport(url, title) {
@@ -1033,7 +1034,7 @@ $('#activity-toggle').addEventListener('click', () =>
 // Collapsed by default so the persistent bar keeps the page usable; the choice is remembered.
 setActivityDetails(localStorage.getItem('activity-details') === 'open');
 
-for (const section of ['settings', 'reports', 'runs']) {
+for (const section of ['settings', 'reports', 'runs', 'issues']) {
   $(`#${section}-tab`).addEventListener('click', event => {
     if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0)
       return;
@@ -1077,12 +1078,20 @@ function renderMonitoringHistory(group, run) {
     .filter(item => item.group.id !== group.id);
   const failures = run.scenarios.filter(s => s.outcome === 'failed');
   $('#monitoring-history').innerHTML =
-    `<h2 class="text-base font-semibold">Trends for the selected check scope</h2><p class="text-sm text-slate-600">Up to 30 comparable runs. LCP is the median of measured synthetic documents; missing values remain unmeasured.</p><div class="grid gap-4 md:grid-cols-2">${chart('Pass rate', 'passRate', '%')}${chart('Synthetic LCP', 'lcp', ' ms')}</div>
+    `<div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-base font-semibold">Trends for the selected check scope</h2><button id="pin-report" class="${button('quiet')}" aria-pressed="${run.pinned}">${run.pinned ? 'Unpin report' : 'Keep this report'}</button></div><p class="text-sm text-slate-600">Up to 30 comparable runs. LCP is the median of measured synthetic documents; missing values remain unmeasured.</p><div class="grid gap-4 md:grid-cols-2">${chart('Pass rate', 'passRate', '%')}${chart('Synthetic LCP', 'lcp', ' ms')}</div>
   <details><summary class="cursor-pointer rounded text-sm font-semibold ${focusRing}">Trend values</summary><div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr><th class="p-2">Run</th><th class="p-2">Pass rate</th><th class="p-2">Coverage</th><th class="p-2">LCP (ms)</th></tr></thead><tbody>${history.map(r => `<tr><td class="p-2">${escapeHTML(r.id)}</td><td class="p-2">${r.passRate ?? 'Unmeasured'}</td><td class="p-2">${r.coverage ?? 'Unmeasured'}</td><td class="p-2">${r.lcp ?? 'Unmeasured'}</td></tr>`).join('')}</tbody></table></div></details>
   <p class="text-sm text-slate-700">Notification delivery: ${escapeHTML(run.notifications.status || 'No delivery record')}${run.notifications.suppressed ? ' · Maintenance suppression' : ''}</p>
   ${failures.map(s => `<p class="text-sm text-red-800">${escapeHTML(s.classification)}: ${escapeHTML(s.name)}</p>`).join('')}
   ${['added', 'removed'].map(key => (run.scriptChanges[key] || []).map(url => `<p class="break-all text-sm text-slate-700">Script ${key}: ${escapeHTML(url)}</p>`).join('')).join('')}
   <label class="${labelClass}">Compare selected production run with candidate<select id="comparison-candidate" class="${inputClass}"><option value="">Select a saved candidate run</option>${candidates.map((item, index) => `<option value="${index}">${escapeHTML(item.group.name)} · ${escapeHTML(item.run.id)}</option>`).join('')}</select></label><div id="comparison-result" role="status" class="space-y-2 text-sm"></div>`;
+  $('#pin-report').addEventListener('click', async () => {
+    try {
+      await post('/api/reports/pin', { site: group.id.slice(5), run: run.id, pinned: !run.pinned });
+      await refreshReports();
+    } catch (error) {
+      $('#reports-message').textContent = error.message;
+    }
+  });
   $('#comparison-candidate').addEventListener('change', async event => {
     const chosen = candidates[event.target.value];
     const output = $('#comparison-result');
@@ -1115,3 +1124,217 @@ function renderMonitoringHistory(group, run) {
     }
   });
 }
+
+function post(url, value) {
+  return api(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Control-Token': token },
+    body: JSON.stringify(value),
+  });
+}
+function renderDiscovery() {
+  return sectionBlock(
+    'Setup assistant',
+    `<p class="mb-3 text-sm text-slate-600">Discover public products and check selectors at the store address above. This visits the store only when you choose Discover.</p><button data-discover class="${button('quiet')}">Discover products and check setup</button><div id="discovery-result" class="mt-3 space-y-3 text-sm" aria-live="polite"></div>`,
+  );
+}
+const totalsTemplate = () => ({
+  fields: [],
+  shippingMethod: '',
+  subtotalSelector: '',
+  shippingSelector: '',
+  taxSelector: '',
+  discountSelector: '',
+  totalSelector: '',
+  subtotal: 0,
+  shipping: 0,
+  tax: 0,
+  discount: 0,
+  total: 0,
+  currency: 'EUR',
+  taxIncluded: false,
+});
+function fieldActions(items, base) {
+  return `<div class="mt-4 space-y-4">${items
+    .map((item, i) =>
+      grid(
+        `${field('Field selector', `${base}.${i}.selector`, item.selector)}${selectField(
+          'Field action',
+          `${base}.${i}.kind`,
+          [
+            ['fill', 'Enter text'],
+            ['select', 'Select option value'],
+            ['check', 'Check radio or checkbox'],
+          ],
+          item.kind,
+        )}${field('Test value (use synthetic details)', `${base}.${i}.value`, item.value || '')}<button class="${button('quiet')}" data-remove-field="${base}" data-index="${i}">Remove field ${i + 1}</button>`,
+      ),
+    )
+    .join(
+      '',
+    )}<button class="${button('quiet')}" data-add-field="${base}">Add form field</button></div>`;
+}
+function totalsFields(totals, base) {
+  return `${help('Expected amounts use minor currency units: EUR 12.50 = 1250; JPY 1250 = 1250. Subtotal is before the separate discount. Use synthetic addresses. No order is submitted.')}${grid(`${field('Currency', `${base}.currency`, totals.currency)}${field('Shipping method radio selector', `${base}.shippingMethod`, totals.shippingMethod)}${['subtotal', 'shipping', 'tax', 'discount', 'total'].map(key => `${field(`Expected ${key} (minor units)`, `${base}.${key}`, totals[key], 'number')}${field(`${key} amount selector`, `${base}.${key}Selector`, totals[`${key}Selector`])}`).join('')}${field('Free shipping threshold (optional, after discount)', `${base}.freeShippingThreshold`, totals.freeShippingThreshold ?? '', 'number', 1, 'data-optional')}`)}${checkbox('Tax is already included in subtotal and shipping', `${base}.taxIncluded`, totals.taxIncluded)}${fieldActions(totals.fields, `${base}.fields`)}`;
+}
+function renderCommerceSettings(site, base) {
+  const analytics = site.analytics;
+  return (
+    disclosure(
+      'Checkout totals',
+      site.checkoutTotals
+        ? `${totalsFields(site.checkoutTotals, `${base}.checkoutTotals`)}<button data-remove-setting="${base}.checkoutTotals" class="${button('quiet')}">Remove checkout totals check</button>`
+        : `<button data-enable-totals="${base}.checkoutTotals" class="${button('quiet')}">Configure checkout totals</button>`,
+    ) +
+    disclosure(
+      'Analytics and tracking consent',
+      analytics
+        ? `${checkbox('Enable analytics checks', `${base}.analytics.enabled`, analytics.enabled)}${grid(`${field('Data layer name', `${base}.analytics.layer`, analytics.layer || 'dataLayer')}${field('Expected analytics product ID', `${base}.analytics.productId`, analytics.productId)}${field('Product view event', `${base}.analytics.events.view`, analytics.events.view)}${field('Add to cart event', `${base}.analytics.events.add`, analytics.events.add)}${field('Checkout event', `${base}.analytics.events.checkout`, analytics.events.checkout)}${field('Observe after each action (milliseconds)', `${base}.analytics.observeMs`, analytics.observeMs || 1000, 'number')}${field('Accept consent button selector', `${base}.analytics.acceptSelector`, analytics.acceptSelector)}${field('Reject consent button selector', `${base}.analytics.rejectSelector`, analytics.rejectSelector)}<label class="${labelClass}">Tracker hostnames, one per line<textarea class="${inputClass}" data-list data-path="${base}.analytics.trackers">${escapeHTML(analytics.trackers.join('\n'))}</textarea></label>`)}${help('Events must use ecommerce.value, currency and items with item_id, price and quantity. The buyer journey checks a single product. Consent checks use fresh sessions and the listed tracker hosts.')}<button data-remove-setting="${base}.analytics" class="${button('quiet')}">Remove analytics checks</button>`
+        : `<button data-enable-analytics="${base}.analytics" class="${button('quiet')}">Configure analytics</button>`,
+    ) +
+    disclosure(
+      'Market scenarios',
+      `${help('Each market runs a fresh buyer journey through checkout. Set its landing path and optional country selection fields; configure the expected price, language and delivery totals. Prices are checked against the selected product; use a representative configured product.')}${(site.markets || []).map((market, i) => `<fieldset class="mt-4 min-w-0 space-y-4 rounded-lg border border-slate-200 p-4"><legend class="px-2 font-semibold">Market ${i + 1}</legend>${grid(`${field('Market name', `${base}.markets.${i}.name`, market.name)}${field('Market landing path', `${base}.markets.${i}.path`, market.path)}${field('Browser locale', `${base}.markets.${i}.locale`, market.locale)}${field('Expected document language', `${base}.markets.${i}.language`, market.language)}${field('Expected market currency', `${base}.markets.${i}.currency`, market.currency)}${field('Expected unit price (minor units)', `${base}.markets.${i}.unitPrice`, market.unitPrice, 'number')}`)}${fieldActions(market.fields || [], `${base}.markets.${i}.fields`)}${totalsFields(market.checkoutTotals, `${base}.markets.${i}.checkoutTotals`)}<button class="${button('quiet')}" data-remove-field="${base}.markets" data-index="${i}">Remove market ${i + 1}</button></fieldset>`).join('')}<button class="${button('quiet')}" data-add-market="${base}.markets">Add market scenario</button>`,
+    ) +
+    disclosure(
+      'Report retention and backups',
+      `${grid(`${field('Maximum saved runs', `${base}.retention.maxRuns`, site.retention?.maxRuns ?? 30, 'number')}${field('Maximum age in days (0 disables)', `${base}.retention.maxDays`, site.retention?.maxDays ?? 0, 'number')}${field('Maximum report size in MB (0 disables)', `${base}.retention.maxBytes`, site.retention?.maxBytes ?? 0, 'number', 1000000)}`)}${help('The latest run, unfinished runs, pinned reports and first/last evidence for open problems are protected, even when limits are exceeded. Limits apply after a run finishes.')}<p class="mt-3 text-sm text-slate-600">For a full backup, wait for active checks to finish and stop the control service. On the host run <code class="break-all">node scripts/backup.js create INSTALLATION BACKUP_DIRECTORY</code>. Restore with <code class="break-all">node scripts/backup.js restore BACKUP_DIRECTORY NEW_DATA_DIRECTORY</code>. Restores require a new directory and verify every file checksum; settings, monitoring state, reports and approved images are included.</p>`,
+    )
+  );
+}
+$('#editor').addEventListener('click', async event => {
+  const control = event.target.closest('button');
+  if (!control) return;
+  const openSections = [...$('#editor').querySelectorAll('details[open]')].map(
+    details => details.querySelector('summary')?.textContent,
+  );
+  let path;
+  if ((path = control.dataset.enableTotals)) writePath(path, totalsTemplate());
+  else if ((path = control.dataset.enableAnalytics))
+    writePath(path, {
+      enabled: false,
+      layer: 'dataLayer',
+      productId: '',
+      observeMs: 1000,
+      acceptSelector: '',
+      rejectSelector: '',
+      trackers: [],
+      events: { view: 'view_item', add: 'add_to_cart', checkout: 'begin_checkout' },
+    });
+  else if ((path = control.dataset.addMarket))
+    writePath(path, [
+      ...(readPath(path) || []),
+      {
+        name: `Market ${(readPath(path)?.length || 0) + 1}`,
+        path: '/',
+        locale: 'en-US',
+        language: 'en',
+        currency: 'EUR',
+        unitPrice: 0,
+        fields: [],
+        checkoutTotals: totalsTemplate(),
+      },
+    ]);
+  else if ((path = control.dataset.addField))
+    writePath(path, [...(readPath(path) || []), { selector: '', kind: 'fill', value: '' }]);
+  else if ((path = control.dataset.removeField)) {
+    readPath(path).splice(Number(control.dataset.index), 1);
+    changed();
+  } else if ((path = control.dataset.removeSetting)) {
+    const keys = path.split('.');
+    delete readPath(keys.slice(0, -1).join('.'))[keys.at(-1)];
+    changed();
+  } else if (control.hasAttribute('data-discover')) {
+    const site = data.sites.find(site => site.slug === selected),
+      output = $('#discovery-result');
+    control.disabled = true;
+    output.textContent = 'Checking the public storefront…';
+    try {
+      const result = await post('/api/discover', { url: site.url, selectors: site.selectors });
+      output.innerHTML = `<p>${escapeHTML(result.message)}</p><p>Platform: ${escapeHTML(result.platform || 'Unknown')}</p>${result.products.map(p => `<p>${escapeHTML(p.title)} · ${escapeHTML(p.url)}</p>`).join('')}${result.checks.map(c => `<p>${escapeHTML(c.name)}: ${escapeHTML(c.status)} (${c.count} visible matches)</p>`).join('')}${result.products.length ? `<button id="apply-discovery" class="${button('quiet')}">Use suggested products</button>` : ''}`;
+      output.querySelector('#apply-discovery')?.addEventListener('click', () => {
+        site.platform = result.platform;
+        if (result.platform === 'shopify') {
+          site.productHandle = result.products[0].handle;
+          site.productHandle2 = (result.products[1] || result.products[0]).handle;
+        } else {
+          site.commerce ||= {};
+          site.commerce.productUrls = result.products.map(p => p.url);
+        }
+        site.searchTerm = result.products[0].title;
+        site.selectors ||= {};
+        for (const check of result.checks)
+          if (check.status === 'ready') site.selectors[check.name] = check.selector;
+        changed();
+        render();
+        message('Suggestions applied to the editor. Review and save to use them.');
+      });
+    } catch (error) {
+      output.textContent = error.message;
+    } finally {
+      control.disabled = false;
+    }
+    return;
+  } else return;
+  render();
+  // Reopen the edited section after rebuilding its fields.
+  for (const details of $('#editor').querySelectorAll('details'))
+    if (
+      details.querySelector(`[data-path^="${path}"]`) ||
+      openSections.includes(details.querySelector('summary')?.textContent)
+    )
+      details.open = true;
+  $('#editor').querySelector(`[data-path^="${path}"]`)?.focus();
+});
+let openIssues = [];
+async function refreshIssues() {
+  try {
+    openIssues = (await api('/api/issues')).issues;
+    renderIssues();
+    $('#issues-message').textContent = `${openIssues.length} open problems`;
+  } catch (error) {
+    $('#issues-message').textContent = error.message;
+  }
+}
+function renderIssues() {
+  const query = $('#issues-filter').value.toLowerCase();
+  $('#issues-list').innerHTML =
+    openIssues
+      .filter(i => `${i.site} ${i.name} ${i.owner || ''}`.toLowerCase().includes(query))
+      .map(
+        issue =>
+          `<article class="min-w-0 rounded-xl border border-slate-200 bg-white p-4 sm:p-6"><h2 class="font-semibold break-words">${escapeHTML(issue.site)} · ${escapeHTML(issue.name)}</h2><p class="mt-1 text-sm text-slate-600">${escapeHTML(issue.category)} · ${escapeHTML(issue.project || '')} · ${issue.count || 1} observations</p><p class="mt-2 text-sm text-slate-600">First: ${escapeHTML(issue.firstSeen || 'Unknown')} · Last: ${escapeHTML(issue.lastSeen || 'Unknown')}</p><div class="mt-2 flex flex-wrap gap-4">${[
+            ['First evidence', issue.firstRun],
+            ['Latest evidence', issue.lastRun],
+          ]
+            .filter(([, run]) => run)
+            .map(
+              ([label, run]) =>
+                `<a class="text-sm font-semibold text-blue-700 underline ${focusRing}" href="/reports?store=${encodeURIComponent('site:' + issue.site)}&amp;run=${encodeURIComponent(run)}">${label}</a>`,
+            )
+            .join(
+              '',
+            )}</div><form data-issue="${issue.id}" data-site="${issue.site}" class="mt-4 space-y-4"><div class="grid gap-4 sm:grid-cols-2"><label class="${labelClass}">Severity<select name="severity" class="${inputClass}">${['critical', 'high', 'review', 'low'].map(v => `<option ${v === issue.severity ? 'selected' : ''}>${v}</option>`).join('')}</select></label><label class="${labelClass}">Owner<input name="owner" maxlength="200" class="${inputClass}" value="${escapeHTML(issue.owner || '')}"></label><label class="${labelClass}">Mute until (UTC, ISO timestamp)<input name="mutedUntil" class="${inputClass}" placeholder="2026-12-01T12:00:00Z" value="${escapeHTML(issue.mutedUntil || '')}"></label><label class="${labelClass}">Note<textarea name="note" maxlength="4000" class="${inputClass}">${escapeHTML(issue.note || '')}</textarea></label></div><button class="${button('quiet')}" type="submit">Save problem</button><p class="text-sm text-slate-700" role="status"></p></form></article>`,
+      )
+      .join('') || '<p class="text-sm text-slate-600">No matching open problems.</p>';
+}
+$('#issues-refresh').addEventListener('click', refreshIssues);
+$('#issues-filter').addEventListener('input', renderIssues);
+$('#issues-list').addEventListener('submit', async event => {
+  event.preventDefault();
+  const form = event.target,
+    issue = openIssues.find(i => i.id === form.dataset.issue && i.site === form.dataset.site);
+  const output = form.querySelector('[role=status]');
+  try {
+    const saved = await post('/api/issues', {
+      ...Object.fromEntries(new FormData(form)),
+      site: issue.site,
+      id: issue.id,
+      revision: issue.revision || 0,
+    });
+    Object.assign(issue, saved);
+    output.textContent = 'Problem saved';
+  } catch (error) {
+    output.textContent = error.message;
+  }
+});

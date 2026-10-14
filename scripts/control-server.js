@@ -13,6 +13,9 @@ const { compareReports } = require('./monitoring');
 const visual = require('./visual-baselines');
 const queue = require('./run-queue');
 const { deleteReports } = require('./report-deletion');
+const { listIssues, updateIssue } = require('./issues');
+const { pinReport } = require('./retention');
+const { discoverStore } = require('./discover-store');
 const root = path.join(__dirname, '..');
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -77,6 +80,7 @@ function createControlServer({
   webDir = path.join(root, 'web'),
 }) {
   const token = randomBytes(32).toString('hex');
+  let discovering = false;
   return http.createServer(async (request, response) => {
     try {
       response.setHeader(
@@ -99,6 +103,9 @@ function createControlServer({
             '/api/runs/cancel',
             '/api/runs/force',
             '/api/reports/delete',
+            '/api/issues',
+            '/api/reports/pin',
+            '/api/discover',
           ].includes(url.pathname))
       ) {
         const origin = request.headers.origin;
@@ -110,6 +117,24 @@ function createControlServer({
         if (!request.headers['content-type']?.startsWith('application/json'))
           return json(response, 415, { error: 'Expected JSON configuration' });
         const input = await body(request);
+        if (url.pathname === '/api/issues')
+          return json(response, 200, updateIssue(reportsDir, input));
+        if (url.pathname === '/api/reports/pin')
+          return json(response, 200, pinReport(reportsDir, input.site, input.run, input.pinned));
+        if (url.pathname === '/api/discover') {
+          if (
+            discovering ||
+            queue.readQueue(stateDir).active ||
+            loadState(path.join(stateDir, 'schedule.json')).running
+          )
+            return json(response, 409, { error: 'Wait for the active run or discovery to finish' });
+          discovering = true;
+          try {
+            return json(response, 200, await discoverStore(input));
+          } finally {
+            discovering = false;
+          }
+        }
         if (url.pathname === '/api/reports/delete')
           return json(
             response,
@@ -165,6 +190,8 @@ function createControlServer({
         atomicWrite(configFile, data);
         return json(response, 200, { revision: readConfiguration(configFile).revision });
       }
+      if (request.method === 'GET' && url.pathname === '/api/issues')
+        return json(response, 200, { issues: listIssues(reportsDir) });
       if (request.method === 'GET' && url.pathname === '/api/runs')
         return json(response, 200, queue.publicQueue(stateDir));
       if (request.method === 'GET' && url.pathname === '/api/runs/details')
@@ -290,9 +317,17 @@ function createControlServer({
       if (decoded.startsWith('/reports/') && decoded !== '/reports/')
         return staticFile(response, reportsDir, decoded.slice('/reports/'.length));
       if (
-        ['/', '/settings', '/reports', '/runs', '/settings/', '/reports/', '/runs/'].includes(
-          decoded,
-        )
+        [
+          '/',
+          '/settings',
+          '/reports',
+          '/runs',
+          '/issues',
+          '/issues/',
+          '/settings/',
+          '/reports/',
+          '/runs/',
+        ].includes(decoded)
       )
         return staticFile(response, webDir, 'index.html');
       if (['/app.js', '/tailwind.css'].includes(decoded))

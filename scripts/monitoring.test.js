@@ -191,3 +191,30 @@ test('history preserves missing metrics and calculates the median of measured sa
   assert.equal(run.lcp, 2000);
   assert.equal(run.passRate, 67);
 });
+test('muting one problem defers its webhook events without hiding failures', async t => {
+  const { listIssues, updateIssue } = require('./issues');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mute-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const messages = [];
+  const server = http.createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    messages.push(JSON.parse(body)); response.end('ok');
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  async function run(id, outcome) {
+    const dir = path.join(root, 'shop', id); fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'run-metadata.json'), JSON.stringify({ phase: 'finished', mode: 'smoke', site: { slug: 'shop' }, scenarios: [scenario(outcome)] }));
+    await processRun(dir, { enabled: true }, { MONITORING_WEBHOOK_URL: `http://127.0.0.1:${server.address().port}` });
+  }
+  await run('one', 'failed');
+  const issue = listIssues(root)[0];
+  const update = { site: 'shop', id: issue.id, severity: 'high', owner: '', note: '', mutedUntil: '2100-01-01T00:00:00Z' };
+  updateIssue(root, update);
+  await run('two', 'failed');
+  assert.equal(messages.length, 1); assert.equal(listIssues(root)[0].count, 2);
+  updateIssue(root, { ...update, mutedUntil: '', revision: 1 });
+  await run('three', 'passed');
+  assert.deepEqual(messages[1].events.map(e => e.state), ['confirmed', 'recovered']);
+  assert.equal(listIssues(root).length, 0);
+});

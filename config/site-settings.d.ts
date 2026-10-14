@@ -1,3 +1,45 @@
+export interface CheckoutField {
+  selector: string;
+  kind: 'fill' | 'select' | 'check';
+  value?: string;
+}
+export interface CheckoutTotals {
+  fields: CheckoutField[];
+  shippingMethod: string;
+  subtotalSelector: string;
+  shippingSelector: string;
+  taxSelector: string;
+  discountSelector: string;
+  totalSelector: string;
+  subtotal: number;
+  shipping: number;
+  tax: number;
+  discount: number;
+  total: number;
+  currency: string;
+  taxIncluded: boolean;
+  freeShippingThreshold?: number;
+}
+export interface Market {
+  name: string;
+  path: string;
+  locale: string;
+  language: string;
+  currency: string;
+  unitPrice: number;
+  fields?: CheckoutField[];
+  checkoutTotals: CheckoutTotals;
+}
+export interface AnalyticsSettings {
+  enabled: boolean;
+  layer?: string;
+  productId: string;
+  observeMs?: number;
+  acceptSelector: string;
+  rejectSelector: string;
+  trackers: string[];
+  events: { view: string; add: string; checkout: string };
+}
 export type Capability =
   | 'checkout'
   | 'discounts'
@@ -12,6 +54,10 @@ export type Capability =
   | 'mobileMenu'
   | 'commerceConsistency';
 export interface SiteSettings {
+  checkoutTotals?: CheckoutTotals;
+  analytics?: AnalyticsSettings;
+  markets: Market[];
+  retention: { maxRuns: number; maxDays: number; maxBytes: number };
   expectations: {
     minProducts: number;
     currency: string;

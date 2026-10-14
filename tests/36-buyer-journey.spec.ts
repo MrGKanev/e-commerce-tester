@@ -5,7 +5,7 @@ import { readSiteSettings } from '../config/site-settings';
 
 test(
   'Buyer journey — search → product → variant → add → quantity → checkout',
-  { tag: ['@full', '@journey'] },
+  { tag: ['@full', '@journey', '@analytics'] },
   async ({ browser }, info) => {
     if (readSiteSettings().capabilities.checkout === false) {
       info.annotations.push({

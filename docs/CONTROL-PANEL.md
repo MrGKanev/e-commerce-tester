@@ -108,3 +108,5 @@ Select WooCommerce in Platform, enter one public product URL per line and adjust
 ## Monitoring
 
 See [monitoring, expectations, trends and staging comparisons](MONITORING.md).
+
+See [Checkout, analytics, markets and operations](OPERATIONS-AND-COMMERCE.md) for the setup assistant, Problems view, new per-store checks, report pinning and backup/restore.

@@ -74,6 +74,8 @@ These are automated checks of selected scenarios. Dictionary checks do not estab
 
 ## Documentation
 
+- [Checkout, analytics, markets and operations](docs/OPERATIONS-AND-COMMERCE.md): expected checkout totals, tracking/consent, market journeys, open problems, retention, backups and setup discovery.
+
 - [Browser control panel](docs/CONTROL-PANEL.md): manage stores and schedules without editing files.
 - [Docker scheduler](docs/SCHEDULER.md): unattended multi-store checks, random intervals, start windows and persistent cooldowns.
 - [WooCommerce](docs/WOOCOMMERCE.md): platform selection, product URLs, Store API, cart sessions and tax rules.

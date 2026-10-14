@@ -129,21 +129,9 @@ for (const site of sites) {
   }
 }
 
-// ── Prune old reports (keep last 30 per site) ─────────────────────────────────
-
-if (fs.existsSync(reportsDir)) {
-  for (const entry of fs.readdirSync(reportsDir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const siteDir = path.join(reportsDir, entry.name);
-    const runs = fs.readdirSync(siteDir)
-      .filter(d => /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}(?:-\d{2}-\d{3})?$/.test(d))
-      .sort()
-      .reverse();
-    for (const old of runs.slice(30)) {
-      fs.rmSync(path.join(siteDir, old), { recursive: true, force: true });
-    }
-  }
-}
+// Preserve pinned reports and evidence for open incidents before pruning completed runs.
+try { require('./retention').pruneReports(reportsDir, sites); }
+catch (error) { console.error('Report retention skipped:', error.message); overallExit = 1; }
 
 // ── Update dashboard ─────────────────────────────────────────────────────────
 

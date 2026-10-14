@@ -5,6 +5,8 @@ const { commerceSettings } = require('../scripts/platform-config');
 const DEFAULTS = {
   expectations: { minProducts: 0, currency: '', paymentSelector: '', paymentPath: '/checkout' },
   monitorScripts: false,
+  markets: [],
+  retention: { maxRuns: 30, maxDays: 0, maxBytes: 0 },
   locale: 'bg-BG',
   timezoneId: 'Europe/Sofia',
   performanceMetrics: {
@@ -76,6 +78,32 @@ function resolveSiteSettings(input = {}) {
   result.timezoneId = input.timezoneId ?? result.timezoneId;
   if (Intl.getCanonicalLocales(result.locale).length !== 1) throw new Error('Invalid locale');
   new Intl.DateTimeFormat(result.locale, { timeZone: result.timezoneId });
+  for (const key of ['checkoutTotals', 'analytics', 'markets'])
+    if (input[key] !== undefined) result[key] = structuredClone(input[key]);
+  Object.assign(result.retention, input.retention);
+  const names = new Set();
+  for (const market of result.markets) {
+    if (names.has(market.name)) throw new Error('Market names must be unique');
+    names.add(market.name);
+    Intl.getCanonicalLocales(market.locale);
+    if (market.currency !== market.checkoutTotals.currency)
+      throw new Error('Market and checkout currencies must match');
+  }
+  for (const totals of [result.checkoutTotals, ...result.markets.map(m => m.checkoutTotals)].filter(
+    Boolean,
+  )) {
+    if (
+      totals.total !==
+      totals.subtotal + totals.shipping + (totals.taxIncluded ? 0 : totals.tax) - totals.discount
+    )
+      throw new Error('Checkout total must equal subtotal + shipping + exclusive tax - discount');
+    if (
+      totals.freeShippingThreshold !== undefined &&
+      totals.subtotal - totals.discount >= totals.freeShippingThreshold &&
+      totals.shipping !== 0
+    )
+      throw new Error('Expected shipping must be zero above the free shipping threshold');
+  }
   Object.assign(result.expectations, input.expectations);
   result.monitorScripts = input.monitorScripts ?? false;
   for (const window of input.notifications?.maintenance || []) {
