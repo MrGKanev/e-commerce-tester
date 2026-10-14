@@ -18,7 +18,12 @@ const { transition } = require('./monitoring');
     reportsDir = path.join(root, 'reports');
   let mutations = 0;
   const fixture = http.createServer((request, response) => {
-    if (request.method !== 'GET') mutations++;
+    if (
+      request.method !== 'GET' ||
+      request.url.includes('add-to-cart') ||
+      request.url.startsWith('/cart/add')
+    )
+      mutations++;
     const woo = request.url.startsWith('/woo');
     const catalogue =
       request.url.startsWith('/products.json') ||
@@ -45,7 +50,7 @@ const { transition } = require('./monitoring');
       );
     else
       response.end(
-        `<!doctype html><html lang="en"><head><title>Store fixture</title></head><body><h1>Sample product</h1><span data-product-price>€29.90</span><button name="add">Add</button><input type="search"><script>${woo ? 'window.woocommerce={}' : 'window.Shopify={}'}</script></body></html>`,
+        `<!doctype html><html lang="en"><head><title>Store fixture</title></head><body><h1>Sample product</h1><span data-product-price>€29.90</span><button name="add">Add</button><input type="search"><script>${woo ? 'window.woocommerce={}' : 'window.Shopify={}'};fetch('/cart/add.js?id=123').catch(()=>{});fetch('/?add-to-cart=123').catch(()=>{});</script></body></html>`,
       );
   });
   await new Promise(resolve => fixture.listen(0, '127.0.0.1', resolve));
@@ -126,6 +131,7 @@ const { transition } = require('./monitoring');
     const woo = await (await discover({ url: storeURL + '/woo' })).json();
     assert.equal(woo.platform, 'woocommerce');
     assert.equal(woo.products[0].title, 'Woo product');
+    assert.equal(mutations, 0);
     const pinRun = path.join(reportsDir, 'shop', run);
     fs.mkdirSync(pinRun);
     fs.writeFileSync(
@@ -187,6 +193,8 @@ const { transition } = require('./monitoring');
         path: path.join(screenshots, `settings-${label}.png`),
         fullPage: true,
       });
+      await page.getByLabel('Expected market currency', { exact: true }).scrollIntoViewIfNeeded();
+      await page.screenshot({ path: path.join(screenshots, `market-${label}.png`) });
       assert.equal(
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
         true,

@@ -37,6 +37,8 @@ test('backup restores configuration, approved pixels and incident state, rejects
   fs.writeFileSync(path.join(archive, 'visual-baselines/shop/approved.json'), 'corrupt');
   assert.throws(() => restore(archive, path.join(root, 'bad')), /checksum/);
   assert.equal(fs.existsSync(path.join(root, 'bad')), false);
+  fs.symlinkSync(source, path.join(root, 'source-alias'));
+  assert.throws(() => backup(source, path.join(root, 'source-alias/reports/backup')), /outside/);
   fs.symlinkSync(source, path.join(source, 'reports/link'));
   assert.throws(() => backup(source, path.join(root, 'linked')), /symbolic/);
 });

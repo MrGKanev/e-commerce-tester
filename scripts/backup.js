@@ -26,9 +26,15 @@ function files(root, relative = '') {
   }
   return result;
 }
+function destinationPath(destination) {
+  const absolute = path.resolve(destination);
+  let parent = path.dirname(absolute);
+  while (!fs.existsSync(parent)) parent = path.dirname(parent);
+  return path.join(fs.realpathSync(parent), path.relative(parent, absolute));
+}
 function backup(source, destination) {
   source = fs.realpathSync(source);
-  destination = path.resolve(destination);
+  destination = destinationPath(destination);
   if (destination === source || destination.startsWith(source + path.sep))
     throw new Error('Choose a backup destination outside the installation');
   if (fs.existsSync(destination)) throw new Error('Backup destination already exists');
@@ -74,7 +80,7 @@ function backup(source, destination) {
 }
 function restore(source, destination) {
   source = fs.realpathSync(source);
-  destination = path.resolve(destination);
+  destination = destinationPath(destination);
   if (fs.existsSync(destination))
     throw new Error(
       'Restore requires a new, nonexistent destination; existing installations are never overwritten',

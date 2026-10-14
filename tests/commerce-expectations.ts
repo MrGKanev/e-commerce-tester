@@ -24,7 +24,7 @@ export async function verifyCheckoutTotals(
   const shipping = page.locator(config.shippingMethod).filter({ visible: true });
   await expect(shipping, 'Shipping method must be unique').toHaveCount(1);
   await shipping.check();
-  const observed: Record<string, number> = {};
+  const observed = { subtotal: 0, shipping: 0, tax: 0, discount: 0, total: 0 };
   for (const key of ['subtotal', 'shipping', 'tax', 'discount', 'total'] as const) {
     const field = page.locator(config[`${key}Selector`]).filter({ visible: true });
     await expect(field, `Checkout ${key} must be unique`).toHaveCount(1);
