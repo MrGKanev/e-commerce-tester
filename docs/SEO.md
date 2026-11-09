@@ -44,15 +44,31 @@ A separate `@seo` test scans `/sitemap.xml`, nested sitemap indexes (including S
 - Original URL plus a sibling ending in a positive integer (`-1`, `-2`, etc.), `-old`, `-new`, `-copy`, `-copy-2`, `-backup`, `-draft`, `-test`, `-duplicate`, `-temp` or `-tmp`.
 - Repeated URLs within or across sitemaps (trailing slashes are normalized).
 - Query strings or fragments in listed URLs.
+- Years from 1900 to 2099 in URL paths or queries, such as `/summer-sale-2024`, `/blog/2023/post` or `?year=2026`. This warning does not require an unsuffixed counterpart; dates may be intentional.
 
-Suffix matching works for collections, product categories, products and pages with arbitrary WooCommerce permalink prefixes. The original must exist in the sitemap on the same domain and language/path prefix. A standalone `model-2026` or `gifts-old` is not flagged without its unsuffixed counterpart. The check does not fetch these pages or prove identical content, indexability, rankings or a ranking penalty. Findings are warnings, not test failures, and make no store changes. Compare full content/product ranges and canonical tags before deciding whether to rename, consolidate or redirect anything.
+Suffix matching works for collections, product categories, products and pages with arbitrary WooCommerce permalink prefixes. The original must exist in the sitemap on the same domain and language/path prefix. A standalone `model-2026` or `gifts-old` does not trigger a suffix-pair warning without its unsuffixed counterpart; `model-2026` still triggers the separate year warning. Suffix and year findings do not prove identical content, indexability, rankings or a ranking penalty. These findings are warnings, not test failures, and make no store changes. Compare full content/product ranges and canonical tags before deciding whether to rename, consolidate or redirect anything.
 
-Useful next checks (not implemented by this sitemap scan):
+## Public HTML crawl
 
-- Identical complete product sets under different category URLs, with pagination accounted for.
-- Empty indexable categories and pages that return HTTP 200 with an error/empty-state template.
-- Sitemap URLs that redirect, return 404, declare `noindex`, or canonicalize elsewhere.
-- Filter/sort/search URLs exposed through internal links and allowed to index.
-- Internal links to old URLs and redirect chains after migrations.
+The same test also creates `seo-crawl.json` and adds findings to the HTML report. It reads sitemap page URLs, configured inventory pages (excluding the cart), and internal filter/sort/search links found in those pages. Requests are sequential, use the shared pacing/rate-limit mechanism, follow at most five redirects, and remain on the configured storefront origin. Administrative, account, checkout and cart/action URLs are not fetched. No JavaScript or forms are executed and no product pages are fetched just to enumerate category products.
 
-The existing inventory audit already checks duplicate titles/descriptions and several canonical problems for the configured pages.
+Errors that fail the test:
+
+- HTTP 4xx/5xx on a crawled URL.
+- Sitemap URLs with `noindex`/`none` in robots metadata or `X-Robots-Tag`.
+- Failed reads, non-HTML responses, unsafe/external redirect targets or exhausted page coverage.
+
+Warnings for review:
+
+- Sitemap URLs that redirect or canonicalize elsewhere, plus redirect chains.
+- HTTP 200 pages whose title/H1 or template markers suggest a missing page (a possible soft 404).
+- Indexable categories with an explicit empty-product message, a zero product total or a recognized empty grid.
+- Different categories with identical complete **observed** product sets and different canonical URLs. Product order is ignored; collection-scoped Shopify product links and product variant/tracking queries are normalized. Noindex categories, empty sets and incomplete sets are excluded. Categories sharing a canonical do not trigger a duplicate finding on their own.
+- Linked filter/sort/search URLs with HTTP 200, no `noindex`, and no valid canonical consolidation to a different URL. Recognized parameters include Shopify `sort_by`/`filter.*`, WooCommerce `orderby`/`filter_*`/`query_type_*`/price/rating parameters, and search `q`/`s`. Shopify tag URLs are also recognized. Parameters alone do not establish a problem: noindex or consolidated URLs do not trigger this warning.
+- Years in discovered URLs not already covered by the sitemap scan.
+
+Collection detection uses Shopify collection paths, WooCommerce archive/taxonomy body classes, or configured inventory entries with type `collection`, so custom WooCommerce category permalinks can be checked. Product extraction is scoped to recognized Shopify/WooCommerce grids and product links, excluding recommendations outside the grid. Supported pagination follows conventional next/page links with `page`, `paged`, `product-page` or `/page/N/`, staying within the same category. All observed products are combined before comparing categories; visible product totals, when recognized, must agree with the collected count.
+
+There is a limit of **200 distinct public page reads** per audit and **50 pages per category**. Exceeding the global budget fails the test as incomplete coverage; `unreadUrls` lists queued pages that were not successfully read. A category with unsupported grid markup, unreadable pagination, load-more/infinite-scroll controls, a failed page or an inconsistent product count receives `collection-incomplete` and is excluded from duplicate comparison. These category warnings do not fail the test by themselves. Increase the documented limits in `tests/seo-crawl.ts` if the intended audit requires a larger budget.
+
+This crawl inspects server HTML. JavaScript-only grids, client-added links/metadata, unrecognized custom pagination and localized empty/error messages may require additional theme-specific support. Absence of `noindex` in the response does not prove Google indexing; this test does not evaluate robots.txt rules or Search Console data. A duplicate product set is a reason to review category intent, descriptions and canonical tags, not an instruction to delete it. The existing inventory audit continues to inspect rendered metadata/JSON-LD for its configured pages.

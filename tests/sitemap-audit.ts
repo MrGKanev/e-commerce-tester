@@ -20,6 +20,14 @@ export function sitemapFindings(urls: string[]): SitemapFinding[] {
         detail: `URL occurs ${count} times in sitemaps.`,
         urls: [value],
       });
+    if (/(?:^|[^0-9])(?:19|20)[0-9]{2}(?=$|[^0-9])/.test(url.pathname + url.search))
+      findings.push({
+        severity: 'warning',
+        code: 'url-year',
+        detail:
+          'URL contains a year (1900–2099); review whether the dated address and content are still appropriate.',
+        urls: [value],
+      });
     if (url.search || url.hash)
       findings.push({
         severity: 'warning',
