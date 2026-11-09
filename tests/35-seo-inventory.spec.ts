@@ -1,8 +1,9 @@
 import { test, expect } from './fixtures';
 import { pageInventory } from './inventory';
 import { analyzeSeo, inventorySeoFindings, readSeoDocument, type SeoResult } from './seo-audit';
-import { waitForContent } from './helpers';
+import { BASE, waitForContent } from './helpers';
 import { assertNotLimited } from './pacing';
+import { auditSitemaps } from './sitemap-audit';
 
 test(
   'SEO — metadata and JSON-LD across page inventory',
@@ -61,5 +62,25 @@ test(
       ),
       'SEO errors; review warnings and metadata in seo-inventory.json',
     ).toEqual([]);
+  },
+);
+
+test(
+  'SEO — sitemap duplicate and suffixed URLs',
+  { tag: ['@full', '@pages', '@seo'] },
+  async ({ page, request }, testInfo) => {
+    test.setTimeout(300000);
+    const audit = await auditSitemaps(page, request, BASE);
+    await testInfo.attach('seo-sitemaps.json', {
+      body: JSON.stringify(audit, null, 2),
+      contentType: 'application/json',
+    });
+    for (const finding of audit.findings)
+      testInfo.annotations.push({
+        type: 'warning',
+        description: `${finding.code}: ${finding.urls.join(' ↔ ')}. ${finding.detail}`,
+      });
+    assertNotLimited();
+    expect(audit.errors, 'Sitemap scan incomplete; see seo-sitemaps.json').toEqual([]);
   },
 );

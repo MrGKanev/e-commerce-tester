@@ -169,3 +169,142 @@ test('canonical targets in inventory expose HTTP errors, noindex and chains', ()
 test('malformed social URL does not misreport a valid canonical as invalid', () => {
   expect(codes({ ...good(), ogUrls: ['https://[invalid'] })).toEqual(['og-url-invalid']);
 });
+
+// All network fixtures below bind only to loopback; no storefront is contacted.
+test('sitemap suffix candidates cover both platforms without treating every suffix as a duplicate', async () => {
+  const { sitemapFindings } = await import('../tests/sitemap-audit');
+  const origin = 'https://store.example';
+  const paths = [
+    '/collections/gifts',
+    '/collections/gifts-1',
+    '/collections/gifts-2',
+    '/product-category/gifts/',
+    '/product-category/gifts-old/',
+    '/products/mug',
+    '/products/mug-new',
+    '/products/mug-copy-2',
+    '/products/mug-backup',
+    '/products/mug-draft',
+    '/products/mug-test',
+    '/products/mug-duplicate',
+    '/products/mug-temp',
+    '/products/mug-tmp',
+    '/pages/about',
+    '/pages/about-copy',
+    '/products/standalone-old',
+    '/products/model-2026',
+    '/fr/collections/gifts-old',
+    '/collections/gifts/products/mug-old',
+  ];
+  const findings = sitemapFindings(paths.map(path => origin + path));
+  expect(findings).toHaveLength(12);
+  expect(findings.every(finding => finding.severity === 'warning')).toBe(true);
+  expect(findings.every(finding => finding.urls.length === 2)).toBe(true);
+  expect(
+    sitemapFindings([
+      origin + '/a',
+      origin + '/a/',
+      origin + '/a?sort=price',
+      origin + '/b#top',
+    ]).map(finding => finding.code),
+  ).toEqual(['sitemap-duplicate-url', 'sitemap-parameters', 'sitemap-parameters']);
+});
+
+test('sitemap scanner handles Shopify/Woo indexes, XML entities, fallback, redirects and failures locally', async ({
+  page,
+  request,
+}) => {
+  const { createServer } = await import('node:http');
+  const { auditSitemaps } = await import('../tests/sitemap-audit');
+  let mode = 'shopify';
+  const requested: string[] = [];
+  const server = createServer((req, res) => {
+    requested.push(req.url!);
+    res.setHeader('Content-Type', 'application/xml');
+    if (req.url === '/sitemap.xml') {
+      if (mode === 'fallback') {
+        res.writeHead(404).end();
+        return;
+      }
+      if (mode === 'redirect') {
+        res.writeHead(301, { Location: '/index.xml' }).end();
+        return;
+      }
+      if (mode === 'external-redirect') {
+        res.writeHead(302, { Location: 'https://external.invalid/sitemap.xml' }).end();
+        return;
+      }
+      if (mode === 'invalid') {
+        res.end('<urlset><broken>');
+        return;
+      }
+      if (mode === 'missing-loc') {
+        res.end('<urlset><url/></urlset>');
+        return;
+      }
+      if (mode === 'http') {
+        res.writeHead(503).end();
+        return;
+      }
+      if (mode === 'external') {
+        res.end(
+          '<sitemapindex><sitemap><loc>https://external.invalid/map.xml</loc></sitemap></sitemapindex>',
+        );
+        return;
+      }
+    }
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('No fixture port');
+    const origin = `http://127.0.0.1:${address.port}`;
+    if (mode === 'limit') {
+      const next = Number(req.url!.match(/map(\d+)/)?.[1] || 0) + 1;
+      res.end(
+        `<sitemapindex><sitemap><loc>${origin}/map${next}.xml</loc></sitemap></sitemapindex>`,
+      );
+      return;
+    }
+    if (req.url === '/sitemap.xml' || req.url === '/index.xml') {
+      res.end(
+        `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><sitemap><loc>${origin}/catalog.xml</loc></sitemap><sitemap><loc>${origin}/index.xml</loc></sitemap></sitemapindex>`,
+      );
+    } else {
+      const path = mode === 'shopify' ? '/collections/gifts' : '/product-category/gifts';
+      res.end(
+        `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${origin}${path}</loc><image:image xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"><image:loc>https://images.invalid/a.jpg</image:loc></image:image></url><url><loc>${origin}${path}-old</loc></url><url><loc>${origin}${path}?a=1&amp;b=2</loc></url></urlset>`,
+      );
+    }
+  });
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('No fixture port');
+    const origin = `http://127.0.0.1:${address.port}`;
+    for (mode of ['shopify', 'woo', 'fallback', 'redirect']) {
+      requested.length = 0;
+      const audit = await auditSitemaps(page, request, origin);
+      expect(audit.errors).toEqual([]);
+      expect(audit.urls).toHaveLength(3);
+      expect(audit.findings.map(finding => finding.code)).toEqual([
+        'sitemap-suffix-pair',
+        'sitemap-parameters',
+      ]);
+      expect(audit.urls[2]).toContain('?a=1&b=2');
+      expect(new Set(requested).size).toBe(requested.length);
+    }
+    mode = 'limit';
+    requested.length = 0;
+    const limited = await auditSitemaps(page, request, origin);
+    expect(limited.errors).toHaveLength(1);
+    expect(limited.errors[0].message).toContain('coverage is incomplete');
+    expect(requested).toHaveLength(100);
+    for (mode of ['invalid', 'missing-loc', 'http', 'external', 'external-redirect']) {
+      const audit = await auditSitemaps(page, request, origin);
+      expect(audit.errors).toHaveLength(1);
+      expect(audit.urls).toEqual([]);
+    }
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      server.close(error => (error ? reject(error) : resolve())),
+    );
+  }
+});

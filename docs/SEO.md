@@ -34,3 +34,25 @@ This is a technical check of the available data, not a full Schema.org or Google
 Local validation without a real store: `pnpm test:seo:local`.
 
 Official guidance: [Canonical URLs](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls), [Robots metadata](https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag), [Structured data policies](https://developers.google.com/search/docs/appearance/structured-data/sd-policies).
+
+## Sitemap duplicate candidates (Shopify and WooCommerce)
+
+A separate `@seo` test scans `/sitemap.xml`, nested sitemap indexes (including Shopify, Yoast and Rank Math formats), or `/wp-sitemap.xml` if the initial URL returns 404. It reads every listed page URL, independent of the configured page inventory. Only URLs on the configured storefront origin are accepted, including redirect targets. External sitemap entries are reported as incomplete coverage rather than fetched. Cycles are deduplicated; the scan stops at 100 sitemap documents and fails explicitly if that limit is exceeded. HTTP/XML errors also fail the scan. Requests use the existing pacing and rate-limit handling.
+
+`seo-sitemaps.json` contains scanned sitemaps, listed URLs, findings and coverage errors. Findings also appear as warning annotations in the Playwright HTML report:
+
+- Original URL plus a sibling ending in a positive integer (`-1`, `-2`, etc.), `-old`, `-new`, `-copy`, `-copy-2`, `-backup`, `-draft`, `-test`, `-duplicate`, `-temp` or `-tmp`.
+- Repeated URLs within or across sitemaps (trailing slashes are normalized).
+- Query strings or fragments in listed URLs.
+
+Suffix matching works for collections, product categories, products and pages with arbitrary WooCommerce permalink prefixes. The original must exist in the sitemap on the same domain and language/path prefix. A standalone `model-2026` or `gifts-old` is not flagged without its unsuffixed counterpart. The check does not fetch these pages or prove identical content, indexability, rankings or a ranking penalty. Findings are warnings, not test failures, and make no store changes. Compare full content/product ranges and canonical tags before deciding whether to rename, consolidate or redirect anything.
+
+Useful next checks (not implemented by this sitemap scan):
+
+- Identical complete product sets under different category URLs, with pagination accounted for.
+- Empty indexable categories and pages that return HTTP 200 with an error/empty-state template.
+- Sitemap URLs that redirect, return 404, declare `noindex`, or canonicalize elsewhere.
+- Filter/sort/search URLs exposed through internal links and allowed to index.
+- Internal links to old URLs and redirect chains after migrations.
+
+The existing inventory audit already checks duplicate titles/descriptions and several canonical problems for the configured pages.
