@@ -51,7 +51,7 @@ test('good page has no extra accessibility problems; bad page trips every static
 const overlayPage = (
   good: boolean,
 ) => `<!doctype html><html lang="en"><head><title>Overlay</title><style>a,button,input{min-width:44px;min-height:44px;display:inline-block;margin:4px}</style></head><body>
-<header><button id="open" ${good ? 'aria-expanded="false"' : ''}>Menu</button></header>
+<header><button id="open" aria-expanded="false">Menu</button></header>
 <main><h1>Shop</h1>
 <fieldset><legend>Size</legend>
 <label><input type="radio" name="size" value="s" checked> Small</label>
@@ -68,6 +68,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Tab'&&${good}&&!dlg.hidden){const l=[...dlg.querySelectorAll('a')];const i=l.indexOf(document.activeElement);
     e.preventDefault();l[(i+(e.shiftKey?-1:1)+l.length)%l.length].focus();}
 });
+
 </script></body></html>`;
 
 test('overlay and variant audits pass a well-built page and flag a broken one', async ({
@@ -93,6 +94,33 @@ test('overlay and variant audits pass a well-built page and flag a broken one', 
     expect(variants.problems.some(p => p.includes('Option group "color"'))).toBe(
       !good ? true : true,
     );
+    await page.unroute('**/*');
+  }
+});
+
+test('native modal dialogs and popovers work without redundant ARIA or custom focus traps', async ({
+  page,
+}) => {
+  for (const kind of ['dialog', 'popover']) {
+    await page.route('**/*', route =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: `<!doctype html><html lang="en"><head><title>Native overlay</title></head><body>
+        <header><button id="open" ${kind === 'popover' ? 'popovertarget="native"' : ''}>Menu</button></header>
+        <main><h1>Shop</h1></main>
+        ${
+          kind === 'dialog'
+            ? '<dialog id="native" aria-labelledby="title"><h2 id="title">Menu</h2><form method="dialog"><button autofocus>Close</button></form></dialog>'
+            : '<div id="native" popover><button popovertarget="native" popovertargetaction="hide">Close menu</button></div>'
+        }
+        ${kind === 'dialog' ? '<script>document.getElementById("open").onclick=()=>document.getElementById("native").showModal()</script>' : ''}
+        </body></html>`,
+      }),
+    );
+    await page.goto(`http://127.0.0.1:45993/native-${kind}`);
+    const result = await auditOverlay(page, page.locator('#open'));
+    expect(result.applicable, kind).toBe(true);
+    expect(result.problems, kind).toEqual([]);
     await page.unroute('**/*');
   }
 });

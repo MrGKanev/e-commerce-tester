@@ -6,6 +6,13 @@ let data,
   dirty = false,
   schedulerStatus;
 const $ = selector => document.querySelector(selector);
+const renderedHTML = new WeakMap();
+function updateHTML(element, html) {
+  // Keep unchanged controls mounted so polling preserves keyboard focus and live regions.
+  if (renderedHTML.get(element) === html) return;
+  element.innerHTML = html;
+  renderedHTML.set(element, html);
+}
 const escapeHTML = value =>
   String(value ?? '').replace(
     /[&<>"']/g,
@@ -30,7 +37,7 @@ const modes = {
 // Shared Tailwind class sets. Every class is written out in full so the Tailwind compiler can detect it.
 const focusRing =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600';
-const buttonBase = `inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`;
+const buttonBase = `inline-flex min-h-6 cursor-pointer items-center justify-center gap-2 rounded-lg border font-semibold transition-colors pointer-coarse:min-h-12 disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`;
 const buttonKinds = {
   primary: 'border-blue-600 bg-blue-600 text-white hover:bg-blue-700',
   quiet: 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
@@ -42,8 +49,9 @@ const button = (kind = 'quiet', size = 'md') =>
   `${buttonBase} ${buttonKinds[kind]} ${buttonSizes[size]}`;
 const labelClass = 'flex flex-col gap-1.5 text-sm font-medium text-slate-700';
 const inputClass =
-  'block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-500 [&[readonly]]:bg-slate-100 [&[readonly]]:text-slate-600 focus-visible:outline-2 focus-visible:outline-blue-600';
-const checkLabelClass = 'inline-flex items-center gap-2 py-1 text-sm font-normal text-slate-700';
+  'block w-full rounded-lg border border-slate-500 bg-white px-3 py-2 text-base text-slate-900 shadow-sm placeholder:text-slate-500 pointer-coarse:min-h-12 [&[readonly]]:bg-slate-100 [&[readonly]]:text-slate-600 focus-visible:outline-2 focus-visible:outline-blue-600';
+const checkLabelClass =
+  'inline-flex min-h-6 items-center gap-2 py-1 text-sm font-normal text-slate-700 pointer-coarse:min-h-12';
 const checkboxClass = `size-4 rounded border-slate-300 accent-blue-600 ${focusRing}`;
 const helpClass = 'mt-3 text-sm text-slate-600';
 const summaryClass = `cursor-pointer rounded text-sm font-semibold text-slate-800 ${focusRing}`;
@@ -100,18 +108,21 @@ function writePath(path, value) {
   changed();
 }
 function field(label, path, value, type = 'text', scale = 1, extra = '') {
-  return `<label class="${labelClass}">${escapeHTML(label)}<input class="${inputClass}" data-path="${escapeHTML(path)}" data-scale="${scale}" type="${type}" value="${escapeHTML(type === 'number' && value !== '' ? value / scale : value)}" ${type === 'number' ? 'min="0" step="any"' : ''} ${extra}></label>`;
+  const id = escapeHTML(`field-${path}`);
+  return `<label for="${id}" class="${labelClass}">${escapeHTML(label)}<input id="${id}" class="${inputClass}" data-path="${escapeHTML(path)}" data-scale="${scale}" type="${type}" value="${escapeHTML(type === 'number' && value !== '' ? value / scale : value)}" ${type === 'number' ? 'min="0" step="any"' : ''} ${type === 'url' ? 'autocorrect="off" autocapitalize="none" spellcheck="false"' : ''} ${extra}></label>`;
 }
 function selectField(label, path, choices, current, extra = '', wide = false) {
-  return `<label class="${labelClass} ${wide ? 'sm:col-span-2' : ''}">${escapeHTML(label)}<select class="${inputClass}" aria-label="${escapeHTML(label)}" data-path="${escapeHTML(path)}" ${extra}>${choices
+  const id = escapeHTML(`field-${path}`);
+  return `<div class="${labelClass} ${wide ? 'sm:col-span-2' : ''}"><label for="${id}">${escapeHTML(label)}</label><select id="${id}" class="${inputClass}" data-path="${escapeHTML(path)}" ${extra}>${choices
     .map(
       ([value, text]) =>
         `<option value="${escapeHTML(value)}" ${current === value ? 'selected' : ''}>${escapeHTML(text)}</option>`,
     )
-    .join('')}</select></label>`;
+    .join('')}</select></div>`;
 }
 function checkbox(label, path, value) {
-  return `<label class="${checkLabelClass}"><input class="${checkboxClass}" type="checkbox" data-path="${escapeHTML(path)}" ${value ? 'checked' : ''}>${escapeHTML(label)}</label>`;
+  const id = escapeHTML(`field-${path}`);
+  return `<label for="${id}" class="${checkLabelClass}"><input id="${id}" class="${checkboxClass}" type="checkbox" data-path="${escapeHTML(path)}" ${value ? 'checked' : ''}>${escapeHTML(label)}</label>`;
 }
 function storeSchedule(site) {
   return (data.scheduler.sites[site.slug] ??= {});
@@ -350,6 +361,7 @@ function renderJobStatus() {
   }
 }
 async function refreshStatus() {
+  if (document.hidden) return;
   try {
     schedulerStatus = await api('/api/status');
     $('#worker').textContent = schedulerStatus.healthy
@@ -592,6 +604,14 @@ function showSection(section, navigate = true) {
     else $(`#${name}-tab`).removeAttribute('aria-current');
   }
   $('#reload').hidden = section !== 'settings';
+  const heading = $(`#${section}-view h1`);
+  if (heading) {
+    document.title = `${heading.textContent.trim()} · Store Health`;
+    if (navigate) {
+      heading.tabIndex = -1;
+      heading.focus();
+    }
+  }
   if (section === 'reports') refreshReports();
   if (section === 'issues') refreshIssues();
   if (section === 'runs') loadRunStores();
@@ -833,29 +853,39 @@ function runCard(run, action = '', canForce = false) {
   return `<article class="flex flex-col gap-2 border-b border-slate-200 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"><button class="min-w-0 flex-1 cursor-pointer rounded-lg px-2 py-1 text-left break-words hover:bg-slate-50 aria-[current=true]:bg-blue-50 ${focusRing}" ${run.id === selectedRun ? 'aria-current="true"' : ''} data-run-select="${escapeHTML(run.id)}"><span class="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-900">${escapeHTML(run.name || run.site)} · ${escapeHTML(run.mode)} ${badge(run.status, statusTone(run.status))} ${forced}</span><small class="mt-1 block text-xs text-slate-600">${escapeHTML(run.source)} · ${escapeHTML(run.projects.join(', '))}${waiting}</small></button><div class="flex shrink-0 flex-wrap gap-2">${force}${stop}</div></article>`;
 }
 async function refreshRuns() {
-  if (runPolling) return;
+  if (runPolling || document.hidden) return;
   runPolling = true;
   try {
     const [runs, status] = await Promise.all([api('/api/runs'), api('/api/status')]);
-    $('#run-active').innerHTML = runs.active
-      ? runCard(runs.active, runs.active.status === 'stopping' ? 'Stopping…' : 'Stop run')
-      : emptyNote('No active run');
-    $('#run-pending').innerHTML = runs.pending.length
-      ? runs.pending.map(run => runCard(run, 'Remove', true)).join('')
-      : emptyNote('Queue is empty');
-    $('#run-scheduled').innerHTML =
+    updateHTML(
+      $('#run-active'),
+      runs.active
+        ? runCard(runs.active, runs.active.status === 'stopping' ? 'Stopping…' : 'Stop run')
+        : emptyNote('No active run'),
+    );
+    updateHTML(
+      $('#run-pending'),
+      runs.pending.length
+        ? runs.pending.map(run => runCard(run, 'Remove', true)).join('')
+        : emptyNote('Queue is empty'),
+    );
+    updateHTML(
+      $('#run-scheduled'),
       [...status.jobs]
         .sort((a, b) => (a.nextAt || Infinity) - (b.nextAt || Infinity))
         .map(
           job =>
             `<p class="border-b border-slate-200 py-2 text-sm text-slate-800 last:border-b-0">${escapeHTML(job.site)} · ${escapeHTML(job.mode)}<small class="block text-xs text-slate-600">Next eligible: ${job.nextAt ? escapeHTML(new Date(job.nextAt).toLocaleString()) : 'Waiting for scheduler'}</small></p>`,
         )
-        .join('') || emptyNote('No scheduled checks');
-    $('#run-history').innerHTML =
+        .join('') || emptyNote('No scheduled checks'),
+    );
+    updateHTML(
+      $('#run-history'),
       runs.history
         .slice(0, 15)
         .map(run => runCard(run))
-        .join('') || emptyNote('No completed runs yet');
+        .join('') || emptyNote('No completed runs yet'),
+    );
     if (!selectedRun && runs.active) selectedRun = runs.active.id;
     const liveRun = runs.active || runs.history[0];
     let liveDetail = null;
@@ -884,29 +914,36 @@ function renderRunDetails({ run, events, log }) {
   $('#run-detail-title').textContent = `${run.name || run.site} · ${run.mode} · ${run.status}`;
   const last = type => events.findLast(event => event.type === type);
   const progress = events.findLast(event => typeof event.total === 'number');
-  $('#run-progress').innerHTML = progress
-    ? `<p>${progress.completed} / ${progress.total} checks completed</p><progress class="mt-2 h-2 w-full overflow-hidden rounded-full [&::-moz-progress-bar]:bg-blue-600 [&::-webkit-progress-bar]:bg-slate-200 [&::-webkit-progress-value]:bg-blue-600" max="${Math.max(progress.total, 1)}" value="${progress.completed}" aria-label="Checks completed"></progress>`
-    : emptyNote('Waiting for test progress…');
+  updateHTML(
+    $('#run-progress'),
+    progress
+      ? `<p>${progress.completed} / ${progress.total} checks completed</p><progress class="mt-2 h-2 w-full overflow-hidden rounded-full [&::-moz-progress-bar]:bg-blue-600 [&::-webkit-progress-bar]:bg-slate-200 [&::-webkit-progress-value]:bg-blue-600" max="${Math.max(progress.total, 1)}" value="${progress.completed}" aria-label="Checks completed"></progress>`
+      : emptyNote('Waiting for test progress…'),
+  );
   const test = last('test'),
     step = events.findLast(event => event.type === 'step' && (!test || event.time >= test.time)),
     url = events.findLast(event => event.type === 'url' && (!test || event.time >= test.time));
-  $('#run-current').innerHTML = [
-    ['Test', test?.title],
-    ['Browser / file', test ? `${test.project} / ${test.file}` : ''],
-    ['Step', step?.title],
-    ['URL / API', url?.url],
-    ['Last result', last('result')?.status],
-    ['Started', run.startedAt ? new Date(run.startedAt).toLocaleString() : ''],
-    ['Finished', run.finishedAt ? new Date(run.finishedAt).toLocaleString() : ''],
-  ]
-    .map(
-      ([label, value]) =>
-        `<div class="border-b border-slate-100 py-2 sm:grid sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-3"><dt class="font-semibold text-slate-700">${label}</dt><dd class="text-slate-900">${escapeHTML(value || '—')}</dd></div>`,
-    )
-    .join('');
+  updateHTML(
+    $('#run-current'),
+    [
+      ['Test', test?.title],
+      ['Browser / file', test ? `${test.project} / ${test.file}` : ''],
+      ['Step', step?.title],
+      ['URL / API', url?.url],
+      ['Last result', last('result')?.status],
+      ['Started', run.startedAt ? new Date(run.startedAt).toLocaleString() : ''],
+      ['Finished', run.finishedAt ? new Date(run.finishedAt).toLocaleString() : ''],
+    ]
+      .map(
+        ([label, value]) =>
+          `<div class="border-b border-slate-100 py-2 sm:grid sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-3"><dt class="font-semibold text-slate-700">${label}</dt><dd class="text-slate-900">${escapeHTML(value || '—')}</dd></div>`,
+      )
+      .join(''),
+  );
   const list = $('#run-events'),
     atBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 30;
-  list.innerHTML =
+  updateHTML(
+    list,
     events
       .slice(-60)
       .map(
@@ -914,7 +951,8 @@ function renderRunDetails({ run, events, log }) {
           `<p class="${eventRowClass}"><time class="tabular-nums text-slate-600">${escapeHTML(new Date(event.time).toLocaleTimeString())}</time> ${escapeHTML(event.type)} · ${escapeHTML(event.url || event.title || `${event.completed || 0} / ${event.total || 0}`)}${event.status ? ' · ' + escapeHTML(event.status) : ''}</p>`,
       )
       .join('') ||
-    `<p class="${eventRowClass} text-slate-600">Activity appears when checks start.</p>`;
+      `<p class="${eventRowClass} text-slate-600">Activity appears when checks start.</p>`,
+  );
   if (atBottom) list.scrollTop = list.scrollHeight;
   $('#run-log').textContent = log || 'No runner output yet.';
 }
@@ -993,14 +1031,23 @@ document.addEventListener('click', async event => {
   }
 });
 setInterval(refreshRuns, 1000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    refreshStatus();
+    refreshRuns();
+  }
+});
 
 function renderActivity(runs, status, detail) {
   const run = runs.active;
   $('#activity-state').textContent =
     `${status.healthy ? '● Worker online' : '○ Worker offline'} · ${run ? `${run.name || run.site} · ${run.mode} · ${run.status}` : 'No active run'} · ${runs.pending.length} queued`;
-  $('#activity-controls').innerHTML = run
-    ? `<button class="${button('danger', 'sm')}" data-run-cancel="${escapeHTML(run.id)}" ${run.status === 'stopping' ? 'disabled' : ''}>${run.status === 'stopping' ? 'Stopping…' : 'Stop run'}</button>`
-    : '';
+  updateHTML(
+    $('#activity-controls'),
+    run
+      ? `<button class="${button('danger', 'sm')}" data-run-cancel="${escapeHTML(run.id)}" ${run.status === 'stopping' ? 'disabled' : ''}>${run.status === 'stopping' ? 'Stopping…' : 'Stop run'}</button>`
+      : '',
+  );
   const events = detail?.events || [];
   const test = events.findLast(event => event.type === 'test');
   const url = events.findLast(event => event.type === 'url' && (!test || event.time >= test.time));
@@ -1010,7 +1057,8 @@ function renderActivity(runs, status, detail) {
   $('#activity-url').textContent = url?.url || '';
   const feed = $('#activity-feed');
   const atBottom = feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 30;
-  feed.innerHTML =
+  updateHTML(
+    feed,
     events
       .slice(-30)
       .map(
@@ -1018,7 +1066,8 @@ function renderActivity(runs, status, detail) {
           `<p class="${eventRowClass}"><time class="tabular-nums text-slate-600">${escapeHTML(new Date(event.time).toLocaleTimeString())}</time> ${escapeHTML(event.url || event.title || `${event.completed || 0}/${event.total || 0} checks`)}${event.status ? ' · ' + escapeHTML(event.status) : ''}</p>`,
       )
       .join('') ||
-    `<p class="${eventRowClass} text-slate-600">Activity will appear here when a run starts.</p>`;
+      `<p class="${eventRowClass} text-slate-600">Activity will appear here when a run starts.</p>`,
+  );
   if (atBottom) feed.scrollTop = feed.scrollHeight;
 }
 $('#activity-open').addEventListener('click', () => showSection('runs'));

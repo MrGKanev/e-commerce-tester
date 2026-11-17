@@ -20,3 +20,7 @@ managed-config/
 visual-baselines/
 
 web/tailwind.css
+
+# Generated upstream guidance; refreshed at the start of frontend agent tasks.
+.agents/skills/modern-web-guidance/
+skills-lock.json

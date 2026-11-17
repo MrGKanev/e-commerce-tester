@@ -15,6 +15,21 @@ pnpm run install:browsers
 
 Use Node.js 22.13+ and pnpm 11+. Keep the pinned Playwright dependency and Docker image version aligned. TypeScript is pinned for compatibility with the installed ESLint parser.
 
+## Upstream web guidance
+
+Frontend agent tasks automatically start with `pnpm guidance:sync`, as required by [AGENTS.md](../AGENTS.md). It uses Google's official installer to refresh the complete [Modern Web Guidance](https://github.com/GoogleChrome/modern-web-guidance) skill from upstream, including its guides and workflow. The generated skill and installer lock are ignored by Git: there is no maintained fork or pinned catalog to update in pull requests. The installed skill becomes available to Codex on the next turn; an agent can read it directly during the installing task.
+
+```bash
+pnpm guidance:sync
+pnpm guidance search "validate form errors"
+pnpm guidance retrieve "forms"
+pnpm guidance:scan
+```
+
+Sync runs once at the beginning of each relevant agent task, not continuously in the background. Search and retrieval use `modern-web-guidance@latest`; syncing refreshes the skill from the GitHub repository. These commands need network access and execute upstream tooling. Offline work can use the last installed skill, but must disclose that freshness could not be checked. Ordinary store runs, builds and offline verification do not download guidance or change when upstream guidance changes.
+
+Apply relevant recommendations to our existing Tailwind helpers and test fixtures. Our panel and reports target Baseline Widely available, with progressive enhancement for newer APIs. Native browser controls remain appropriate when they already solve the problem. A store should not fail a health check solely because it uses a working custom component. `legacy-scan` covers a subset of the catalog and its findings need contextual review.
+
 ## Validation
 
 ```bash
@@ -24,7 +39,7 @@ pnpm format:check
 
 `pnpm check` runs TypeScript, ESLint, offline unit tests and the Docker/Playwright toolchain check. ESLint covers storefront tests, local checks, configuration, Node scripts and browser JavaScript with the appropriate runtime globals. Formatting is a separate command.
 
-The [Project checks workflow](../.github/workflows/ci.yml) runs `pnpm check` and `pnpm test:acceptance:local` on pull requests, pushes to `master` and manual dispatch. It installs the pnpm version from `package.json`, Node from `.nvmrc`, and Chromium with its system dependencies. The acceptance command runs pacing, readiness, reporting, control panel, shared-page, performance-observation, approved-visual lifecycle, Shopify/WooCommerce public commerce consistency SEO and continuous buyer-journey checks sequentially against local fixtures. Live store checks are scheduled separately. Failed CI runs retain available local report artifacts for seven days.
+The [Project checks workflow](../.github/workflows/ci.yml) runs `pnpm check` and `pnpm test:acceptance:local` on pull requests, pushes to `master` and manual dispatch. It installs the pnpm version from `package.json`, Node from `.nvmrc`, and Chromium with its system dependencies. The acceptance command runs pacing, readiness, reporting, control panel, shared-page, performance-observation, approved-visual lifecycle, Shopify/WooCommerce public commerce consistency, SEO, dynamic accessibility and continuous buyer-journey checks sequentially against local fixtures. Live store checks are scheduled separately. Failed CI runs retain available local report artifacts for seven days.
 
 To run the same checks locally:
 
@@ -43,6 +58,7 @@ Additional loopback acceptance checks:
 | Command                      | Covers                                                                                              |
 | ---------------------------- | --------------------------------------------------------------------------------------------------- |
 | `pnpm test:control:local`    | Browser forms, persistence, pause, mobile layout and axe                                            |
+| `pnpm test:a11y:local` | Accessibility checks, custom overlays, native dialogs and popovers |
 | `pnpm test:pacing`           | Request pacing and rate-limit behavior                                                              |
 | `pnpm test:readiness`        | Content readiness and consent handling                                                              |
 | `pnpm test:reporting`        | Metadata, coverage, skips and retries                                                               |

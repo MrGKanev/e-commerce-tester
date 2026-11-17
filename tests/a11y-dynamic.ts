@@ -2,7 +2,8 @@ import type { Locator, Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
-const DIALOG = '[role="dialog"], [role="alertdialog"], dialog[open], [aria-modal="true"]';
+const OVERLAY =
+  '[role="dialog"], [role="alertdialog"], dialog[open], [aria-modal="true"], [popover]:is(:popover-open)';
 const SHOWN = 1500;
 
 export type Audit = { applicable: boolean; problems: string[] };
@@ -45,14 +46,16 @@ export async function auditOverlay(page: Page, trigger: Locator): Promise<Audit>
 
   const overlay = isSummary
     ? trigger.locator('xpath=ancestor::details[1]')
-    : page.locator(DIALOG).filter({ visible: true }).first();
+    : page.locator(OVERLAY).filter({ visible: true }).first();
   const opened = await overlay
     .waitFor({ state: 'visible', timeout: SHOWN })
     .then(() => true)
     .catch(() => false);
   if (!opened) return na;
 
-  if (!isSummary && (await trigger.getAttribute('aria-expanded')) !== 'true')
+  const expanded = await trigger.getAttribute('aria-expanded');
+  // Native dialog/popover invokers need no explicit aria-expanded attribute.
+  if (!isSummary && expanded !== null && expanded !== 'true')
     problems.push('Trigger does not expose aria-expanded="true" while the overlay is open');
 
   const info = await overlay.evaluate(element => {
@@ -71,7 +74,10 @@ export async function auditOverlay(page: Page, trigger: Locator): Promise<Audit>
   });
   if (info.dialog && !info.named) problems.push('Dialog has no accessible name');
   if (info.modal) {
-    const inside = () => overlay.evaluate(el => el.contains(document.activeElement));
+    const inside = () =>
+      overlay.evaluate(
+        el => el.contains(document.activeElement) || (el.matches(':modal') && !document.hasFocus()),
+      );
     if (!(await inside())) problems.push('Focus did not move into the modal dialog');
     for (let i = 0; i < 12; i++) {
       await page.keyboard.press('Tab');

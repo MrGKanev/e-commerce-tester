@@ -1,5 +1,5 @@
 'use strict';
-/* global document, innerWidth -- Used only inside Playwright page.evaluate callbacks. */
+/* global document, innerWidth, window, MutationObserver -- Used only inside Playwright page.evaluate callbacks. */
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -29,6 +29,11 @@ const { digest, approved } = require('./visual-baselines');
       new URL(route.request().url()).origin === origin ? route.continue() : route.abort(),
     );
     await page.goto(`${origin}/settings`);
+    await expect(page).toHaveTitle('Stores & schedules · Store Health');
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('link', { name: 'Skip to content' })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#main-content')).toBeFocused();
     await expect(page.locator('body'), 'Tailwind CSS must be built with pnpm build:css').toHaveCSS(
       'display',
       'flex',
@@ -36,6 +41,16 @@ const { digest, approved } = require('./visual-baselines');
     await page.getByRole('button', { name: 'Add a store', exact: true }).click();
     await page.getByLabel('Store name', { exact: true }).fill('Example Shop');
     await page.getByLabel('Store address', { exact: true }).fill('https://example.test');
+    await expect(page.getByLabel('Store address', { exact: true })).toHaveAttribute(
+      'autocapitalize',
+      'none',
+    );
+    assert.equal(
+      await page
+        .getByLabel('Store name', { exact: true })
+        .evaluate(input => input.labels[0].htmlFor === input.id && Boolean(input.id)),
+      true,
+    );
     await page
       .getByLabel('First product URL or handle', { exact: true })
       .fill('https://example.test/products/one?variant=123');
@@ -109,6 +124,7 @@ const { digest, approved } = require('./visual-baselines');
       })),
       [],
     );
+    await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
       path: path.join(os.tmpdir(), 'store-control-desktop.png'),
       fullPage: true,
@@ -123,6 +139,35 @@ const { digest, approved } = require('./visual-baselines');
       path: path.join(os.tmpdir(), 'store-control-mobile.png'),
       fullPage: true,
     });
+    const touchContext = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      isMobile: true,
+      hasTouch: true,
+    });
+    await touchContext.route('**/*', route =>
+      new URL(route.request().url()).origin === origin ? route.continue() : route.abort(),
+    );
+    const touchPage = await touchContext.newPage();
+    await touchPage.goto(`${origin}/settings`);
+    await expect(touchPage.getByLabel('Store name', { exact: true })).toHaveCSS(
+      'font-size',
+      '16px',
+    );
+    await expect(touchPage.getByLabel('Store name', { exact: true })).toHaveCSS(
+      'min-height',
+      '48px',
+    );
+    await expect(touchPage.locator('#activity-dock')).toBeVisible();
+    assert.equal(
+      await touchPage.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+      false,
+    );
+    await touchPage.screenshot({
+      path: path.join(os.tmpdir(), 'store-control-touch-mobile.png'),
+      fullPage: true,
+    });
+    await touchContext.close();
+    await page.bringToFront();
     await page.getByLabel('Enable scheduled checks for this store').uncheck();
     await page.getByRole('button', { name: 'Save changes', exact: true }).click();
     await expect(page.getByRole('status')).toContainText('Settings saved');
@@ -414,6 +459,46 @@ const { digest, approved } = require('./visual-baselines');
     await expect(page.locator('#run-progress')).toContainText('2 / 9');
     await expect(page.locator('#activity-test')).toContainText('Checking product price');
     await expect(page.locator('#activity-url')).toContainText('/products/one');
+    const removeRun = page
+      .locator('#run-pending')
+      .getByRole('button', { name: 'Remove', exact: true });
+    await removeRun.focus();
+    await page.evaluate(() => {
+      window.pollMutations = 0;
+      window.pollObserver = new MutationObserver(records => {
+        window.pollMutations += records.length;
+      });
+      window.pollObserver.observe(document.querySelector('#run-pending'), {
+        childList: true,
+        subtree: true,
+      });
+    });
+    // Wait for two real polling cycles, rather than a fixed delay.
+    for (let cycle = 0; cycle < 2; cycle++)
+      await page.waitForResponse(response => response.url().includes('/api/runs/details'));
+    await expect(removeRun).toBeFocused();
+    assert.equal(
+      await page.evaluate(() => {
+        window.pollObserver.disconnect();
+        return window.pollMutations;
+      }),
+      0,
+      'Unchanged polling results must not replace controls',
+    );
+    const backgroundRequests = [];
+    const observeBackground = request => backgroundRequests.push(request.url());
+    page.on('request', observeBackground);
+    await page.evaluate(async () => {
+      Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+      try {
+        await window.refreshRuns();
+        await window.refreshStatus();
+      } finally {
+        delete document.hidden;
+      }
+    });
+    page.off('request', observeBackground);
+    assert.deepEqual(backgroundRequests, [], 'Hidden tabs must not initiate polling');
     await page.locator('#run-pending').getByRole('button', { name: 'Remove', exact: true }).click();
     await expect(page.locator('#runs-message')).toContainText('Stop/remove requested');
     assert.ok(
@@ -480,12 +565,14 @@ const { digest, approved } = require('./visual-baselines');
       await page.goto(`${origin}/${section}`);
       await expect(page.locator(`#${section}-view`)).toBeVisible();
       await expect(page.locator(`#${section}-tab`)).toHaveAttribute('aria-current', 'page');
+      await expect(page).toHaveTitle(/Store Health/);
       await page.reload();
       await expect(page.locator(`#${section}-view`)).toBeVisible();
       assert.equal(new URL(page.url()).pathname, `/${section}`);
       await expect(page.locator('#activity-dock')).toBeVisible();
     }
     await page.getByRole('link', { name: 'Settings', exact: true }).click();
+    await expect(page.locator('#settings-view h1')).toBeFocused();
     await page.getByRole('link', { name: 'Reports', exact: true }).click();
     await page.goBack();
     await expect(page.locator('#settings-view')).toBeVisible();
