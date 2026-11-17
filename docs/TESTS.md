@@ -1,24 +1,28 @@
 # Test Cases
 
-`43-modern-web.spec.ts` (`@full`, `@modern-web`) now runs the passive Modern Web inspector plus guarded form/checkbox and presentation probes for every configured inventory URL. Pages reuses the passive inspector only. Evidence includes `modern-web`, `modern-web-interactions` and `modern-web-presentation` JSON/text attachments; only definite broken active form-description references block the Modern Web scenario. All new heuristics remain advisory. The shared inspector has 21 registered observations; see [the registry and remaining limits](MODERN-WEB.md).
+`43-modern-web.spec.ts` (`@full`, `@modern-web`) now runs the passive Modern Web inspector plus guarded form/checkbox and presentation probes for every configured inventory URL. Pages reuses the passive inspector only. Evidence includes `modern-web`, `modern-web-interactions` and `modern-web-presentation` JSON/text attachments; only definite broken active form-description references block the Modern Web scenario. All new heuristics remain advisory. The shared inspector has 27 registered observations; see [the registry and remaining limits](MODERN-WEB.md).
 
 `40-a11y-dynamic.spec.ts` additionally records `dynamic-accessibility.json`: forward/reverse modal focus, explicit menu arrow advance, native light-dismiss/drag boundaries when supported, and developer-controlled close-policy observations. It does not click arbitrary destructive close actions or emulate native mobile system-back gestures.
 
 ## Modern Web work remaining — review 2026-11-17
 
-The original 32 partial guides were reviewed: the initial-visibility instrumentation contract is now Covered, and the other 31 remain Partial with expanded executable evidence and narrower gaps. Heavy-script attribution and native progress naming also advanced from Pending to Partial. Current catalog totals: **1 Covered / 33 Partial / 77 Pending / 97 outside scope** (208 guides). These are guide topics, not test counts. A whole discipline is not complete just because its bounded samples pass.
+The original 32 partial guides were reviewed: the initial-visibility instrumentation contract is now Covered, and the other 31 remain Partial with expanded executable evidence and narrower gaps. Heavy-script attribution and native progress naming also advanced from Pending to Partial. Current catalog totals: **1 Covered / 37 Partial / 73 Pending / 98 outside scope** (209 guides). These are guide topics, not test counts. A whole discipline is not complete just because its bounded samples pass.
+
+Preload/script priority and external subresource HTML policy observations also advanced from Pending to Partial; actual network scheduling, resource criticality, digest enforcement and CSS/fetch coverage remain open. Six advisory rules and URL-free resource timing evidence are validated with local fixtures.
+
+Existing-code reconciliation also corrected `accessible-error-announcement` from Pending to Partial: the guarded probes already sample initial/blur/invalid/corrected ARIA states. Live-region timing and speech remain open. [The reconciliation table](MODERN-WEB.md#existing-implementation-reconciliation--2026-11-17) records reviewed legacy evidence and why related topics remain Pending.
 
 The remaining partial topics are indexed below. [The complete matrix](MODERN-WEB.md#complete-catalog-mapping) names the exact missing assertion/contract and code evidence for every entry; [the review summary](MODERN-WEB.md#partial-coverage-implementation-review--2026-11-17) groups the manual/device/business constraints.
 
 | Area | Remaining partial guide topics |
 | --- | --- |
-| Accessibility | `accessibility` |
+| Accessibility | `accessibility`, `accessible-error-announcement` |
 | Css | `responsive-design` |
 | Forms | `autofill-sign-in-form`, `forms`, `required-field-feedback`, `validate-input-after-interaction` |
 | Html | `html` |
-| Performance | `identify-heavy-scripts`, `identify-inp-causes`, `optimize-image-priority`, `performance` |
+| Performance | `identify-heavy-scripts`, `identify-inp-causes`, `optimize-image-priority`, `optimize-preload-priority`, `optimize-script-priority`, `performance` |
 | Privacy | `privacy` |
-| Security | `security` |
+| Security | `security`, `secure-external-subresources` |
 | Ui Atoms | `icons` |
 | Ui Behaviors | `declarative-dialog-popover-control`, `light-dismiss-a-dialog`, `motion`, `platform-controls-dismiss-dialog` |
 | Ui Components | `breadcrumbs`, `card`, `checkbox`, `dialog`, `menu`, `navbar`, `navigation-drawer`, `progress`, `spinner` |

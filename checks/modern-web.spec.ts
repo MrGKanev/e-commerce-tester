@@ -146,6 +146,9 @@ test('empty scopes and unsupported animation inspection are explicit', async ({ 
     images: 0,
     formControls: 0,
     videos: 0,
+    resourceHints: 0,
+    externalScripts: 0,
+    resourceTimingSupported: true,
     responseHeadersObserved: false,
     motionSupported: false,
     motionBaseline: 0,
@@ -183,4 +186,103 @@ test('long finite spatial motion is inspected while short decorative transitions
       .filter(item => item.rule === 'motion-reduced-unchanged')
       .map(item => item.selector),
   ).toEqual(['#long']);
+});
+
+test('resource hints expose conflicts without leaking asset URLs or assuming missing SRI is unsafe', async ({
+  page,
+}) => {
+  await page.route('**/*', route =>
+    route.request().isNavigationRequest()
+      ? route.fulfill({ contentType: 'text/html', body: fixtureDocument('') })
+      : route.fulfill({ status: 204 }),
+  );
+  await page.goto('http://127.0.0.1:45996/resource-hints');
+  // Inert script types are excluded; dynamic scripts remain observations, never parser-blocking claims.
+  await page.evaluate(() => {
+    document.head.insertAdjacentHTML(
+      'beforeend',
+      `
+      <link id="bad-font" rel="preload" as="font" href="/font.woff2">
+      <link id="bad-as" rel="preload" href="/resource">
+      <link rel="preload" as="image" fetchpriority="high" href="/a.png">
+      <link rel="preload" as="image" fetchpriority="high" href="/b.png">
+      <link rel="preload" as="image" fetchpriority="high" href="/c.png">
+      <script id="bad-cors" src="https://cdn.example.test/app.js?email=asset-secret" integrity="sha384-not-recorded" referrerpolicy="unsafe-url" fetchpriority="high"></script>
+      <script src="/second.js" fetchpriority="high"></script>
+      <script src="/third.js" fetchpriority="high"></script>
+      <script type="application/ld+json" src="/not-executable" fetchpriority="high"></script>
+    `,
+    );
+  });
+  const report = await inspectModernWeb(page);
+  expect(report.findings.map(f => f.rule)).toEqual(
+    expect.arrayContaining([
+      'preload-image-high-overuse',
+      'preload-font-cors',
+      'preload-destination',
+      'script-high-overuse',
+      'external-integrity-cors',
+      'external-referrer-policy',
+    ]),
+  );
+  expect(report.findings.every(f => f.severity === 'warning')).toBe(true);
+  expect(report.coverage).toMatchObject({ resourceHints: 5, externalScripts: 3 });
+  expect(report.resources.find(r => r.selector === '#bad-cors')).toMatchObject({
+    crossOrigin: true,
+    integrityPresent: true,
+    corsMode: 'absent',
+    timing: null,
+  });
+  expect(JSON.stringify(report)).not.toMatch(/asset-secret|sha384-not-recorded|cdn\.example/);
+});
+
+test('resource hint alternatives and mutable third-party scripts avoid false failures', async ({
+  page,
+}) => {
+  await page.route('**/*', route =>
+    route.request().isNavigationRequest()
+      ? route.fulfill({ contentType: 'text/html', body: fixtureDocument('') })
+      : route.fulfill({ contentType: 'application/javascript', body: '/* fixture */' }),
+  );
+  await page.goto('http://127.0.0.1:45996/resource-alternatives');
+  await page.evaluate(() => {
+    document.head.insertAdjacentHTML(
+      'beforeend',
+      `
+      <link rel="preload" as="font" crossorigin href="/font.woff2">
+      <link rel="preload" as="image" fetchpriority="high" href="/a.png">
+      <link rel="modulepreload" crossorigin="anonymous" integrity="sha384-fixture" href="https://cdn.example.test/module.js">
+      <link rel="stylesheet" crossorigin="use-credentials" integrity="sha384-fixture" referrerpolicy="no-referrer" href="https://cdn.example.test/style.css">
+      <script src="https://cdn.example.test/mutable-analytics.js" async></script>
+      <script src="/local.js" integrity="sha384-fixture"></script>
+    `,
+    );
+  });
+  const report = await inspectModernWeb(page);
+  expect(report.findings).toEqual([]);
+  expect(report.resources.filter(r => r.crossOrigin)).toHaveLength(3);
+});
+
+test('resource timing records completed requests and null restricted timing without fetching again', async ({
+  page,
+}) => {
+  let requests = 0;
+  await page.route('**/*', route => {
+    requests++;
+    return route.request().isNavigationRequest()
+      ? route.fulfill({
+          contentType: 'text/html',
+          body: fixtureDocument('<script src="/app.js?token=private-asset"></script>'),
+        })
+      : route.fulfill({ contentType: 'application/javascript', body: '/* local */' });
+  });
+  await page.goto('http://127.0.0.1:45996/resource-timing');
+  const before = requests;
+  const report = await inspectModernWeb(page);
+  expect(requests).toBe(before);
+  expect(report.resources[0].timing).toMatchObject({
+    startTime: expect.any(Number),
+    responseEnd: expect.any(Number),
+  });
+  expect(JSON.stringify(report)).not.toContain('private-asset');
 });

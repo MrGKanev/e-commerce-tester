@@ -20,6 +20,36 @@ export function safeAuditUrl(value: string) {
 
 // Executable rules are reviewed locally; upstream skills are never executed by store runs.
 export const MODERN_WEB_RULES = {
+  'preload-image-high-overuse': [
+    'optimize-preload-priority',
+    'warning',
+    'Reserve high priority for at most two critical image preloads.',
+  ],
+  'preload-font-cors': [
+    'optimize-preload-priority',
+    'warning',
+    'Use anonymous crossorigin on font preloads, including same-origin fonts.',
+  ],
+  'preload-destination': [
+    'optimize-preload-priority',
+    'warning',
+    'Specify a supported preload as destination matching the resource.',
+  ],
+  'script-high-overuse': [
+    'optimize-script-priority',
+    'warning',
+    'Review competing high-priority scripts; reserve high for one or two critical scripts.',
+  ],
+  'external-integrity-cors': [
+    'secure-external-subresources',
+    'warning',
+    'Pair cross-origin script/stylesheet integrity with an explicit CORS mode and verify response CORS headers.',
+  ],
+  'external-referrer-policy': [
+    'secure-external-subresources',
+    'warning',
+    'Review a cross-origin resource that explicitly permits sending the full document URL.',
+  ],
   'form-username-autofill': [
     'autofill-sign-in-form',
     'warning',
@@ -280,12 +310,133 @@ export async function inspectModernWeb(page: Page, headers?: Record<string, stri
       )
         add('video-captions', video, { captionTrackPresent: false, audioContentNotVerified: true });
     }
+    // Authored hints are evidence, not proof of browser scheduling or resource criticality.
+    // Never copy asset paths, queries, credentials, integrity digests or script contents into reports.
+    const scripts = [...document.querySelectorAll<HTMLScriptElement>('script[src]')].filter(
+      script => /^(?:|module|text\/javascript|application\/javascript)$/i.test(script.type.trim()),
+    );
+    const preloads = [...document.querySelectorAll<HTMLLinkElement>('link[rel]')].filter(link =>
+      link.relList.contains('preload'),
+    );
+    const highImages = preloads.filter(
+      link => link.as === 'image' && link.getAttribute('fetchpriority')?.toLowerCase() === 'high',
+    );
+    if (highImages.length > 2)
+      add('preload-image-high-overuse', highImages[0], { count: highImages.length });
+    const highScripts = scripts.filter(
+      script => script.getAttribute('fetchpriority')?.toLowerCase() === 'high',
+    );
+    if (highScripts.length > 2)
+      add('script-high-overuse', highScripts[0], { count: highScripts.length });
+    const destinations = new Set([
+      'audio',
+      'document',
+      'embed',
+      'fetch',
+      'font',
+      'image',
+      'object',
+      'script',
+      'style',
+      'track',
+      'video',
+      'worker',
+    ]);
+    for (const link of preloads) {
+      if (!destinations.has(link.as))
+        add('preload-destination', link, { destinationRecognized: false });
+      if (link.as === 'font' && link.crossOrigin !== 'anonymous' && link.crossOrigin !== '')
+        add('preload-font-cors', link, {
+          corsMode: link.crossOrigin === 'use-credentials' ? 'use-credentials' : 'absent',
+        });
+    }
+    const resources = [...scripts, ...document.querySelectorAll<HTMLLinkElement>('link[rel]')]
+      .filter(
+        el =>
+          el instanceof HTMLScriptElement ||
+          el.relList.contains('stylesheet') ||
+          el.relList.contains('preload') ||
+          el.relList.contains('modulepreload'),
+      )
+      .flatMap(el => {
+        const raw =
+          el instanceof HTMLScriptElement ? el.getAttribute('src') : el.getAttribute('href');
+        if (!raw) return [];
+        let url: URL;
+        try {
+          url = new URL(raw, document.baseURI);
+        } catch {
+          return [];
+        }
+        if (!/^https?:$/.test(url.protocol)) return [];
+        const crossOrigin = url.origin !== location.origin;
+        const integrity = Boolean(el.getAttribute('integrity')?.trim());
+        const corsMode = el.crossOrigin;
+        const policy =
+          el.getAttribute('referrerpolicy')?.trim().toLowerCase() || 'document-default';
+        const sriSupported =
+          el instanceof HTMLScriptElement ||
+          (el instanceof HTMLLinkElement &&
+            (el.relList.contains('stylesheet') ||
+              el.relList.contains('modulepreload') ||
+              (el.relList.contains('preload') && ['script', 'style'].includes(el.as))));
+        if (crossOrigin && integrity && sriSupported && corsMode === null)
+          add('external-integrity-cors', el, {
+            integrityPresent: true,
+            corsMode: 'absent',
+            responseCorsVerified: false,
+          });
+        if (crossOrigin && ['unsafe-url', 'no-referrer-when-downgrade'].includes(policy))
+          add('external-referrer-policy', el, { policy, documentPolicyMayBeOverridden: true });
+        const timings = performance.getEntriesByName(
+          url.href,
+          'resource',
+        ) as PerformanceResourceTiming[];
+        const timing = timings.at(-1);
+        return [
+          {
+            selector: selector(el),
+            kind: el.localName,
+            crossOrigin,
+            integrityPresent: integrity,
+            sriApplicable: sriSupported,
+            corsMode: corsMode === null ? 'absent' : corsMode || 'anonymous',
+            referrerPolicy: policy,
+            fetchPriority: ['high', 'low', 'auto'].includes(
+              el.getAttribute('fetchpriority')?.toLowerCase() || '',
+            )
+              ? el.getAttribute('fetchpriority')!.toLowerCase()
+              : 'auto',
+            destination: el instanceof HTMLLinkElement ? el.as : 'script',
+            async: el instanceof HTMLScriptElement ? el.async : null,
+            defer: el instanceof HTMLScriptElement ? el.defer : null,
+            module: el instanceof HTMLScriptElement ? el.type === 'module' : null,
+            timing: timing
+              ? {
+                  startTime: timing.startTime,
+                  duration: timing.duration,
+                  responseEnd: timing.responseEnd,
+                  requestStart: timing.requestStart > 0 ? timing.requestStart : null,
+                  responseStart: timing.responseStart > 0 ? timing.responseStart : null,
+                }
+              : null,
+          },
+        ];
+      });
     const reportUrl = new URL(location.href);
     for (const key of sensitiveKeys) reportUrl.searchParams.set(key, '[redacted]');
     return {
       url: reportUrl.href,
       viewport: { width: innerWidth, height: innerHeight },
-      coverage: { images: images.length, formControls: controls.length, videos: videos.length },
+      coverage: {
+        images: images.length,
+        formControls: controls.length,
+        videos: videos.length,
+        resourceHints: preloads.length,
+        externalScripts: scripts.length,
+        resourceTimingSupported: typeof performance.getEntriesByName === 'function',
+      },
+      resources,
       findings,
     };
   });
