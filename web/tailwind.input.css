@@ -3,3 +3,4 @@
 @import 'tailwindcss/preflight.css' layer(base);
 @import 'tailwindcss/utilities.css' source('./');
 @source '../scripts/update-history.js';
+@source '../checks/modern-web.spec.ts';

@@ -1,5 +1,7 @@
 # Test Cases
 
+`43-modern-web.spec.ts` (`@full`, `@modern-web`) inspects every configured inventory URL for image loading priorities, form description/error references, password form/autofill hints, video caption-track candidates and reduced-motion behavior. The same shared inspector runs in Pages without another navigation. Findings include evidence and fixes in `modern-web.json`/`modern-web.txt`; only missing active form-description references block the run. See [Modern Web coverage and maintenance](MODERN-WEB.md) for the nine initial rules, advisory semantics and limitations. Run with `pnpm test:modern-web --site=<slug>`; local desktop/mobile fixtures: `pnpm test:modern-web:local`.
+
 Scenario reference for the storefront specs. The runner defaults to Desktop Chrome; other desktop projects and selected mobile specs are opt-in. See [Running tests](RUNNING.md) for mode/project selection and [Configuration](CONFIGURATION.md) for per-store capabilities and thresholds.
 
 Optional features may be skipped. This table describes automated assertions, not a guarantee of complete accessibility, security or legal compliance.

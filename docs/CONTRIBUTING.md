@@ -32,6 +32,8 @@ Apply relevant recommendations to our existing Tailwind helpers and test fixture
 
 ## Validation
 
+Executable Modern Web rules and their maintenance contract are tracked in [MODERN-WEB.md](MODERN-WEB.md). Their local desktop/mobile fixtures are part of `pnpm test:acceptance:local`; run them separately with `pnpm test:modern-web:local` after `pnpm build:css`.
+
 ```bash
 pnpm check
 pnpm format:check

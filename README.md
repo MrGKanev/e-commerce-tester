@@ -74,6 +74,8 @@ These are automated checks of selected scenarios. Dictionary checks do not estab
 
 ## Documentation
 
+- [Modern Web checks and maintenance](docs/MODERN-WEB.md): executable checks, findings, coverage limits and maintenance. Run with `pnpm test:modern-web --site=<slug>`; Full and Pages include them.
+
 - [Checkout, analytics, markets and operations](docs/OPERATIONS-AND-COMMERCE.md): expected checkout totals, tracking/consent, market journeys, open problems, retention, backups and setup discovery.
 
 - [Browser control panel](docs/CONTROL-PANEL.md): manage stores and schedules without editing files.

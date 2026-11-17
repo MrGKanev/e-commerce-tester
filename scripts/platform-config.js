@@ -12,6 +12,7 @@ const SHARED = [
   '38-third-party-scripts.spec.ts',
   '39-a11y-extras.spec.ts',
   '40-a11y-dynamic.spec.ts',
+  '43-modern-web.spec.ts',
 ];
 function compatibleSpec(file, platform) {
   const name = path.basename(file);

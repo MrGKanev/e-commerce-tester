@@ -22,4 +22,6 @@ test('metadata/media/axe/content/screenshot/performance share one document navig
   expect(testInfo.attachments.some(attachment => attachment.name === 'shared-page-evidence')).toBe(
     true,
   );
+  expect(testInfo.attachments.some(attachment => attachment.name === 'modern-web.json')).toBe(true);
+  expect(testInfo.attachments.some(attachment => attachment.name === 'modern-web.txt')).toBe(true);
 });

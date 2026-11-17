@@ -4,6 +4,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { waitForContent, waitForImages } from './helpers';
 import { auditSpelling } from './spelling';
 import { readSiteSettings } from '../config/site-settings';
+import { inspectModernWeb, attachModernWeb } from './modern-web';
 
 /** Read-only checks consume the current document. They never navigate or mutate cart. */
 export async function auditCurrentPage(page: Page, testInfo: TestInfo, language: string) {
@@ -59,6 +60,16 @@ export async function auditCurrentPage(page: Page, testInfo: TestInfo, language:
   });
   await test.step('Content spelling', async () => {
     await auditSpelling(page, testInfo, language);
+  });
+  await test.step('Modern web guidance', async () => {
+    const report = await inspectModernWeb(page);
+    await attachModernWeb(report, testInfo);
+    expect
+      .soft(
+        report.findings.filter(finding => finding.severity === 'error'),
+        'Broken form description references; see modern-web.txt',
+      )
+      .toEqual([]);
   });
   await testInfo.attach('shared-page-evidence', {
     body: await page.screenshot({ animations: 'disabled', scale: 'css' }),

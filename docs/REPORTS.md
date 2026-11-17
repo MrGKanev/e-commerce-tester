@@ -54,6 +54,10 @@ Visited URLs describe coverage, not defects on every URL. Screenshot and Trace Z
 
 For annotation conventions and offline reporting validation, see [Contributing](CONTRIBUTING.md).
 
+## Modern Web observations
+
+Full and Pages attach `modern-web.json` and `modern-web.txt` to inspected page scenarios in the Playwright HTML report. These include coverage, evidence, guide IDs and fixes. Broken active form-description references fail the scenario; image loading, password/autofill, caption and reduced-motion heuristics are advisory annotations. See [the maintained rule registry](MODERN-WEB.md) for exact scope and limitations. A passing scenario can still contain advisory findings.
+
 ## Visual approval
 
 The control panel's Reports section shows captured candidates and their baseline/diff images for a selected store run. A baseline missing or environment mismatch is a failed visual check requiring review. Only selected screenshots and an explicit confirmation change the approved store version. Unselected images retain their existing approval. Approval does not change historical results or pass rate.
