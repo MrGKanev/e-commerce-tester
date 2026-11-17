@@ -166,7 +166,7 @@ async function reflow(page: Page) {
   await page.setViewportSize({ width: 320, height: 640 });
   try {
     return await page.evaluate(() => {
-      const wide = document.documentElement.scrollWidth - innerWidth;
+      const wide = document.documentElement.scrollWidth - document.documentElement.clientWidth;
       return wide > 5 ? [`Page is ${wide}px wider than a 320px viewport`] : [];
     });
   } finally {

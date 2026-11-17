@@ -7,7 +7,7 @@
 - For broad modernization tasks, also run `pnpm guidance:scan`, verify findings in context and follow the upstream modernization workflow. A clean scan is not a complete audit; the scanner covers only a subset of the guides.
 - Browser support for our panel and HTML reports: Baseline Widely available across Chromium, Firefox and WebKit. Use newer features only as progressive enhancements with working fallbacks. Keep all styling in Tailwind as described below.
 - Evaluate storefront checks by observable behavior and accessibility, not by whether a store adopted a particular modern API. Keep synthetic interaction timings distinct from field INP.
-- Maintain `docs/MODERN-WEB.md` whenever executable guidance checks change: record rule IDs, source guides, severity, evidence, limitations and local validation. Upstream skill updates alone do not change store verdicts.
+- Maintain `docs/MODERN-WEB.md` and the remaining-work index in `docs/TESTS.md` whenever executable guidance checks change: record rule IDs, source guides, severity, evidence, limitations and local validation. Upstream skill updates alone do not change store verdicts.
 - Guidance is a development tool. Do not fetch or execute it in the control server, scheduler, store runs, CSS build or required offline checks. If syncing fails, disclose it and use the previously installed guidance when available; do not claim it is current.
 
 ## UI and design

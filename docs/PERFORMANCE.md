@@ -26,6 +26,14 @@ Shared-page mode opens each inventory URL once within its scenario and reuses th
 
 All measurements are **synthetic**. A few scripted interactions do not constitute field INP or a real-user Core Web Vitals assessment. Reports preserve periods, URLs, browsers, scenarios, raw entries, operations and reasons for missing measurements. Pacing effects are not silently subtracted.
 
+## Attribution and probe boundaries
+
+Where supported, the collector records historical initial visibility and first-hidden time; otherwise it explicitly labels the execution-time fallback, whose initial-state precision can be inaccurate for late installation. Observed LCP element/loading priority and available resource load/render delays are retained; cross-origin/missing timing stays null.
+
+Event entries include input delay, processing duration and a presentation-delay estimate derived from the quantized Event Timing duration. Optional Long Animation Frame records retain reported script durations (the longest ten), style/layout timings or their combined fallback. Unsupported fields stay null; these diagnostics do not establish field INP or prove causal responsibility.
+
+Modern Web inspection finalizes passive sampling at `modern-web-probe-boundary` before its own preference/viewport/input stress. This avoids counting test-induced layout shifts and frames as storefront loading regressions. A short passive window can still be unmeasured and therefore fail strict mode. Choose a controlled performance profile when enforcing strict budgets.
+
 ## Observation windows and missing data
 
 These are the defaults:

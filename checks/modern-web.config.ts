@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: '.',
-  testMatch: 'modern-web.spec.ts',
+  testMatch: /modern-web(?:-probes)?\.spec\.ts/,
   workers: 1,
   retries: 0,
   reporter: 'list',

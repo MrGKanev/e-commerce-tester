@@ -1,6 +1,33 @@
 # Test Cases
 
-`43-modern-web.spec.ts` (`@full`, `@modern-web`) inspects every configured inventory URL for image loading priorities, form description/error references, password form/autofill hints, video caption-track candidates and reduced-motion behavior. The same shared inspector runs in Pages without another navigation. Findings include evidence and fixes in `modern-web.json`/`modern-web.txt`; only missing active form-description references block the run. See [Modern Web coverage and maintenance](MODERN-WEB.md) for the nine initial rules, advisory semantics and limitations. Run with `pnpm test:modern-web --site=<slug>`; local desktop/mobile fixtures: `pnpm test:modern-web:local`.
+`43-modern-web.spec.ts` (`@full`, `@modern-web`) now runs the passive Modern Web inspector plus guarded form/checkbox and presentation probes for every configured inventory URL. Pages reuses the passive inspector only. Evidence includes `modern-web`, `modern-web-interactions` and `modern-web-presentation` JSON/text attachments; only definite broken active form-description references block the Modern Web scenario. All new heuristics remain advisory. The shared inspector has 21 registered observations; see [the registry and remaining limits](MODERN-WEB.md).
+
+`40-a11y-dynamic.spec.ts` additionally records `dynamic-accessibility.json`: forward/reverse modal focus, explicit menu arrow advance, native light-dismiss/drag boundaries when supported, and developer-controlled close-policy observations. It does not click arbitrary destructive close actions or emulate native mobile system-back gestures.
+
+## Modern Web work remaining — review 2026-11-17
+
+The original 32 partial guides were reviewed: the initial-visibility instrumentation contract is now Covered, and the other 31 remain Partial with expanded executable evidence and narrower gaps. Heavy-script attribution and native progress naming also advanced from Pending to Partial. Current catalog totals: **1 Covered / 33 Partial / 77 Pending / 97 outside scope** (208 guides). These are guide topics, not test counts. A whole discipline is not complete just because its bounded samples pass.
+
+The remaining partial topics are indexed below. [The complete matrix](MODERN-WEB.md#complete-catalog-mapping) names the exact missing assertion/contract and code evidence for every entry; [the review summary](MODERN-WEB.md#partial-coverage-implementation-review--2026-11-17) groups the manual/device/business constraints.
+
+| Area | Remaining partial guide topics |
+| --- | --- |
+| Accessibility | `accessibility` |
+| Css | `responsive-design` |
+| Forms | `autofill-sign-in-form`, `forms`, `required-field-feedback`, `validate-input-after-interaction` |
+| Html | `html` |
+| Performance | `identify-heavy-scripts`, `identify-inp-causes`, `optimize-image-priority`, `performance` |
+| Privacy | `privacy` |
+| Security | `security` |
+| Ui Atoms | `icons` |
+| Ui Behaviors | `declarative-dialog-popover-control`, `light-dismiss-a-dialog`, `motion`, `platform-controls-dismiss-dialog` |
+| Ui Components | `breadcrumbs`, `card`, `checkbox`, `dialog`, `menu`, `navbar`, `navigation-drawer`, `progress`, `spinner` |
+| User Experience | `content-first-noise-reduction`, `form-factor-adaptation`, `natural-interactions` |
+| Visual Design | `color`, `contrast-color`, `typography` |
+
+Not yet closed by automation: screen-reader speech/essential-motion decisions, real OS keyboards/text scale, sandbox sign-in/password-manager behavior, successful/async form workflows, progress/spinner completion contracts, full data-flow/security obligations, field metrics and all nested/gesture/unsupported-browser states. These remain explicitly tracked; no passing result certifies them.
+
+Run `pnpm test:modern-web --site=<slug>` for a configured store. Offline checks: `pnpm test:modern-web:local`, `pnpm test:a11y:local`, `pnpm test:vitals:local`, `pnpm test:pages:local` and `pnpm check`. The local Modern Web config can also run installed Firefox/WebKit projects. Do not use live stores to validate new rules without authorization.
 
 Scenario reference for the storefront specs. The runner defaults to Desktop Chrome; other desktop projects and selected mobile specs are opt-in. See [Running tests](RUNNING.md) for mode/project selection and [Configuration](CONFIGURATION.md) for per-store capabilities and thresholds.
 
@@ -99,4 +126,4 @@ Checkout and empty-cart assertions: `pnpm test:claims:local` covers both platfor
 
 `39-a11y-extras.spec.ts` complements axe on every configured page (Shopify and WooCommerce): a single `main`, uniquely named `nav` landmarks, skip links with a real target, `lang` matching the page language, blocked zoom, positive `tabindex`, generic link text, accessible names that omit the visible label (2.5.3), keyboard traps, visible focus, focus landing on a hidden element, reflow at 320px, and serious axe best-practice/ARIA findings. Tags `@full`, `@a11y`; evidence `a11y-extras.json`. Run with `pnpm test:a11y --site=<slug>`; locally: `pnpm test:a11y:local`. These are heuristics over the first 20 Tab stops, not a complete accessibility audit.
 
-`40-a11y-dynamic.spec.ts` checks states that static axe cannot see: the menu, search and cart drawer open with Enter, an explicit `aria-expanded` reflects the open state, the dialog has a name, a modal dialog receives and holds focus (Tab), and Escape closes it and returns focus. Native dialogs and open popovers are supported without requiring redundant ARIA or custom focus traps; native modal focus may reach browser chrome. Variant options are named, grouped and changeable with arrow keys, and axe reports no blockers after a selection. The same file audits pages outside the configured inventory: the 404 page, policy/contact pages (Shopify), `/my-account/` (Woo) and discovered products, using axe and the checks from `39`. Controls and pages that a store lacks are marked `not-applicable`. Tags `@full`, `@a11y`; locally: `pnpm test:a11y:local`. No forms are submitted and the cart is not changed.
+`40-a11y-dynamic.spec.ts` checks states that static axe cannot see: the menu, search and cart drawer open with Enter, an explicit `aria-expanded` reflects the open state, the dialog has a name, a modal dialog receives and holds focus (Tab/Shift+Tab), and dismissal follows its declared policy with focus return when closed. Explicit menu arrow advance and supported native light-dismiss/drag boundaries are also observed. Native dialogs and open popovers are supported without requiring redundant ARIA or custom focus traps; native modal focus may reach browser chrome. Variant options are named, grouped and changeable with arrow keys, and axe reports no blockers after a selection. The same file audits pages outside the configured inventory: the 404 page, policy/contact pages (Shopify), `/my-account/` (Woo) and discovered products, using axe and the checks from `39`. Controls and pages that a store lacks are marked `not-applicable`. Tags `@full`, `@a11y`; locally: `pnpm test:a11y:local`. No forms are submitted and the cart is not changed.

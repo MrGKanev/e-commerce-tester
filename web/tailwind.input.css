@@ -4,3 +4,5 @@
 @import 'tailwindcss/utilities.css' source('./');
 @source '../scripts/update-history.js';
 @source '../checks/modern-web.spec.ts';
+@source '../checks/modern-web-probes.spec.ts';
+@source '../checks/a11y.spec.ts';

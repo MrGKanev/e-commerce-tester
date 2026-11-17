@@ -56,7 +56,7 @@ For annotation conventions and offline reporting validation, see [Contributing](
 
 ## Modern Web observations
 
-Full and Pages attach `modern-web.json` and `modern-web.txt` to inspected page scenarios in the Playwright HTML report. These include coverage, evidence, guide IDs and fixes. Broken active form-description references fail the scenario; image loading, password/autofill, caption and reduced-motion heuristics are advisory annotations. See [the maintained rule registry](MODERN-WEB.md) for exact scope and limitations. A passing scenario can still contain advisory findings.
+Full and Pages attach `modern-web.json` and `modern-web.txt` to inspected page scenarios in the Playwright HTML report. These include coverage, evidence, guide IDs and fixes. Broken active form-description references fail the scenario; image loading, password/autofill, caption and reduced-motion heuristics are advisory annotations. See [the maintained rule registry](MODERN-WEB.md) for exact scope and limitations. Full also attaches `modern-web-interactions.json`/`.txt` and `modern-web-presentation.json`/`.txt`; Pages retains the passive phase only. These record guarded field/checkbox states, viewport/text/theme observations and blocked-network/unavailable states. Dynamic overlay checks attach `dynamic-accessibility.json`. A passing scenario can still contain advisory or unverified findings.
 
 ## Visual approval
 

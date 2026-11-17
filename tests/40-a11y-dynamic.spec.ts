@@ -14,17 +14,21 @@ const OVERLAYS: Record<string, string> = {
   'cart drawer': `header ${BUTTONS}[aria-label*="cart" i], header ${BUTTONS}[aria-label*="количка" i]`,
 };
 
-function report(audit: Audit, info: TestInfo, name: string) {
+async function report(audit: Audit, info: TestInfo, name: string) {
   if (!audit.applicable) {
     info.annotations.push({ type: 'not-applicable', description: `No ${name} on this store` });
     test.skip(true, `No ${name} on this store`);
   }
+  await info.attach('dynamic-accessibility.json', {
+    body: JSON.stringify({ name, ...audit }),
+    contentType: 'application/json',
+  });
   expect.soft(audit.problems, name).toEqual([]);
 }
 
 test.describe('40 · Accessibility of dynamic states', { tag: ['@full', '@a11y'] }, () => {
   for (const [name, selector] of Object.entries(OVERLAYS))
-    test(`${name} opens, traps focus where modal, and closes with Escape`, async ({
+    test(`${name} opens, contains modal focus, and respects dismissal policy`, async ({
       page,
     }, info) => {
       await goto(page);
@@ -36,13 +40,13 @@ test.describe('40 · Accessibility of dynamic states', { tag: ['@full', '@a11y']
         });
         test.skip(true, `No ${name} control at this viewport`);
       }
-      report(await auditOverlay(page, trigger), info, name);
+      await report(await auditOverlay(page, trigger), info, name);
     });
 
   test('variant options are named, grouped and keyboard operable', async ({ page }, info) => {
     await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
     await waitForContent(page);
-    report(await auditVariantPicker(page), info, 'variant picker');
+    await report(await auditVariantPicker(page), info, 'variant picker');
   });
 });
 

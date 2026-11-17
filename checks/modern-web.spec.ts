@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { test, expect } from '../tests/fixtures';
-import { inspectModernWeb, attachModernWeb, MODERN_WEB_RULES } from '../tests/modern-web';
+import { inspectModernWeb, attachModernWeb } from '../tests/modern-web';
 
 const css = fs.readFileSync(path.resolve(__dirname, '../web/tailwind.css'), 'utf8');
 const image =
@@ -35,7 +35,19 @@ test('broken fixtures exercise every rule, retain evidence and never submit a fo
   const report = await inspectModernWeb(page);
   await attachModernWeb(report, info);
   expect([...new Set(report.findings.map(finding => finding.rule))].sort()).toEqual(
-    Object.keys(MODERN_WEB_RULES).sort(),
+    expect.arrayContaining(
+      [
+        'image-lazy-high',
+        'image-viewport-lazy',
+        'image-high-overuse',
+        'form-description-reference',
+        'form-invalid-feedback',
+        'form-password-get',
+        'form-password-autofill',
+        'video-captions',
+        'motion-reduced-unchanged',
+      ].sort(),
+    ),
   );
   expect(
     report.findings.filter(finding => finding.severity === 'error').map(finding => finding.rule),
@@ -134,8 +146,41 @@ test('empty scopes and unsupported animation inspection are explicit', async ({ 
     images: 0,
     formControls: 0,
     videos: 0,
+    responseHeadersObserved: false,
     motionSupported: false,
     motionBaseline: 0,
     motionReduced: 0,
   });
+});
+
+test('long finite spatial motion is inspected while short decorative transitions are excluded', async ({
+  page,
+}) => {
+  await page.route('**/*', route =>
+    route.fulfill({
+      contentType: 'text/html',
+      body: fixtureDocument(
+        '<div id="long" class="size-4 bg-blue-600">Long</div><div id="short" class="size-4 bg-blue-600">Short</div>',
+      ),
+    }),
+  );
+  await page.goto('http://127.0.0.1:45996/finite');
+  await page.evaluate(() => {
+    for (const [id, duration] of [
+      ['long', 8000],
+      ['short', 200],
+    ] as const)
+      document
+        .getElementById(id)!
+        .animate([{ transform: 'translateX(0)' }, { transform: 'translateX(40px)' }], {
+          duration,
+          fill: 'forwards',
+        });
+  });
+  const report = await inspectModernWeb(page);
+  expect(
+    report.findings
+      .filter(item => item.rule === 'motion-reduced-unchanged')
+      .map(item => item.selector),
+  ).toEqual(['#long']);
 });

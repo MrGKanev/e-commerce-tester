@@ -44,6 +44,12 @@ export type VitalDocument = {
   entries: Record<string, unknown>[];
   support: string[];
   resources: { transferBytesLowerBound: number; blocking: { url: string; duration: number }[] };
+  attribution?: {
+    initialVisibility: string;
+    visibilitySource: 'performance-history' | 'execution-time-fallback';
+    firstHiddenAtMs: number | null;
+    lcp: Record<string, unknown> | null;
+  };
 };
 export type VitalsOptions = {
   enabled: boolean;
@@ -68,6 +74,7 @@ export function initWebVitals(options: VitalsOptions) {
     finish: (reason: string) => VitalDocument;
     begin: (label: string) => { documentId: string; id: number };
     end: (id: number, outcome: string) => void;
+    peek: () => VitalDocument;
   };
   const scope = window as unknown as {
     __storeVitals?: Runtime;
@@ -75,7 +82,11 @@ export function initWebVitals(options: VitalsOptions) {
   };
   if (scope.__storeVitals) return;
   const id = `${performance.timeOrigin}-${Math.random()}`;
-  const visibleAtStart = document.visibilityState === 'visible';
+  const visibilityHistory = performance.getEntriesByType('visibility-state');
+  const initialVisibility = visibilityHistory[0]?.name || document.visibilityState;
+  const visibleAtStart = initialVisibility === 'visible';
+  let fallbackHiddenAt: number | null = visibleAtStart ? null : 0;
+  let lcpAttribution: Record<string, unknown> | null = null;
   let endedAt: number | null = null;
   let savedFinal: VitalDocument | null = null;
   const supported =
@@ -122,12 +133,55 @@ export function initWebVitals(options: VitalsOptions) {
           interactionId: event.interactionId,
           processingStart: event.processingStart,
           processingEnd: event.processingEnd,
+          inputDelayMs:
+            typeof event.processingStart === 'number'
+              ? round(Math.max(0, event.processingStart - entry.startTime))
+              : null,
+          processingDurationMs:
+            typeof event.processingStart === 'number' && typeof event.processingEnd === 'number'
+              ? round(Math.max(0, event.processingEnd - event.processingStart))
+              : null,
+          presentationDelayEstimateMs:
+            typeof event.processingEnd === 'number'
+              ? round(Math.max(0, entry.startTime + entry.duration - event.processingEnd))
+              : null,
           target: event.target
             ? event.target.tagName.toLowerCase() + (event.target.id ? '#' + event.target.id : '')
             : null,
         });
       }
-      if (type === 'largest-contentful-paint' && !paintEnded) lcp = entry.startTime;
+      if (type === 'largest-contentful-paint' && !paintEnded) {
+        lcp = entry.startTime;
+        const element = (entry as PerformanceEntry & { element?: Element }).element;
+        const image = element instanceof HTMLImageElement ? element : null;
+        const resource = image
+          ? (performance.getEntriesByName(image.currentSrc).at(-1) as
+              PerformanceResourceTiming | undefined)
+          : undefined;
+        const nav = performance.getEntriesByType('navigation')[0] as
+          PerformanceNavigationTiming | undefined;
+        const timed = resource && resource.responseStart > 0 && nav && nav.responseStart > 0;
+        lcpAttribution = {
+          kind: image ? 'image' : element ? 'text' : 'unknown',
+          element: element
+            ? element.tagName.toLowerCase() + (element.id ? '#' + CSS.escape(element.id) : '')
+            : null,
+          loading: image?.loading || null,
+          fetchPriority: image?.getAttribute('fetchpriority') || null,
+          resourceLoadDelayMs: timed
+            ? round(Math.max(0, resource.startTime - nav.responseStart))
+            : null,
+          resourceLoadDurationMs: timed ? round(resource.duration) : null,
+          elementRenderDelayMs: timed
+            ? round(Math.max(0, entry.startTime - resource.responseEnd))
+            : null,
+          timingReason: timed
+            ? null
+            : image
+              ? 'resource-timing-restricted-or-missing'
+              : 'no-image-resource',
+        };
+      }
       if (type === 'layout-shift' && !paintEnded && !(entry as Shift).hadRecentInput) {
         if (
           sessionStart === null ||
@@ -146,6 +200,52 @@ export function initWebVitals(options: VitalsOptions) {
         const event = entry as EventEntry;
         if (event.interactionId && Number.isFinite(event.duration))
           events.push({ id: event.interactionId, time: event.startTime, duration: event.duration });
+      }
+      if (type === 'long-animation-frame' && entries.length < 1000) {
+        const frame = entry as PerformanceEntry & {
+          blockingDuration?: number;
+          styleDuration?: number;
+          layoutDuration?: number;
+          styleAndLayoutStart?: number;
+          scripts?: Array<{
+            sourceURL?: string;
+            duration?: number;
+            forcedStyleDuration?: number;
+            forcedLayoutDuration?: number;
+            forcedStyleAndLayoutDuration?: number;
+          }>;
+        };
+        entries.push({
+          type: 'long-animation-frame-attribution',
+          startTime: entry.startTime,
+          duration: entry.duration,
+          blockingDuration: frame.blockingDuration ?? null,
+          styleDuration: frame.styleDuration ?? null,
+          layoutDuration: frame.layoutDuration ?? null,
+          combinedStyleAndLayoutMs: frame.styleAndLayoutStart
+            ? Math.max(0, entry.startTime + entry.duration - frame.styleAndLayoutStart)
+            : null,
+          scripts: (frame.scripts || [])
+            .slice()
+            .sort((a, b) => (b.duration || 0) - (a.duration || 0))
+            .slice(0, 10)
+            .map(script => {
+              let source = null;
+              try {
+                const url = new URL(script.sourceURL || '');
+                source = url.origin + url.pathname;
+              } catch {
+                /* Inline/opaque script: no source URL. */
+              }
+              return {
+                source,
+                duration: script.duration ?? null,
+                forcedStyleDuration: script.forcedStyleDuration ?? null,
+                forcedLayoutDuration: script.forcedLayoutDuration ?? null,
+                forcedStyleAndLayoutDuration: script.forcedStyleAndLayoutDuration ?? null,
+              };
+            }),
+        });
       }
       // first-input is diagnostic; pointerdown alone is not the full click interaction.
       if (type === 'first-input') firstInput = true;
@@ -207,6 +307,16 @@ export function initWebVitals(options: VitalsOptions) {
       },
       activeObservers: active.size,
       support: [...supported],
+      attribution: {
+        initialVisibility,
+        visibilitySource: visibilityHistory.length
+          ? 'performance-history'
+          : 'execution-time-fallback',
+        firstHiddenAtMs:
+          performance.getEntriesByType('visibility-state').find(entry => entry.name === 'hidden')
+            ?.startTime ?? fallbackHiddenAt,
+        lcp: lcpAttribution,
+      },
       entries: [...entries],
       actions: named,
       metrics: {
@@ -275,7 +385,13 @@ export function initWebVitals(options: VitalsOptions) {
     savedFinal ||= snapshot(true);
     return savedFinal;
   }
-  for (const type of ['largest-contentful-paint', 'layout-shift', 'event', 'first-input']) {
+  for (const type of [
+    'largest-contentful-paint',
+    'layout-shift',
+    'event',
+    'first-input',
+    'long-animation-frame',
+  ]) {
     if (!supported.includes(type)) {
       failed.add(type);
       continue;
@@ -312,8 +428,8 @@ export function initWebVitals(options: VitalsOptions) {
   timers.push(window.setTimeout(() => stopPaint('max-paint-window'), options.maxPaintMs));
   timers.push(
     window.setTimeout(() => {
-      drain(['event', 'first-input']);
-      for (const type of ['event', 'first-input']) {
+      drain(['event', 'first-input', 'long-animation-frame']);
+      for (const type of ['event', 'first-input', 'long-animation-frame']) {
         active.get(type)?.disconnect();
         active.delete(type);
       }
@@ -321,7 +437,10 @@ export function initWebVitals(options: VitalsOptions) {
     }, options.maxEventMs),
   );
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') stopPaint('document-hidden');
+    if (document.visibilityState === 'hidden') {
+      fallbackHiddenAt ??= performance.now();
+      stopPaint('document-hidden');
+    }
   });
   window.addEventListener(
     'pagehide',
@@ -332,6 +451,10 @@ export function initWebVitals(options: VitalsOptions) {
     { once: true },
   );
   scope.__storeVitals = {
+    peek() {
+      drain([...active.keys()]);
+      return snapshot(false);
+    },
     finish,
     begin(label) {
       const start = performance.now();

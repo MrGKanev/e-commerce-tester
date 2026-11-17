@@ -36,7 +36,7 @@ export async function auditCurrentPage(page: Page, testInfo: TestInfo, language:
     );
     expect.soft(broken, 'Broken viewport images').toEqual([]);
     const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth > innerWidth + 5,
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 5,
     );
     expect.soft(overflow, 'Page overflows its viewport').toBe(false);
   });

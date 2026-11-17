@@ -6,7 +6,11 @@ const OVERLAY =
   '[role="dialog"], [role="alertdialog"], dialog[open], [aria-modal="true"], [popover]:is(:popover-open)';
 const SHOWN = 1500;
 
-export type Audit = { applicable: boolean; problems: string[] };
+export type Audit = {
+  applicable: boolean;
+  problems: string[];
+  observations?: Record<string, unknown>;
+};
 const na: Audit = { applicable: false, problems: [] };
 
 /** Serious/critical axe findings for the current DOM state, optionally limited to one subtree. */
@@ -70,6 +74,11 @@ export async function auditOverlay(page: Page, trigger: Locator): Promise<Audit>
       dialog: element.matches('[role="dialog"], [role="alertdialog"], dialog, [aria-modal="true"]'),
       modal: element.matches(':modal') || element.getAttribute('aria-modal') === 'true',
       named: Boolean((element.getAttribute('aria-label') || '').trim() || labelled),
+      native: element.tagName === 'DIALOG',
+      closePolicy: element.getAttribute('closedby'),
+      manualPopover: element.getAttribute('popover') === 'manual',
+      lightDismissSupported:
+        element.tagName === 'DIALOG' && 'closedBy' in HTMLDialogElement.prototype,
     };
   });
   if (info.dialog && !info.named) problems.push('Dialog has no accessible name');
@@ -79,16 +88,49 @@ export async function auditOverlay(page: Page, trigger: Locator): Promise<Audit>
         el => el.contains(document.activeElement) || (el.matches(':modal') && !document.hasFocus()),
       );
     if (!(await inside())) problems.push('Focus did not move into the modal dialog');
-    for (let i = 0; i < 12; i++) {
-      await page.keyboard.press('Tab');
+    for (let i = 0; i < 16; i++) {
+      await page.keyboard.press(i < 8 ? 'Tab' : 'Shift+Tab');
       if (!(await inside())) {
         problems.push('Tab moved focus out of the modal dialog (no focus containment)');
         break;
       }
     }
   }
+  const menu = overlay.locator('[role="menu"]').first();
+  if (await menu.count()) {
+    const items = menu
+      .locator('[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]')
+      .filter({ visible: true });
+    if ((await items.count()) > 1) {
+      await items.first().focus();
+      await page.keyboard.press(
+        (await menu.getAttribute('aria-orientation')) === 'horizontal' ? 'ArrowRight' : 'ArrowDown',
+      );
+      if (
+        !(await items
+          .nth(1)
+          .evaluate(
+            el =>
+              el === document.activeElement ||
+              Boolean(
+                el.id && document.activeElement?.getAttribute('aria-activedescendant') === el.id,
+              ),
+          ))
+      )
+        problems.push('Menu arrow navigation did not advance focus/active descendant');
+    }
+  }
   problems.push(...(await blockingAxe(page, overlay)).map(finding => `Open state — ${finding}`));
 
+  if (info.manualPopover || (info.native && info.closePolicy === 'none'))
+    return {
+      applicable: true,
+      problems,
+      observations: {
+        ...info,
+        dismissal: 'developer-controlled; explicit close action requires a configured safe control',
+      },
+    };
   await page.keyboard.press('Escape');
   const closed = await overlay
     .waitFor({ state: 'hidden', timeout: SHOWN })
@@ -97,7 +139,45 @@ export async function auditOverlay(page: Page, trigger: Locator): Promise<Audit>
   if (!closed) problems.push('Escape does not close the overlay');
   else if (!(await trigger.evaluate(element => element === document.activeElement)))
     problems.push('Focus does not return to the trigger after closing');
-  return { applicable: true, problems };
+  let lightDismiss: string = 'not-requested';
+  if (closed && info.native && info.closePolicy === 'any') {
+    lightDismiss = info.lightDismissSupported ? 'outside-space-unavailable' : 'native-unsupported';
+    if (info.lightDismissSupported) {
+      await trigger.press('Enter');
+      const points = await overlay.evaluate(el => {
+        const r = el.getBoundingClientRect();
+        const outside = [
+          { x: 1, y: 1 },
+          { x: innerWidth - 2, y: innerHeight - 2 },
+        ].find(p => p.x < r.left || p.x > r.right || p.y < r.top || p.y > r.bottom);
+        const inside = [
+          { x: r.left + 2, y: r.top + 2 },
+          { x: r.right - 2, y: r.bottom - 2 },
+        ].find(p => document.elementFromPoint(p.x, p.y) === el);
+        return { outside, inside };
+      });
+      if (points.outside) {
+        if (points.inside) {
+          await page.mouse.move(points.inside.x, points.inside.y);
+          await page.mouse.down();
+          await page.mouse.move(points.outside.x, points.outside.y);
+          await page.mouse.up();
+          if (!(await overlay.isVisible()))
+            problems.push('Dialog dismisses a drag that started inside its padding');
+        }
+        if (await overlay.isVisible()) await page.mouse.click(points.outside.x, points.outside.y);
+        if (await overlay.isVisible())
+          problems.push('closedby="any" does not light-dismiss on an outside click');
+        lightDismiss = points.inside ? 'outside-click-and-drag-boundary' : 'outside-click-only';
+      }
+      if (await overlay.isVisible()) await page.keyboard.press('Escape');
+    }
+  }
+  return {
+    applicable: true,
+    problems,
+    observations: { ...info, lightDismiss, keyboardDirections: 'Tab and Shift+Tab' },
+  };
 }
 
 /** Variant options must be named, grouped and operable by keyboard; the selected state must stay accessible. */

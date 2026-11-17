@@ -1,6 +1,10 @@
 import { test, expect } from '../tests/fixtures';
+import fs from 'node:fs';
+import path from 'node:path';
 import { auditOverlay, auditVariantPicker } from '../tests/a11y-dynamic';
 import { A11Y_CHECKS, auditA11yExtras, type A11yCheck } from '../tests/a11y-extras';
+
+const tailwind = fs.readFileSync(path.resolve(__dirname, '../web/tailwind.css'), 'utf8');
 
 const good = `<!doctype html><html lang="bg"><head><title>Добра страница</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -121,6 +125,48 @@ test('native modal dialogs and popovers work without redundant ARIA or custom fo
     const result = await auditOverlay(page, page.locator('#open'));
     expect(result.applicable, kind).toBe(true);
     expect(result.problems, kind).toEqual([]);
+    await page.unroute('**/*');
+  }
+});
+
+test('declarative dialog controls respect developer dismissal policy and light-dismiss boundaries', async ({
+  page,
+}) => {
+  for (const policy of ['any', 'none', 'manual']) {
+    await page.route('**/*', route =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: `<!doctype html><html lang="en"><head><title>Policy fixture</title><style>${tailwind}</style></head><body>
+      <main><h1>Shop</h1><button id="open" ${policy === 'manual' ? 'popovertarget="dlg"' : 'commandfor="dlg" command="show-modal"'}>Menu</button></main>
+      ${policy === 'manual' ? '<div id="dlg" popover="manual"><button popovertarget="dlg" popovertargetaction="hide">Close</button></div>' : `<dialog id="dlg" class="m-auto p-6" closedby="${policy}" aria-label="Menu"><form method="dialog"><button>Close</button></form></dialog>`}
+      <script>const dlg=document.getElementById('dlg');if(!('commandForElement' in HTMLButtonElement.prototype)&&${policy !== 'manual'})document.getElementById('open').onclick=()=>dlg.showModal();if(${policy === 'none'})dlg.addEventListener('cancel',e=>e.preventDefault());</script>
+      </body></html>`,
+      }),
+    );
+    await page.goto('http://127.0.0.1:45993/' + policy);
+    const result = await auditOverlay(page, page.locator('#open'));
+    expect(result.problems, policy).toEqual([]);
+    if (policy === 'any')
+      expect(result.observations?.lightDismiss).toMatch(/outside-click|native-unsupported/);
+    else expect(result.observations?.dismissal).toContain('developer-controlled');
+    await page.unroute('**/*');
+  }
+});
+
+test('menu arrow navigation is verified rather than inferred from menu roles', async ({ page }) => {
+  for (const working of [true, false]) {
+    await page.route('**/*', route =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: `<!doctype html><html lang="en"><head><title>Menu fixture</title><style>${tailwind}</style></head><body><main><h1>Shop</h1><button id="open">Menu</button></main>
+      <div id="dlg" role="dialog" aria-modal="true" aria-label="Actions" hidden><div id="menu" role="menu" aria-label="Actions"><button class="min-h-8 min-w-8" role="menuitem">One</button><button class="min-h-8 min-w-8" role="menuitem">Two</button></div></div>
+      <script>const trigger=document.getElementById('open'),dlg=document.getElementById('dlg'),items=[...document.querySelectorAll('[role=menuitem]')];trigger.onclick=()=>{dlg.hidden=false;items[0].focus()};document.addEventListener('keydown',e=>{if(dlg.hidden)return;let i=items.indexOf(document.activeElement);if(e.key==='Tab'){e.preventDefault();items[(i+(e.shiftKey?-1:1)+2)%2].focus()}if(e.key==='ArrowDown'&&${working}){e.preventDefault();items[(i+1)%2].focus()}if(e.key==='Escape'){dlg.hidden=true;trigger.focus()}});</script></body></html>`,
+      }),
+    );
+    await page.goto('http://127.0.0.1:45993/menu');
+    const result = await auditOverlay(page, page.locator('#open'));
+    if (working) expect(result.problems).toEqual([]);
+    else expect(result.problems.join('\n')).toContain('Menu arrow navigation');
     await page.unroute('**/*');
   }
 });
