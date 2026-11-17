@@ -49,7 +49,8 @@ export async function inspectInteractions(page: Page) {
     throw new Error('Interaction probes require prepareInteractionProbe(...).freeze() first');
   const findings: WebFinding[] = [];
   const fields: Array<Record<string, unknown>> = [],
-    checkboxes: Array<Record<string, unknown>> = [];
+    checkboxes: Array<Record<string, unknown>> = [],
+    selects: Array<Record<string, unknown>> = [];
   const add = (
     rule: string,
     guide: string,
@@ -161,6 +162,158 @@ export async function inspectInteractions(page: Page) {
       });
     }
   }
+  const selectControls = page
+    .locator(
+      'select:required:enabled:not([multiple]):not([aria-disabled="true"]):not([inert], [inert] *)',
+    )
+    .filter({ visible: true });
+  for (let index = 0; index < Math.min(await selectControls.count(), 5); index++) {
+    const control = (await selectControls
+      .nth(index)
+      .elementHandle()) as ElementHandle<HTMLSelectElement> | null;
+    if (!control) continue;
+    const state = () =>
+      control.evaluate(el => ({
+        selector: el.id ? '#' + CSS.escape(el.id) : 'select[required]',
+        empty: !el.value,
+        valid: el.validity.valid,
+        userInvalid: el.matches(':user-invalid'),
+        ariaInvalid: el.getAttribute('aria-invalid'),
+        selectedIndex: el.selectedIndex,
+        displaySize: el.size,
+        described: ['aria-describedby', 'aria-errormessage'].some(attr =>
+          (el.getAttribute(attr) || '')
+            .split(/\s+/)
+            .some(id => document.getElementById(id)?.textContent?.trim()),
+        ),
+      }));
+    const initial = await state();
+    if (initial.displaySize > 1) {
+      selects.push({ selector: initial.selector, status: 'not-probed', reason: 'listbox-select' });
+      continue;
+    }
+    if (!initial.empty) {
+      selects.push({
+        selector: initial.selector,
+        status: 'not-probed',
+        reason: 'prefilled-select',
+      });
+      continue;
+    }
+    const optionIndex = await control.evaluate(el =>
+      [...el.options].findIndex(
+        option =>
+          Boolean(option.value) && !option.disabled && !option.closest('optgroup[disabled]'),
+      ),
+    );
+    if (optionIndex < 0) {
+      selects.push({
+        selector: initial.selector,
+        status: 'unverified',
+        reason: 'no-enabled-nonempty-option',
+      });
+      continue;
+    }
+    // Only booleans/timing are retained: a global live-region change is not proof of speech or causality.
+    const announcements = await control.evaluateHandle(() => {
+      const started = performance.now();
+      const changes: Array<{ elapsedMs: number; politeness: string; textPresent: boolean }> = [];
+      const observer = new MutationObserver(records => {
+        for (const record of records) {
+          const target =
+            record.target instanceof Element ? record.target : record.target.parentElement;
+          const region = target?.closest('[aria-live], [role="status"], [role="alert"]');
+          if (!region || changes.length >= 20) continue;
+          const politeness =
+            region.getAttribute('aria-live') ||
+            (region.getAttribute('role') === 'alert' ? 'assertive' : 'polite');
+          if (!['polite', 'assertive'].includes(politeness)) continue;
+          changes.push({
+            elapsedMs: Math.round(performance.now() - started),
+            politeness: politeness === 'assertive' ? 'assertive' : 'polite',
+            textPresent: Boolean(region.textContent?.trim()),
+          });
+        }
+      });
+      observer.observe(document.documentElement, {
+        subtree: true,
+        childList: true,
+        characterData: true,
+      });
+      return { changes, stop: () => observer.disconnect() };
+    });
+    try {
+      if (initial.ariaInvalid === 'true' && !initial.userInvalid)
+        add(
+          'select-premature-error',
+          'select-menu-interaction',
+          initial.selector,
+          { initial },
+          'Review an explicit invalid state before selection; distinguish server validation from premature required-select feedback.',
+        );
+      await control.focus();
+      await control.evaluate(el => el.reportValidity());
+      // Allow bounded delayed polite announcements without collecting their text.
+      await control.evaluate(() => new Promise(resolve => setTimeout(resolve, 600)));
+      const rejected = await state();
+      if (rejected.valid)
+        add(
+          'select-placeholder-valid',
+          'select-menu-interaction',
+          initial.selector,
+          { rejected },
+          'Verify that the empty placeholder in this mandatory select is rejected by native constraints.',
+        );
+      if (!rejected.valid && rejected.ariaInvalid === 'true' && !rejected.described)
+        add(
+          'select-error-description',
+          'accessible-error-announcement',
+          initial.selector,
+          { rejected },
+          'Associate useful error text with an explicitly invalid select.',
+        );
+      await control.selectOption({ index: optionIndex }, { timeout: 1500 });
+      await control.press('Tab', { timeout: 1500 });
+      const corrected = await state();
+      if (corrected.valid && corrected.ariaInvalid === 'true')
+        add(
+          'select-stale-invalid',
+          'select-menu-interaction',
+          initial.selector,
+          { corrected },
+          'Clear stale aria-invalid after a real option satisfies the required select.',
+        );
+      selects.push({
+        selector: initial.selector,
+        status: corrected.valid ? 'observed' : 'correction-unverified',
+        initial,
+        rejected,
+        corrected,
+        liveRegionObservations: await announcements.evaluate(value => value.changes),
+        announcementWindowMs: 600,
+        speechVerified: false,
+        announcementCausalityVerified: false,
+      });
+    } catch {
+      selects.push({
+        selector: initial.selector,
+        status: 'unverified',
+        reason: 'control-changed-or-blocked-dependent-work',
+      });
+    } finally {
+      await announcements.evaluate(value => value.stop()).catch(() => {});
+      await announcements.dispose();
+      // Restore this node only. Never select into a replacement node that may contain customer data.
+      await control
+        .evaluate((el, selectedIndex) => {
+          if (!el.isConnected) return;
+          el.selectedIndex = selectedIndex;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        }, initial.selectedIndex)
+        .catch(() => {});
+    }
+  }
   const checks = page
     .locator(
       'input[type="checkbox"]:not([disabled]), [role="checkbox"]:not([aria-disabled="true"]):not([aria-readonly="true"])',
@@ -201,6 +354,8 @@ export async function inspectInteractions(page: Page) {
     coverage: {
       fields,
       checkboxes,
+      selects,
+      selectLimit: 5,
       formLimit: 5,
       checkboxLimit: 5,
       successfulSubmissionAttempted: false,

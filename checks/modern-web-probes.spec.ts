@@ -201,3 +201,32 @@ test('rerendered controls cannot redirect a probe into prefilled replacement dat
   await expect(page.locator('#existing')).toHaveValue('keep-existing');
   expect(JSON.stringify(report)).not.toContain('keep-existing');
 });
+
+test('passive metrics finish before inspector DOM work can contaminate attribution', async ({
+  page,
+}) => {
+  await page.route('**/*', route =>
+    route.fulfill({ contentType: 'text/html', body: fixture('<p>Observer boundary</p>') }),
+  );
+  await page.goto(url);
+  await page.evaluate(() => {
+    const scope = window as unknown as {
+      __storeVitals: { peek: () => { activeObservers: number } };
+      __observerCapture?: number;
+    };
+    const images = document.images;
+    Object.defineProperty(document, 'images', {
+      configurable: true,
+      get: () => {
+        scope.__observerCapture = scope.__storeVitals.peek().activeObservers;
+        return images;
+      },
+    });
+  });
+  await inspectModernWeb(page);
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { __observerCapture?: number }).__observerCapture,
+    ),
+  ).toBe(0);
+});

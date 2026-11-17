@@ -1,3 +1,8 @@
+import { inspectDataWidgets } from './modern-web-data-widgets';
+import { inspectComponents } from './modern-web-components';
+import { inspectFormPurposes } from './modern-web-forms';
+import { inspectResilience } from './modern-web-resilience';
+import { inspectDocumentPolicies } from './modern-web-policy';
 import type { Page, TestInfo } from '@playwright/test';
 import type { VitalDocument } from './web-vitals';
 
@@ -162,6 +167,15 @@ export type ModernWebReport = Awaited<ReturnType<typeof inspectModernWeb>>;
 
 /** Inspect the current document without filling fields, submitting forms or scrolling. */
 export async function inspectModernWeb(page: Page, headers?: Record<string, string>) {
+  const attribution = await page.evaluate(() => {
+    const scope = window as unknown as {
+      __storeVitals?: { peek?: () => VitalDocument; finish?: (reason: string) => VitalDocument };
+    };
+    // End passive sampling before inspector DOM/style work and subsequent preference/input stress.
+    const snapshot =
+      scope.__storeVitals?.finish?.('modern-web-probe-boundary') || scope.__storeVitals?.peek?.();
+    return snapshot?.attribution || null;
+  });
   const snapshot = await page.evaluate(() => {
     const findings: Observation[] = [];
     const visible = (el: Element) => {
@@ -441,15 +455,11 @@ export async function inspectModernWeb(page: Page, headers?: Record<string, stri
     };
   });
 
-  const attribution = await page.evaluate(() => {
-    const scope = window as unknown as {
-      __storeVitals?: { peek?: () => VitalDocument; finish?: (reason: string) => VitalDocument };
-    };
-    // End passive sampling before our own preference/viewport/input stress changes the page.
-    const snapshot =
-      scope.__storeVitals?.finish?.('modern-web-probe-boundary') || scope.__storeVitals?.peek?.();
-    return snapshot?.attribution || null;
-  });
+  const documentPolicies = await inspectDocumentPolicies(page, headers);
+  const formPurposes = await inspectFormPurposes(page);
+  const resilience = await inspectResilience(page);
+  const components = await inspectComponents(page);
+  const dataWidgets = await inspectDataWidgets(page);
   if (attribution?.initialVisibility === 'visible' && attribution.lcp?.kind === 'image') {
     const element = String(attribution.lcp.element || 'observed LCP image');
     if (attribution.lcp.loading === 'lazy')
@@ -609,6 +619,11 @@ export async function inspectModernWeb(page: Page, headers?: Record<string, stri
   return {
     schemaVersion: 1,
     ...snapshot,
+    documentPolicies: documentPolicies.coverage,
+    formPurposes: formPurposes.coverage,
+    components: { ...components.coverage, observations: components.observations },
+    dataWidgets: { ...dataWidgets.coverage, observations: dataWidgets.observations },
+    resilience: { ...resilience.coverage, observations: resilience.observations },
     attribution,
     coverage: {
       ...snapshot.coverage,
@@ -617,10 +632,17 @@ export async function inspectModernWeb(page: Page, headers?: Record<string, stri
       motionBaseline: baseline?.length ?? 0,
       motionReduced: reduced?.length ?? 0,
     },
-    findings: snapshot.findings.map(finding => {
-      const [guide, severity, recommendation] = MODERN_WEB_RULES[finding.rule];
-      return { ...finding, guide, severity, recommendation };
-    }),
+    findings: [
+      ...snapshot.findings.map(finding => {
+        const [guide, severity, recommendation] = MODERN_WEB_RULES[finding.rule];
+        return { ...finding, guide, severity, recommendation };
+      }),
+      ...documentPolicies.findings,
+      ...formPurposes.findings,
+      ...resilience.findings,
+      ...components.findings,
+      ...dataWidgets.findings,
+    ],
   };
 }
 

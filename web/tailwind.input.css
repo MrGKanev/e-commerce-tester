@@ -6,3 +6,11 @@
 @source '../checks/modern-web.spec.ts';
 @source '../checks/modern-web-probes.spec.ts';
 @source '../checks/a11y.spec.ts';
+@source '../checks/modern-web-forms.spec.ts';
+@source '../checks/modern-web-widgets.spec.ts';
+@source '../checks/modern-web-resilience.spec.ts';
+@source '../checks/modern-web-dialog-scroll.spec.ts';
+@source '../checks/modern-web-components.spec.ts';
+@source '../checks/modern-web-integration.spec.ts';
+@source '../scripts/check-modern-web-entry.js';
+@source '../checks/modern-web-data-widgets.spec.ts';
