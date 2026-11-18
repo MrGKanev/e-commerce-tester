@@ -164,3 +164,39 @@ test('duplicate explicit directions and localized control names are not guessed'
     status: 'not-probed',
   });
 });
+
+test('missing inverse control prevents changing the slide', async ({ page }) => {
+  await fixture(page);
+  await page.locator('#previous').evaluate(el => el.remove());
+  const report = await inspectCarousels(page);
+  expect(report.coverage.observations[0]).toMatchObject({ status: 'not-probed' });
+  await expect(page.locator('#one')).toBeVisible();
+});
+
+test('focus-time inverse submitter mutation prevents forward activation', async ({ page }) => {
+  await fixture(
+    page,
+    markup,
+    behavior +
+      "document.getElementById('next').addEventListener('focus',()=>document.getElementById('previous').type='submit');",
+  );
+  const report = await inspectCarousels(page);
+  expect(report.coverage.observations[0]).toMatchObject({ status: 'unverified' });
+  await expect(page.locator('#one')).toBeVisible();
+});
+
+test('content-visibility hidden ancestors do not establish an active slide', async ({ page }) => {
+  await fixture(page);
+  await page.locator('section').evaluate(el => {
+    const wrapper = document.createElement('div');
+    el.append(wrapper);
+    wrapper.append(document.getElementById('one')!, document.getElementById('two')!);
+    wrapper.style.contentVisibility = 'hidden';
+  });
+  const report = await inspectCarousels(page);
+  expect(report.coverage.observations[0]).toMatchObject({
+    status: 'not-probed',
+    initial: { active: -1 },
+  });
+  expect(await page.locator('#one').getAttribute('hidden')).toBeNull();
+});

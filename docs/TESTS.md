@@ -24,6 +24,8 @@ Explicit guarded tooltip focus/hover/dismissal and position samples add two more
 
 Guarded interaction extension adds `carousel` as Partial: explicit declared single-slide next/previous Enter operation and inverse restoration run under frozen quarantine in Full only (both platforms and desktop/mobile). `carousel-semantics` and `tooltip-hover-persistence` are advisory; tooltips gain one hit-tested gap path and 700 ms persistence/cleanup observations. Tabs gain root-focus active-descendant operation and enabled boundaries; optional Home/End remains observational. [Rule IDs, evidence and limits](MODERN-WEB.md#guarded-interaction-extension--2026-11-18) retain autoplay/pause, localized control contracts, gestures, arbitrary pointer paths, blocked dependencies and AT speech as unverified.
 
+The quick carousel follow-up additionally revalidates both retained controls before forward activation and excludes content-visibility-hidden ancestors from active-slide evidence. Three owned regression fixtures cover missing inverse, focus-time inverse submitter mutation and hidden scope; rule IDs/severity/applicability and 59 Partial / 51 Pending remain unchanged. All 55 targeted carousel cases passed across five projects, along with typecheck, focused lint and coverage metadata validation; full acceptance was not repeated for this small follow-up.
+
 The remaining partial topics are indexed below. [The complete matrix](MODERN-WEB.md#complete-catalog-mapping) names the exact missing assertion/contract and code evidence for every entry; [the review summary](MODERN-WEB.md#partial-coverage-implementation-review--2026-11-17) groups the manual/device/business constraints.
 
 | Area | Remaining partial guide topics |

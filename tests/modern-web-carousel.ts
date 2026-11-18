@@ -43,6 +43,9 @@ export async function inspectCarousels(page: Page) {
           const visible = (el: Element) => {
             const r = el.getBoundingClientRect(),
               s = getComputedStyle(el);
+            for (let ancestor: Element | null = el; ancestor; ancestor = ancestor.parentElement) {
+              if (getComputedStyle(ancestor).contentVisibility === 'hidden') return false;
+            }
             return (
               !el.closest('[hidden],[inert]') &&
               s.display !== 'none' &&
@@ -63,7 +66,7 @@ export async function inspectCarousels(page: Page) {
             el => el.closest('[aria-roledescription="carousel"]') === root,
           );
           const rendered = slides.map(visible);
-          const safe = (buttons: HTMLButtonElement[], direction: string) =>
+          const retained = (buttons: HTMLButtonElement[], direction: string) =>
             buttons.length === 1 &&
             buttons[0].isConnected &&
             buttons[0].type === 'button' &&
@@ -79,12 +82,17 @@ export async function inspectCarousels(page: Page) {
                 new RegExp('^' + direction + ' slide$', 'i').test(
                   el.getAttribute('aria-label')?.trim() || '',
                 ),
-            ).length === 1 &&
+            ).length === 1;
+          const safe = (buttons: HTMLButtonElement[], direction: string) =>
+            retained(buttons, direction) &&
             !buttons[0].matches(':disabled,[aria-disabled="true"],[inert],[inert] *') &&
             visible(buttons[0]);
           return {
             connected:
               root.isConnected &&
+              visible(root) &&
+              retained(next, 'next') &&
+              retained(previous, 'previous') &&
               slides.every(el => el.isConnected) &&
               currentSlides.length === slides.length &&
               currentSlides.every((el, i) => el === slides[i]),
