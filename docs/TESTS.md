@@ -148,4 +148,8 @@ TypeScript stays at 6.0.3, the latest compatible 6.x release: [typescript-eslint
 
 The registry audit still reports [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf) for transitive picomatch 4.0.7. Its advisory names >=4.0.8 as patched, but registry lookup for 4.0.8 returns no published matching version and latest is 4.0.7. No fabricated override or unreviewed Git dependency is substituted. Re-run `pnpm audit` and update when a patched release is published.
 
-Validation after the refresh: frozen installation, local CSS build, `pnpm check` (98 unit tests), the complete `pnpm test:acceptance:local` chain, 375 Modern Web cases across five browser projects and 24 actual production-entry scenarios passed. OCI manifest availability for the pinned Docker tag was verified; a Docker image build was not executed locally. No live stores were contacted.
+Validation after the refresh: frozen installation, local CSS build, `pnpm check` (99 unit tests), the complete `pnpm test:acceptance:local` chain, 375 Modern Web cases across five browser projects and 24 actual production-entry scenarios passed. OCI manifest availability for the pinned Docker tag was verified; a Docker image build was not executed locally. No live stores were contacted.
+
+## Claims fixture port isolation — 2026-11-18
+
+GitHub CI exposed a collision on legacy fixed port 45994. The parent claims acceptance runner now binds an OS-assigned loopback port before spawning Playwright and supplies its URL through STORE_URL. Workers no longer own a fixed-port server. Fixture-only mode/state endpoints preserve the existing assertions and counters; both platform servers close in finally. A Node regression occupies the old port (or accepts that it is already occupied), starts two independent dynamic-port fixtures and verifies no request reaches the unrelated listener. All 40 browser claims cases and the complete check (99 unit tests) pass locally after this change.
