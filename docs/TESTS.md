@@ -1,10 +1,12 @@
 # Test Cases
 
-`43-modern-web.spec.ts` (`@full`, `@modern-web`) now runs the passive Modern Web inspector plus guarded form/checkbox and presentation probes for every configured inventory URL. Pages reuses the passive inspector only. Evidence includes `modern-web`, `modern-web-interactions` `modern-web-presentation` `modern-web-widgets`, `modern-web-dialog-scroll` and `modern-web-tooltips` JSON/text attachments; only definite broken active form-description references block the Modern Web scenario. All new heuristics remain advisory. The shared inspector has 27 base registered observations plus the additional passive modules and guarded probes; see [the registry and remaining limits](MODERN-WEB.md).
+Latest handoff: [MODERN-WEB.md](MODERN-WEB.md#current-handoff--2026-11-18). The last executable commit `6bc5aa1` passed [GitHub CI run 44257229541](https://github.com/MrGKanev/e-commerce-tester/actions/runs/44257229541), including the full browser acceptance chain after claims-port isolation. PR #29 is ready for review; dependency PRs #23, #25, #26 and #27 are superseded and closed. This records a validated batch, not completion of all remaining guides.
+
+`43-modern-web.spec.ts` (`@full`, `@modern-web`) now runs the passive Modern Web inspector plus guarded form/checkbox and presentation probes for every configured inventory URL. Pages reuses the passive inspector only. Evidence includes `modern-web`, `modern-web-interactions`, `modern-web-presentation`, `modern-web-widgets`, `modern-web-dialog-scroll` and `modern-web-tooltips` JSON/text attachments; only definite broken active form-description references block the Modern Web scenario. All new heuristics remain advisory. The shared inspector has 27 base registered observations plus the additional passive modules and guarded probes; see [the registry and remaining limits](MODERN-WEB.md).
 
 `40-a11y-dynamic.spec.ts` additionally records `dynamic-accessibility.json`: forward/reverse modal focus, explicit menu arrow advance, native light-dismiss/drag boundaries when supported, and developer-controlled close-policy observations. It does not click arbitrary destructive close actions or emulate native mobile system-back gestures.
 
-## Modern Web work remaining — review 2026-11-17
+## Modern Web work remaining — updated 2026-11-18
 
 The original 32 partial guides were reviewed: the initial-visibility instrumentation contract is now Covered, and the other 31 remain Partial with expanded executable evidence and narrower gaps. Heavy-script attribution and native progress naming also advanced from Pending to Partial. Current catalog totals: **1 Covered / 58 Partial / 52 Pending / 98 outside scope** (209 guides). These are guide topics, not test counts. A whole discipline is not complete just because its bounded samples pass.
 

@@ -2,7 +2,16 @@
 
 [Back to README](../README.md) · [Test reference](TESTS.md) · [Reports](REPORTS.md)
 
-## Catalog coverage snapshot — 2026-11-17
+## Current handoff — 2026-11-18
+
+- **Delivery:** [PR #29](https://github.com/MrGKanev/e-commerce-tester/pull/29) is ready for review on `feat/modern-web-coverage-expansion`; it has not been merged. Superseded dependency PRs #23, #25, #26 and #27 are closed. It is the only open PR at this handoff.
+- **Last verified executable commit:** `6bc5aa1` (claims fixture dynamic-port isolation). [GitHub CI run 44257229541](https://github.com/MrGKanev/e-commerce-tester/actions/runs/44257229541) completed successfully, including the full local browser acceptance chain, after the fixed-port collision was corrected. Subsequent handoff documentation does not change executable behavior.
+- **Current coverage:** 209 catalog IDs: 1 Covered, 58 Partial, 52 Pending and 98 Not applicable. Partial is not complete: 110 guide topics still have pending or partial obligations. The catalog was retrieved on November 17; implementation and validation continued through November 18.
+- **Validation:** 375 Modern Web fixtures across five browser projects, 24 actual production-entry scenarios, 40 claims scenarios, 99 unit tests, typecheck/lint, CSS build, frozen installation and the complete local acceptance chain passed. Desktop/mobile fixture screenshots were inspected. No live stores were contacted.
+- **Dependencies and limits:** dependency/toolchain refresh, grouped Dependabot updates, the supported TypeScript 6.0.3 constraint and the unpublished picomatch fix are recorded in [TESTS.md](TESTS.md#toolchain-refresh--2026-11-18). Docker tag availability was checked; no local Docker image build was executed.
+- **Resume here:** use the [remaining implementation order](#suggested-implementation-order), then the exact per-guide gaps in the [complete matrix](#complete-catalog-mapping). Re-read existing assertions before implementing a missing topic or changing its status; do not count guidance installation, generic axe or fixture presence as complete coverage.
+
+## Catalog coverage snapshot — updated 2026-11-18
 
 The current CLI-visible upstream catalog has **209 guides**. This is a guide-level mapping of catalog use cases to executable storefront assertions, not a count of test cases or a line-by-line certification of upstream requirements. Developer skills, control-panel improvements, backend tests and generic screenshots are not credited as store coverage.
 
@@ -545,13 +554,13 @@ Priorities are product judgments: **P1** = first actionable wave; **P2** = subse
 
 ## Suggested implementation order
 
-1. **Form feedback and input safety:** accessible-error-announcement, required-field-feedback, validate-input-after-interaction, select-menu-interaction, ime-safe-enter-submit and autofill-address-form. Reuse existing newsletter/checkout helpers, but validate good/bad cases locally without successful submissions.
-2. **Loading evidence and attribution:** finish optimize-image-priority using actual supported LCP attribution, then add media deferral, preload/script-priority observations and long-frame script attribution. Keep heuristics advisory and mark unavailable browser observations explicitly.
-3. **Interactive accessibility:** modal scroll containment, carousel pause/navigation and tabs; then keyboard/edge positioning for custom controls and overlays. Feature absence is not a defect.
-4. **Security/privacy depth:** resource integrity/referrer hints and configured policy/consent lifecycle checks, with explicit platform parity. Controlled fixtures and scope contracts come before any invasive live probing.
-5. **Broader resilience:** fonts/text scaling, theme/forced-color checks, shadow component behavior and optional SPA/scroll/gesture workflows. P2/P3 work remains conditional, not an instruction to add features to stores.
+1. **Remaining form workflows:** trusted OS IME behavior (`ime-safe-enter-submit`), sandbox password-manager/address autofill and full asynchronous validation/failed-submit focus. Initial/invalid/corrected native field/select evidence and semantic autofill hints already exist; extend those rather than duplicating them. Never attempt successful live submissions without a configured sandbox contract.
+2. **Optional interaction contracts:** carousel next/previous/pause/autoplay remains Pending. Expand existing Partial tab/menu/accordion/tooltip/modal samples for keyboard boundaries, root-focus tab operation, tooltip hoverability, safe dismissal restoration and touch only where the feature and expected outcome are explicitly identifiable.
+3. **Loading and font resilience:** existing LCP attribution, media request observations, preload/script hints and long-frame diagnostics are Partial. Add controlled font delay/failure/swap, hidden-slide loading and stronger request-role/priority evidence; do not relabel heuristics as actual browser scheduling or field INP.
+4. **Policy/privacy depth:** integrity/CORS/referrer and authored CSP/Trusted Types/Connection-Allowlist observations already exist. Actual enforcement, consent lifecycle/retention/deletion, worker/data-flow obligations and platform parity still need owned fixtures or explicit policy contracts. Watch for publication of the picomatch fix; TypeScript 7 remains blocked by parser compatibility.
+5. **Device and component resilience:** real OS text scaling/keyboards, optional theme-toggle persistence, custom-component form reset/restore, closed-shadow limitations and configured SPA/scroll/gesture workflows remain open. Existing open-shadow names/references/disabled-participant samples, text stress, table/progress semantics and preference contrast samples are not complete certification.
 
-These waves group guide topics, not promised test counts. P1 is a starting order, not a claim that every P1 check applies to every store. Keep the existing nine rules and their evidence contract stable while expanding coverage.
+These priorities reflect the November 18 handoff, not the original implementation plan. The matrix gives the exact Pending/Partial status and limitation for every guide. Feature absence is not a storefront defect, and required human/device/business contracts must remain explicit. Preserve the existing evidence schema and advisory-versus-blocking behavior while expanding coverage.
 
 ## Updating this mapping
 
