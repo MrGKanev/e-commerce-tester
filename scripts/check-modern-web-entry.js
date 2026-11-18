@@ -229,7 +229,7 @@ async function main() {
       total += tests.length;
     }
     console.log(
-      `Modern Web production entry acceptance: ${total} scenarios passed across Shopify/WooCommerce and desktop/mobile Chromium; all six evidence families attached, one visit per scenario, no probe traffic reached the server.`,
+      `Modern Web production entry acceptance: ${total} scenarios passed across Shopify/WooCommerce and desktop/mobile Chromium; all ${families.length} evidence families attached, one visit per scenario, no probe traffic reached the server.`,
     );
   } finally {
     await new Promise(resolve => server.close(resolve));

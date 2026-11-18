@@ -44,7 +44,7 @@ Existing implementation modules include:
 
 ## Current interaction extension
 
-The same branch now adds root-focus tab operation and enabled boundaries (130 cases across five projects), one tooltip hoverability path (50 cases) and explicit carousel next/previous restoration (40 cases). Catalog counts are 1 Covered / 59 Partial / 51 Pending / 98 Not applicable. Full adds seven evidence families. Read the newest handoff/validation section in MODERN-WEB.md for the final acceptance and CI result; do not infer final validation from the earlier 375-case snapshot.
+The same branch now adds root-focus tab operation and enabled boundaries (130 cases across five projects), one tooltip hoverability path (50 cases) and explicit carousel next/previous restoration (40 cases). Catalog counts are 1 Covered / 59 Partial / 51 Pending / 98 Not applicable. Full adds seven evidence families. Executable batch `810562a` passed the full local acceptance chain, 500 Modern Web fixtures across five browser projects, 24 actual production-entry scenarios with seven evidence families, 99 unit tests and desktop/mobile screenshot inspection. Read the newest handoff in MODERN-WEB.md and PR checks for the final remote CI result; do not infer current state from the earlier 375-case snapshot.
 
 ## Next priorities
 
