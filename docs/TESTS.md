@@ -1,12 +1,12 @@
 # Test Cases
 
-`43-modern-web.spec.ts` (`@full`, `@modern-web`) now runs the passive Modern Web inspector plus guarded form/checkbox and presentation probes for every configured inventory URL. Pages reuses the passive inspector only. Evidence includes `modern-web`, `modern-web-interactions` `modern-web-presentation` `modern-web-widgets` and `modern-web-dialog-scroll` JSON/text attachments; only definite broken active form-description references block the Modern Web scenario. All new heuristics remain advisory. The shared inspector has 27 base registered observations plus the additional passive modules and guarded probes; see [the registry and remaining limits](MODERN-WEB.md).
+`43-modern-web.spec.ts` (`@full`, `@modern-web`) now runs the passive Modern Web inspector plus guarded form/checkbox and presentation probes for every configured inventory URL. Pages reuses the passive inspector only. Evidence includes `modern-web`, `modern-web-interactions` `modern-web-presentation` `modern-web-widgets`, `modern-web-dialog-scroll` and `modern-web-tooltips` JSON/text attachments; only definite broken active form-description references block the Modern Web scenario. All new heuristics remain advisory. The shared inspector has 27 base registered observations plus the additional passive modules and guarded probes; see [the registry and remaining limits](MODERN-WEB.md).
 
 `40-a11y-dynamic.spec.ts` additionally records `dynamic-accessibility.json`: forward/reverse modal focus, explicit menu arrow advance, native light-dismiss/drag boundaries when supported, and developer-controlled close-policy observations. It does not click arbitrary destructive close actions or emulate native mobile system-back gestures.
 
 ## Modern Web work remaining — review 2026-11-17
 
-The original 32 partial guides were reviewed: the initial-visibility instrumentation contract is now Covered, and the other 31 remain Partial with expanded executable evidence and narrower gaps. Heavy-script attribution and native progress naming also advanced from Pending to Partial. Current catalog totals: **1 Covered / 56 Partial / 54 Pending / 98 outside scope** (209 guides). These are guide topics, not test counts. A whole discipline is not complete just because its bounded samples pass.
+The original 32 partial guides were reviewed: the initial-visibility instrumentation contract is now Covered, and the other 31 remain Partial with expanded executable evidence and narrower gaps. Heavy-script attribution and native progress naming also advanced from Pending to Partial. Current catalog totals: **1 Covered / 58 Partial / 52 Pending / 98 outside scope** (209 guides). These are guide topics, not test counts. A whole discipline is not complete just because its bounded samples pass.
 
 Preload/script priority and external subresource HTML policy observations also advanced from Pending to Partial; actual network scheduling, resource criticality, digest enforcement and CSS/fetch coverage remain open. Six advisory rules and URL-free resource timing evidence are validated with local fixtures.
 
@@ -17,6 +17,8 @@ The next expansion adds 13 Partial topics for native dropdown feedback, address/
 Open-shadow semantics/disabled form-participant observations and already-open native-modal wheel containment add four more Partial topics. Closed roots, private ElementInternals, touch and successful business workflows remain unverified.
 
 Targeted table headers/clipping and identified progress-ring semantics add two more Partial topics. They preserve native clamping and indeterminate states and do not certify keyboard scrolling or progress completion.
+
+Explicit guarded tooltip focus/hover/dismissal and position samples add two more Partial topics; native interest/anchor APIs remain optional and absent display remains unverified.
 
 The remaining partial topics are indexed below. [The complete matrix](MODERN-WEB.md#complete-catalog-mapping) names the exact missing assertion/contract and code evidence for every entry; [the review summary](MODERN-WEB.md#partial-coverage-implementation-review--2026-11-17) groups the manual/device/business constraints.
 
@@ -29,8 +31,8 @@ The remaining partial topics are indexed below. [The complete matrix](MODERN-WEB
 | Performance | `identify-heavy-scripts`, `identify-inp-causes`, `optimize-image-priority`, `optimize-preload-priority`, `optimize-script-priority`, `performance`, `lazy-load-video-and-audio` |
 | Privacy | `privacy` |
 | Security | `security`, `secure-external-subresources`, `trusted-types`, `restrict-outbound-connections` |
-| Ui Atoms | `responsive-table`, `icons`, `scrollability-affordance-hints`, `single-line-overflow` |
-| Ui Behaviors | `declarative-dialog-popover-control`, `light-dismiss-a-dialog`, `motion`, `platform-controls-dismiss-dialog`, `prevent-page-scroll-under-modal-dialog` |
+| Ui Atoms | `position-aware-tooltips`, `responsive-table`, `icons`, `scrollability-affordance-hints`, `single-line-overflow` |
+| Ui Behaviors | `declarative-dialog-popover-control`, `light-dismiss-a-dialog`, `motion`, `platform-controls-dismiss-dialog`, `prevent-page-scroll-under-modal-dialog`, `interest-triggered-tooltips` |
 | Ui Components | `breadcrumbs`, `card`, `checkbox`, `dialog`, `menu`, `navbar`, `navigation-drawer`, `progress`, `spinner`, `accordion`, `tabs`, `progress-ring` |
 | User Experience | `content-first-noise-reduction`, `form-factor-adaptation`, `natural-interactions` |
 | Visual Design | `color`, `contrast-color`, `typography` |
@@ -137,3 +139,13 @@ Checkout and empty-cart assertions: `pnpm test:claims:local` covers both platfor
 `39-a11y-extras.spec.ts` complements axe on every configured page (Shopify and WooCommerce): a single `main`, uniquely named `nav` landmarks, skip links with a real target, `lang` matching the page language, blocked zoom, positive `tabindex`, generic link text, accessible names that omit the visible label (2.5.3), keyboard traps, visible focus, focus landing on a hidden element, reflow at 320px, and serious axe best-practice/ARIA findings. Tags `@full`, `@a11y`; evidence `a11y-extras.json`. Run with `pnpm test:a11y --site=<slug>`; locally: `pnpm test:a11y:local`. These are heuristics over the first 20 Tab stops, not a complete accessibility audit.
 
 `40-a11y-dynamic.spec.ts` checks states that static axe cannot see: the menu, search and cart drawer open with Enter, an explicit `aria-expanded` reflects the open state, the dialog has a name, a modal dialog receives and holds focus (Tab/Shift+Tab), and dismissal follows its declared policy with focus return when closed. Explicit menu arrow advance and supported native light-dismiss/drag boundaries are also observed. Native dialogs and open popovers are supported without requiring redundant ARIA or custom focus traps; native modal focus may reach browser chrome. Variant options are named, grouped and changeable with arrow keys, and axe reports no blockers after a selection. The same file audits pages outside the configured inventory: the 404 page, policy/contact pages (Shopify), `/my-account/` (Woo) and discovered products, using axe and the checks from `39`. Controls and pages that a store lacks are marked `not-applicable`. Tags `@full`, `@a11y`; locally: `pnpm test:a11y:local`. No forms are submitted and the cart is not changed.
+
+## Toolchain refresh — 2026-11-18
+
+Direct dependencies and compatible transitive dependencies were refreshed together. Current pins/ranges include Playwright 1.65.1 (with matching noble Docker image and local browser revision), pnpm 12.21.0, Tailwind/CLI 4.3.5, axe Playwright 4.14.0, ESLint 10.15.0, typescript-eslint 8.73.0, Node types 26.6.6, Prettier 3.10.1 and Lighthouse 13.6.0. CI uses current major actions: checkout/setup-node v7, pnpm setup/cache v6 and artifact upload v7. The Node 24 LTS project runtime remains supported.
+
+TypeScript stays at 6.0.3, the latest compatible 6.x release: [typescript-eslint's supported compiler range](https://typescripteslint.com/users/dependency-versions/) is currently >=4.8.4 <6.1.0. Its 7.x major update is temporarily ignored in Dependabot until the parser's peer range expands. Other npm updates are grouped into one weekly PR, with one open version-update PR at a time.
+
+The registry audit still reports [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf) for transitive picomatch 4.0.7. Its advisory names >=4.0.8 as patched, but registry lookup for 4.0.8 returns no published matching version and latest is 4.0.7. No fabricated override or unreviewed Git dependency is substituted. Re-run `pnpm audit` and update when a patched release is published.
+
+Validation after the refresh: frozen installation, local CSS build, `pnpm check` (98 unit tests), the complete `pnpm test:acceptance:local` chain, 375 Modern Web cases across five browser projects and 24 actual production-entry scenarios passed. OCI manifest availability for the pinned Docker tag was verified; a Docker image build was not executed locally. No live stores were contacted.

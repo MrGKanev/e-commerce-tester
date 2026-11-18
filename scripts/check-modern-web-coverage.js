@@ -97,6 +97,23 @@ function validateModernWebCoverage({ modernWeb, testsReference, repositoryRoot, 
     Number(reference[5]) !== rows.length
   )
     errors.push('TESTS.md catalog summary does not match guide rows');
+  const partialIds = new Set(rows.filter(row => row.status === 'Partial').map(row => row.id));
+  const indexStart = testsReference.indexOf('| Area | Remaining partial guide topics |');
+  if (indexStart < 0) errors.push('Missing TESTS.md partial-topic index');
+  else {
+    const listed = [];
+    for (const line of testsReference.slice(indexStart).split(/\r?\n/).slice(2)) {
+      if (!line.startsWith('|')) break;
+      listed.push(...[...line.matchAll(/`([^`]+)`/g)].map(match => match[1]));
+    }
+    const listedSet = new Set(listed);
+    if (listedSet.size !== listed.length)
+      errors.push('Duplicate guide in TESTS.md partial-topic index');
+    for (const id of partialIds)
+      if (!listedSet.has(id)) errors.push(`Partial guide missing from TESTS.md index: ${id}`);
+    for (const id of listedSet)
+      if (!partialIds.has(id)) errors.push(`Stale guide in TESTS.md partial-topic index: ${id}`);
+  }
   if (catalog !== undefined) {
     if (
       !Array.isArray(catalog) ||

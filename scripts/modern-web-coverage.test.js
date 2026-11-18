@@ -30,7 +30,7 @@ function fixture(t) {
 **Remaining work spans 2 guide topics: 1 pending plus 1 partial.**
 ${rows.join('\n')}`;
   const testsReference =
-    'Current catalog totals: **1 Covered / 1 Partial / 1 Pending / 1 outside scope** (4 guides).';
+    'Current catalog totals: **1 Covered / 1 Partial / 1 Pending / 1 outside scope** (4 guides).\n| Area | Remaining partial guide topics |\n| --- | --- |\n| Forms | `two` |\n';
   const catalog = ['one', 'two', 'three', 'four'].map(id => ({ id, description: 'fixture' }));
   return { repositoryRoot, modernWeb, testsReference, catalog, row };
 }
@@ -145,4 +145,25 @@ test('empty matrices and nonofficial source links fail', t => {
     ),
   });
   assert.ok(result.errors.includes('Unexpected upstream source for one'));
+});
+
+test('partial-topic index rejects missing, stale and duplicate guide membership', t => {
+  const input = fixture(t);
+  for (const [replacement, expected] of [
+    ['| Forms | — |', 'Partial guide missing from TESTS.md index: two'],
+    ['| Forms | `two`, `three` |', 'Stale guide in TESTS.md partial-topic index: three'],
+    ['| Forms | `two`, `two` |', 'Duplicate guide in TESTS.md partial-topic index'],
+  ]) {
+    const result = validateModernWebCoverage({
+      ...input,
+      testsReference: input.testsReference.replace('| Forms | `two` |', replacement),
+    });
+    assert.ok(result.errors.includes(expected), result.errors.join('\n'));
+  }
+  assert.ok(
+    validateModernWebCoverage({
+      ...input,
+      testsReference: input.testsReference.split('\n| Area |')[0],
+    }).errors.includes('Missing TESTS.md partial-topic index'),
+  );
 });

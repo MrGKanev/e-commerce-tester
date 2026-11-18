@@ -12,6 +12,7 @@ const families = [
   'modern-web-dialog-scroll',
   'modern-web-interactions',
   'modern-web-widgets',
+  'modern-web-tooltips',
   'modern-web-presentation',
 ];
 const css = fs.readFileSync(path.join(root, 'web/tailwind.css'));
@@ -220,7 +221,7 @@ async function main() {
       total += tests.length;
     }
     console.log(
-      `Modern Web production entry acceptance: ${total} scenarios passed across Shopify/WooCommerce and desktop/mobile Chromium; all five evidence families attached, one visit per scenario, no probe traffic reached the server.`,
+      `Modern Web production entry acceptance: ${total} scenarios passed across Shopify/WooCommerce and desktop/mobile Chromium; all six evidence families attached, one visit per scenario, no probe traffic reached the server.`,
     );
   } finally {
     await new Promise(resolve => server.close(resolve));

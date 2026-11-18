@@ -14,3 +14,4 @@
 @source '../checks/modern-web-integration.spec.ts';
 @source '../scripts/check-modern-web-entry.js';
 @source '../checks/modern-web-data-widgets.spec.ts';
+@source '../checks/modern-web-tooltips.spec.ts';

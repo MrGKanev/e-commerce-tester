@@ -1,3 +1,4 @@
+import { inspectTooltips } from './modern-web-tooltips';
 import { inspectDialogScroll } from './modern-web-dialog-scroll';
 import { inspectWidgets } from './modern-web-widgets';
 import { test, expect } from './fixtures';
@@ -37,6 +38,12 @@ for (const entry of configuredPages())
           isolation.counts().blockedRequests > 0 || isolation.counts().blockedSockets > 0,
       });
       await attachModernWeb(widgets, testInfo, 'modern-web-widgets');
+      const tooltips = await inspectTooltips(page);
+      Object.assign(tooltips.coverage, isolation.counts(), {
+        networkDependentStatesUnverified:
+          isolation.counts().blockedRequests > 0 || isolation.counts().blockedSockets > 0,
+      });
+      await attachModernWeb(tooltips, testInfo, 'modern-web-tooltips');
       const presentation = await inspectPresentation(page);
       Object.assign(presentation.coverage, isolation.counts(), {
         networkDependentStatesUnverified:
