@@ -146,3 +146,56 @@ test('empty scope, sample limits and passive execution remain explicit', async (
   expect(report.observations.tables).toHaveLength(20);
   expect(await page.locator('body').innerHTML()).toBe(before);
 });
+
+test('unknown authored header scope is advisory while standard and omitted scopes are accepted', async ({
+  page,
+}) => {
+  await load(
+    page,
+    '<table><tr><th id="bad-scope" scope="private-invalid-axis">Bad</th><th scope="ROW">Row</th><th scope="col">Column</th><th scope="rowgroup">Rows</th><th scope="colgroup">Columns</th><th>Auto</th><th scope="">Empty auto</th></tr></table>',
+  );
+  const report = await inspectDataWidgets(page);
+  expect(report.findings).toEqual([
+    expect.objectContaining({
+      rule: 'table-header-scope',
+      severity: 'warning',
+      selector: '#bad-scope',
+      evidence: { recognizedScopeKeyword: false, browserAutoFallback: true },
+    }),
+  ]);
+  expect(JSON.stringify(report)).not.toContain('private-invalid-axis');
+});
+
+test('hidden responsive cells are not audited but visible cells may reference hidden headers', async ({
+  page,
+}) => {
+  await load(
+    page,
+    '<table><tr hidden><th id="column">Hidden header</th></tr><tr><td hidden headers="private-missing">Hidden data</td><td headers="column">Visible data</td></tr></table>',
+  );
+  const report = await inspectDataWidgets(page);
+  expect(report.findings).toEqual([]);
+  expect(report.observations.tables[0]).toMatchObject({
+    sampledCells: 3,
+    renderedSampledCells: 1,
+    invalidReferences: 0,
+  });
+  expect(JSON.stringify(report)).not.toContain('private-missing');
+});
+
+test('content-visibility hidden table and progress ancestors are outside rendered scope', async ({
+  page,
+}) => {
+  await load(
+    page,
+    '<div id="hidden-scope"><table><tr><th scope="invalid">Header</th></tr></table><div role="progressbar" aria-valuenow="invalid">' +
+      ring +
+      '</div></div>',
+  );
+  await page.locator('#hidden-scope').evaluate(el => {
+    (el as HTMLElement).style.contentVisibility = 'hidden';
+  });
+  const report = await inspectDataWidgets(page);
+  expect(report.coverage).toMatchObject({ tables: 0, progressIndicators: 0 });
+  expect(report.findings).toEqual([]);
+});

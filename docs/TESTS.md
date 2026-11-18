@@ -34,6 +34,14 @@ Completed small component checks ([evidence and limitations](MODERN-WEB.md#compl
 
 All 55 component cases across five projects, Pages integration, typecheck and focused lint passed. Existing advisory rule IDs, Full/Pages/platform applicability and catalog statuses are unchanged; `accessible-web-components` remains Partial. Full acceptance was not repeated for this small batch.
 
+Completed small table checks ([rules, evidence and limits](MODERN-WEB.md#completed-small-table-checks--2026-11-18)):
+
+- [x] Advisory `table-header-scope` distinguishes unknown authored scope from native Auto fallback.
+- [x] Hidden cells are excluded from reference/scope samples; hidden header targets remain resolvable.
+- [x] Content-visibility-hidden tables/progress scope is excluded.
+
+All 45 data-widget cases across five projects, Pages integration, typecheck and focused lint passed. These remain passive Full/Pages observations for both platforms; `responsive-table` remains Partial, with keyboard scrolling, complex associations and speech still unverified. No new Covered guide is claimed and full acceptance was not repeated.
+
 The remaining partial topics are indexed below. [The complete matrix](MODERN-WEB.md#complete-catalog-mapping) names the exact missing assertion/contract and code evidence for every entry; [the review summary](MODERN-WEB.md#partial-coverage-implementation-review--2026-11-17) groups the manual/device/business constraints.
 
 | Area | Remaining partial guide topics |

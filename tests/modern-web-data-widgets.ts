@@ -17,6 +17,9 @@ export async function inspectDataWidgets(page: Page) {
     const visible = (el: Element) => {
       const r = el.getBoundingClientRect();
       const s = getComputedStyle(el);
+      for (let ancestor: Element | null = el; ancestor; ancestor = ancestor.parentElement) {
+        if (getComputedStyle(ancestor).contentVisibility === 'hidden') return false;
+      }
       return (
         r.width > 0 &&
         r.height > 0 &&
@@ -56,12 +59,26 @@ export async function inspectDataWidgets(page: Page) {
       const ownCells = [...table.querySelectorAll<HTMLTableCellElement>('th,td')].filter(
         cell => cell.closest('table') === table,
       );
-      const cells = ownCells.slice(0, cellLimit);
+      const sampledCells = ownCells.slice(0, cellLimit);
+      const cells = sampledCells.filter(visible);
       const headerCount = ownCells.filter(cell => cell.localName === 'th').length;
       const rows = [...table.rows].filter(row => row.closest('table') === table);
       const dataIntentExplicit = table.getAttribute('role') === 'table' || Boolean(table.caption);
       let invalidReferences = 0;
       for (const cell of cells) {
+        const scope = cell.getAttribute('scope');
+        if (
+          cell.localName === 'th' &&
+          scope &&
+          !['row', 'col', 'rowgroup', 'colgroup'].includes(scope.toLowerCase())
+        )
+          add(
+            'table-header-scope',
+            'responsive-table',
+            cell,
+            { recognizedScopeKeyword: false, browserAutoFallback: true },
+            'Review the authored header scope: use row, col, rowgroup or colgroup when an explicit relationship is intended. The browser falls back to contextual Auto for unknown values; this is not proof that associations fail.',
+          );
         const ids = (cell.getAttribute('headers') || '').split(/\s+/).filter(Boolean);
         if (!ids.length) continue;
         const invalid = ids.filter(id => {
@@ -138,7 +155,8 @@ export async function inspectDataWidgets(page: Page) {
         selector: selector(table),
         rows: rows.length,
         headerCount,
-        sampledCells: cells.length,
+        sampledCells: sampledCells.length,
+        renderedSampledCells: cells.length,
         cellsTruncated: ownCells.length > cellLimit,
         invalidReferences,
         clippedByAncestor: clipped,
