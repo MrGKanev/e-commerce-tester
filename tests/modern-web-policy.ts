@@ -47,16 +47,20 @@ export async function inspectDocumentPolicies(page: Page, headers?: Record<strin
     if (value.includes(','))
       return { disposition, source, parseStatus: 'comma-containing-policy-unverified' };
     const directives = new Map<string, string[]>();
+    let duplicateDirectiveCount = 0;
     for (const directive of value.split(';')) {
       const [name, ...tokens] = directive.trim().split(/\s+/);
-      if (name && !directives.has(name.toLowerCase())) directives.set(name.toLowerCase(), tokens);
+      if (!name) continue;
+      const normalizedName = name.toLowerCase();
+      if (directives.has(normalizedName)) duplicateDirectiveCount++;
+      else directives.set(normalizedName, tokens);
     }
     const connect = directives.get('connect-src') || directives.get('default-src');
     const requiresTrustedTypes =
       directives.get('require-trusted-types-for')?.includes("'script'") || false;
     const policyNames = directives.get('trusted-types');
     const broadConnect = Boolean(
-      connect?.some(token => ['*', 'https:', 'http:', 'wss:', 'ws:'].includes(token)),
+      connect?.some(token => ['*', 'https:', 'http:', 'wss:', 'ws:'].includes(token.toLowerCase())),
     );
     if (disposition === 'enforce' && requiresTrustedTypes && policyNames?.includes('*'))
       add(
@@ -69,6 +73,9 @@ export async function inspectDocumentPolicies(page: Page, headers?: Record<strin
       disposition,
       source,
       parseStatus: 'observed',
+      directiveCount: directives.size,
+      duplicateDirectiveCount,
+      connectSourceExpressionCount: connect?.length ?? null,
       connectSource: directives.has('connect-src')
         ? 'connect-src'
         : directives.has('default-src')

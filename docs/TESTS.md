@@ -50,6 +50,14 @@ Completed small table checks ([rules, evidence and limits](MODERN-WEB.md#complet
 
 All 45 data-widget cases across five projects, Pages integration, typecheck and focused lint passed. These remain passive Full/Pages observations for both platforms; `responsive-table` remains Partial, with keyboard scrolling, complex associations and speech still unverified. No new Covered guide is claimed and full acceptance was not repeated.
 
+Completed small CSP observations ([evidence, sources and limits](MODERN-WEB.md#completed-small-csp-observations--2026-11-18)):
+
+- [x] Case-insensitive broad connection schemes and directive names.
+- [x] Duplicate-directive counters with first-occurrence semantics and token-free evidence.
+- [x] Empty-versus-absent connection source counts with explicit connect-src precedence.
+
+All 45 policy cases across five projects, Pages integration, typecheck, focused lint and catalog/coverage validation passed. Existing advisory rules and passive Full/Pages/platform applicability are unchanged; no effective enforcement or new Covered guide is claimed. The volatile Connection-Allowlist guide was not opted into, and its feature-specific code was not changed. Full acceptance was not repeated for this small CSP batch. The preceding full CI run for `14a554a` passed [all checks](https://github.com/MrGKanev/e-commerce-tester/actions/runs/44275481026).
+
 The remaining partial topics are indexed below. [The complete matrix](MODERN-WEB.md#complete-catalog-mapping) names the exact missing assertion/contract and code evidence for every entry; [the review summary](MODERN-WEB.md#partial-coverage-implementation-review--2026-11-17) groups the manual/device/business constraints.
 
 | Area | Remaining partial guide topics |

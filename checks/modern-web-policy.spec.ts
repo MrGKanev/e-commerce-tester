@@ -150,3 +150,64 @@ test('owned fixture calibrates benign sink rejection without probing live-page s
   else expect(result.text).toBe('Benign calibration');
   expect(report.coverage.activeEnforcementProbed).toBe(false);
 });
+
+test('CSP directive names and broad connection schemes are case insensitive', async ({ page }) => {
+  await fixtureDocument(page);
+  const report = await inspectDocumentPolicies(page, {
+    'Content-Security-Policy': 'CONNECT-SRC HTTPS: WSS:',
+    'Content-Security-Policy-Report-Only': 'DEFAULT-SRC HTTP: WS:',
+  });
+  expect(report.coverage.policies).toEqual([
+    expect.objectContaining({
+      disposition: 'enforce',
+      connectSource: 'connect-src',
+      broadConnect: true,
+      connectSourceExpressionCount: 2,
+    }),
+    expect.objectContaining({
+      disposition: 'report',
+      connectSource: 'default-src',
+      broadConnect: true,
+      connectSourceExpressionCount: 2,
+    }),
+  ]);
+  expect(report.findings).toEqual([]);
+});
+
+test('duplicate CSP directives keep the first value and report only token-free counts', async ({
+  page,
+}) => {
+  await fixtureDocument(page);
+  const report = await inspectDocumentPolicies(page, {
+    'content-security-policy':
+      "CONNECT-SRC 'self'; connect-src HTTPS:; report-to private-report; REPORT-TO private-other; trusted-types private-policy",
+  });
+  expect(report.coverage.policies[0]).toMatchObject({
+    directiveCount: 3,
+    duplicateDirectiveCount: 2,
+    connectSourceExpressionCount: 1,
+    broadConnect: false,
+  });
+  expect(JSON.stringify(report)).not.toMatch(/private-report|private-other|private-policy/);
+  expect(report.findings).toEqual([]);
+});
+
+test('empty CSP connection sources remain distinct from absent directives and override defaults', async ({
+  page,
+}) => {
+  await fixtureDocument(page);
+  for (const [value, source, count] of [
+    ['default-src HTTPS:; connect-src;', 'connect-src', 0],
+    ['default-src;', 'default-src', 0],
+    ["script-src 'self'", 'unrestricted-by-this-policy', null],
+  ] as const) {
+    const report = await inspectDocumentPolicies(page, { 'content-security-policy': value });
+    expect(report.coverage.policies[0]).toMatchObject({
+      connectSource: source,
+      connectSourceExpressionCount: count,
+      broadConnect: false,
+    });
+    expect(report.coverage.activeEnforcementProbed).toBe(false);
+    expect(report.findings).toEqual([]);
+  }
+});
