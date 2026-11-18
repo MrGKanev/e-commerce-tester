@@ -12,6 +12,7 @@ const families = [
   'modern-web-dialog-scroll',
   'modern-web-interactions',
   'modern-web-widgets',
+  'modern-web-carousel',
   'modern-web-tooltips',
   'modern-web-presentation',
 ];
@@ -19,7 +20,8 @@ const css = fs.readFileSync(path.join(root, 'web/tailwind.css'));
 const fixture = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Local storefront Modern Web entry fixture</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/tailwind.css"></head><body class="bg-white text-slate-900"><main class="mx-auto max-w-3xl space-y-3 p-4"><h1 class="text-2xl font-bold">Local store fixture</h1>
 <form><label for="country">Country</label><select id="country" name="country" autocomplete="country" required aria-invalid="false"><option value="" disabled selected>Choose country</option><option value="bg">Bulgaria</option></select><p id="country-error" hidden>Choose a country.</p><div id="announcer" aria-live="polite"></div></form>
 <form><label for="address">Address</label><input id="address" name="address1" autocomplete="shipping street-address"><label for="account">Account email</label><input id="account" type="email" autocomplete="username" spellcheck="false"><label for="password">New password</label><input id="password" type="password" autocomplete="new-password"></form>
-<details><summary>Delivery details</summary><p>Local delivery information.</p></details><label><input type="checkbox" role="switch">Preview preference</label><label for="range">Preview quantity</label><input id="range" type="range" min="0" max="10" value="4"></main><script>
+<details><summary>Delivery details</summary><p>Local delivery information.</p></details><label><input type="checkbox" role="switch">Preview preference</label><label for="range">Preview quantity</label><input id="range" type="range" min="0" max="10" value="4"><section aria-roledescription="carousel" role="region" aria-label="Local gallery"><button type="button" aria-label="Previous slide">Previous</button><button type="button" aria-label="Next slide">Next</button><div role="group" aria-roledescription="slide" aria-label="1 of 2" id="slide-a">First view</div><div role="group" aria-roledescription="slide" aria-label="2 of 2" id="slide-b" hidden>Second view</div></section></main><script>
+const slides=[document.getElementById('slide-a'),document.getElementById('slide-b')];document.querySelectorAll('[aria-label="Next slide"],[aria-label="Previous slide"]').forEach(button=>button.addEventListener('click',()=>{slides.forEach(slide=>slide.hidden=!slide.hidden);fetch('/probe-carousel',{method:'POST'}).catch(()=>{});}));
 const select=document.getElementById('country'),error=document.getElementById('country-error');
 const sync=()=>{const invalid=!select.validity.valid;select.setAttribute('aria-invalid',String(invalid));error.hidden=!invalid;if(invalid)select.setAttribute('aria-describedby','country-error');else select.removeAttribute('aria-describedby');};
 select.addEventListener('invalid',sync);select.addEventListener('change',()=>{sync();fetch('/probe-save',{method:'POST',body:'synthetic-probe'}).catch(()=>{});fetch('/probe-get?change=1').catch(()=>{});});
@@ -168,6 +170,12 @@ async function main() {
         assert.equal(widgets.coverage.accordions.length, 1);
         assert.equal(widgets.coverage.switches.length, 1);
         assert.equal(widgets.coverage.sliders.length, 1);
+        const carousel = attachmentJson(
+          result.attachments.find(item => item.name === 'modern-web-carousel.json'),
+        );
+        assert.equal(carousel.coverage.observations.length, 1);
+        assert.equal(carousel.coverage.observations[0].status, 'observed');
+        assert.equal(carousel.coverage.observations[0].restoration.status, 'restored');
       }
       assert.equal(projectCounts.get('Desktop Chrome'), 6);
       assert.equal(projectCounts.get('Mobile Chrome'), 6);

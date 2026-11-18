@@ -2,13 +2,13 @@
 
 Latest handoff: [MODERN-WEB.md](MODERN-WEB.md#current-handoff--2026-11-18). The last executable commit `6bc5aa1` passed [GitHub CI run 44257229541](https://github.com/MrGKanev/e-commerce-tester/actions/runs/44257229541), including the full browser acceptance chain after claims-port isolation. PR #29 is ready for review; dependency PRs #23, #25, #26 and #27 are superseded and closed. This records a validated batch, not completion of all remaining guides.
 
-`43-modern-web.spec.ts` (`@full`, `@modern-web`) now runs the passive Modern Web inspector plus guarded form/checkbox and presentation probes for every configured inventory URL. Pages reuses the passive inspector only. Evidence includes `modern-web`, `modern-web-interactions`, `modern-web-presentation`, `modern-web-widgets`, `modern-web-dialog-scroll` and `modern-web-tooltips` JSON/text attachments; only definite broken active form-description references block the Modern Web scenario. All new heuristics remain advisory. The shared inspector has 27 base registered observations plus the additional passive modules and guarded probes; see [the registry and remaining limits](MODERN-WEB.md).
+`43-modern-web.spec.ts` (`@full`, `@modern-web`) now runs the passive Modern Web inspector plus guarded form/checkbox and presentation probes for every configured inventory URL. Pages reuses the passive inspector only. Evidence includes `modern-web`, `modern-web-interactions`, `modern-web-presentation`, `modern-web-widgets`, `modern-web-dialog-scroll`, `modern-web-carousel` and `modern-web-tooltips` JSON/text attachments; only definite broken active form-description references block the Modern Web scenario. All new heuristics remain advisory. The shared inspector has 27 base registered observations plus the additional passive modules and guarded probes; see [the registry and remaining limits](MODERN-WEB.md).
 
 `40-a11y-dynamic.spec.ts` additionally records `dynamic-accessibility.json`: forward/reverse modal focus, explicit menu arrow advance, native light-dismiss/drag boundaries when supported, and developer-controlled close-policy observations. It does not click arbitrary destructive close actions or emulate native mobile system-back gestures.
 
 ## Modern Web work remaining — updated 2026-11-18
 
-The original 32 partial guides were reviewed: the initial-visibility instrumentation contract is now Covered, and the other 31 remain Partial with expanded executable evidence and narrower gaps. Heavy-script attribution and native progress naming also advanced from Pending to Partial. Current catalog totals: **1 Covered / 58 Partial / 52 Pending / 98 outside scope** (209 guides). These are guide topics, not test counts. A whole discipline is not complete just because its bounded samples pass.
+The original 32 partial guides were reviewed: the initial-visibility instrumentation contract is now Covered, and the other 31 remain Partial with expanded executable evidence and narrower gaps. Heavy-script attribution and native progress naming also advanced from Pending to Partial. Current catalog totals: **1 Covered / 59 Partial / 51 Pending / 98 outside scope** (209 guides). These are guide topics, not test counts. A whole discipline is not complete just because its bounded samples pass.
 
 Preload/script priority and external subresource HTML policy observations also advanced from Pending to Partial; actual network scheduling, resource criticality, digest enforcement and CSS/fetch coverage remain open. Six advisory rules and URL-free resource timing evidence are validated with local fixtures.
 
@@ -21,6 +21,8 @@ Open-shadow semantics/disabled form-participant observations and already-open na
 Targeted table headers/clipping and identified progress-ring semantics add two more Partial topics. They preserve native clamping and indeterminate states and do not certify keyboard scrolling or progress completion.
 
 Explicit guarded tooltip focus/hover/dismissal and position samples add two more Partial topics; native interest/anchor APIs remain optional and absent display remains unverified.
+
+Guarded interaction extension adds `carousel` as Partial: explicit declared single-slide next/previous Enter operation and inverse restoration run under frozen quarantine in Full only (both platforms and desktop/mobile). `carousel-semantics` and `tooltip-hover-persistence` are advisory; tooltips gain one hit-tested gap path and 700 ms persistence/cleanup observations. Tabs gain root-focus active-descendant operation and enabled boundaries; optional Home/End remains observational. [Rule IDs, evidence and limits](MODERN-WEB.md#guarded-interaction-extension--2026-11-18) retain autoplay/pause, localized control contracts, gestures, arbitrary pointer paths, blocked dependencies and AT speech as unverified.
 
 The remaining partial topics are indexed below. [The complete matrix](MODERN-WEB.md#complete-catalog-mapping) names the exact missing assertion/contract and code evidence for every entry; [the review summary](MODERN-WEB.md#partial-coverage-implementation-review--2026-11-17) groups the manual/device/business constraints.
 
@@ -35,7 +37,7 @@ The remaining partial topics are indexed below. [The complete matrix](MODERN-WEB
 | Security | `security`, `secure-external-subresources`, `trusted-types`, `restrict-outbound-connections` |
 | Ui Atoms | `position-aware-tooltips`, `responsive-table`, `icons`, `scrollability-affordance-hints`, `single-line-overflow` |
 | Ui Behaviors | `declarative-dialog-popover-control`, `light-dismiss-a-dialog`, `motion`, `platform-controls-dismiss-dialog`, `prevent-page-scroll-under-modal-dialog`, `interest-triggered-tooltips` |
-| Ui Components | `breadcrumbs`, `card`, `checkbox`, `dialog`, `menu`, `navbar`, `navigation-drawer`, `progress`, `spinner`, `accordion`, `tabs`, `progress-ring` |
+| Ui Components | `breadcrumbs`, `card`, `checkbox`, `dialog`, `menu`, `navbar`, `navigation-drawer`, `progress`, `spinner`, `accordion`, `tabs`, `progress-ring`, `carousel` |
 | User Experience | `content-first-noise-reduction`, `form-factor-adaptation`, `natural-interactions` |
 | Visual Design | `color`, `contrast-color`, `typography` |
 

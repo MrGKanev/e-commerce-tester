@@ -36,7 +36,7 @@ export async function inspectWidgets(page: Page) {
             const s = getComputedStyle(el),
               r = el.getBoundingClientRect();
             return (
-              !el.closest('[hidden]') &&
+              !el.closest('[hidden],[inert]') &&
               s.display !== 'none' &&
               s.visibility === 'visible' &&
               s.contentVisibility !== 'hidden' &&
@@ -83,10 +83,15 @@ export async function inspectWidgets(page: Page) {
               items.some(
                 el => Boolean(el.id) && root.getAttribute('aria-activedescendant') === el.id,
               ),
+            rootFocused: root === document.activeElement,
             active: items.findIndex(
               el =>
                 el === document.activeElement ||
-                Boolean(el.id && root.getAttribute('aria-activedescendant') === el.id),
+                Boolean(
+                  root === document.activeElement &&
+                  el.id &&
+                  root.getAttribute('aria-activedescendant') === el.id,
+                ),
             ),
             panelPresent: panels.map(Boolean),
             panelVisible: panels.map(panel => Boolean(panel && visible(panel))),
@@ -117,21 +122,12 @@ export async function inspectWidgets(page: Page) {
           { initial },
           'Name the tablist, expose exactly one selected tab and matching visible named panel, and provide one keyboard entry stop.',
         );
-      if (initial.rootFocusModel) {
-        tabs.push({
-          initial,
-          status: 'not-probed',
-          reason: 'root-focus-active-descendant-model',
-          keyboardBehaviorUnverified: true,
-        });
-        continue;
-      }
       const collection = await list.evaluateHandle(root => {
         const visible = (el: Element) => {
           const style = getComputedStyle(el),
             rect = el.getBoundingClientRect();
           return (
-            !el.closest('[hidden]') &&
+            !el.closest('[hidden],[inert]') &&
             style.display !== 'none' &&
             style.visibility === 'visible' &&
             style.contentVisibility !== 'hidden' &&
@@ -150,10 +146,11 @@ export async function inspectWidgets(page: Page) {
             !el.matches(':disabled,[aria-disabled="true"]'),
         );
       });
-      const eligible = [];
+      const eligible: ElementHandle<HTMLElement>[] = [];
       const properties = await collection.getProperties();
       for (const [key, handle] of properties) {
-        if (/^\d+$/.test(key) && handle.asElement()) eligible.push(handle.asElement()!);
+        if (/^\d+$/.test(key) && handle.asElement())
+          eligible.push(handle.asElement()! as ElementHandle<HTMLElement>);
       }
       const safeButtons = await Promise.all(
         eligible.map(el =>
@@ -166,7 +163,9 @@ export async function inspectWidgets(page: Page) {
         !selected ||
         initial.count < 2 ||
         eligible.length !== initial.count ||
-        safeButtons.some(safe => !safe)
+        safeButtons.some(safe => !safe) ||
+        (initial.rootFocusModel &&
+          (await list.evaluate(el => el.matches('a[href],button,input,select,textarea'))))
       ) {
         tabs.push({
           initial,
@@ -175,53 +174,227 @@ export async function inspectWidgets(page: Page) {
         });
         continue;
       }
-      const targetIndex = (selectedIndex + 1) % eligible.length;
-      await selected.focus();
-      await selected.press(
-        (await list.getAttribute('aria-orientation')) === 'vertical'
-          ? 'ArrowDown'
-          : (await list.evaluate(el => getComputedStyle(el).direction === 'rtl'))
-            ? 'ArrowLeft'
-            : 'ArrowRight',
-        { timeout: 1500 },
-      );
-      const moved = await snapshot();
-      if (!moved.connected) throw new Error('Tablist replaced');
-      if (moved.active !== targetIndex)
-        add(
-          'widget-tabs-keyboard',
-          'tabs',
-          initial.selector,
-          { initial, moved, expectedIndex: targetIndex },
-          'Move focus or active descendant to the adjacent enabled tab with the orientation-appropriate arrow key.',
-        );
-      // Manual-activation tabs are valid. Never press Enter on an arbitrary link or submitter.
-      if (
-        moved.active === targetIndex &&
-        !moved.selected[targetIndex] &&
-        (await eligible[targetIndex].evaluate(el => (el as HTMLButtonElement).type !== 'submit'))
-      )
-        await eligible[targetIndex].press('Enter', { timeout: 1500 });
-      const activated = await snapshot();
-      if (
-        moved.active === targetIndex &&
-        (!activated.selected[targetIndex] ||
-          !activated.panelVisible[targetIndex] ||
-          activated.selected.filter(Boolean).length !== 1)
-      )
-        add(
-          'widget-tabs-activation',
-          'tabs',
-          initial.selector,
-          { activated, expectedIndex: targetIndex },
-          'Synchronize selected state and visible panel after focus-following or explicit keyboard activation.',
-        );
-      // Restore through the declared tab control; no unrelated action buttons are clicked.
-      if (activated.selected[targetIndex] && !activated.selected[selectedIndex]) {
-        await selected.focus();
-        await selected.press('Enter', { timeout: 1500 });
+      if (initial.count > 20 || initial.selected.filter(Boolean).length !== 1) {
+        tabs.push({ initial, status: 'not-probed', reason: 'ambiguous-selection-or-tab-limit' });
+        continue;
       }
-      tabs.push({ initial, moved, activated, restored: await snapshot(), status: 'observed' });
+      const originalPanels = await collection.evaluateHandle(items =>
+        items.map(
+          el =>
+            [...document.querySelectorAll<HTMLElement>('[role="tabpanel"]')].find(
+              panel =>
+                Boolean(el.id) &&
+                (panel.getAttribute('aria-labelledby') || '').split(/\s+/).includes(el.id),
+            ) || document.getElementById(el.getAttribute('aria-controls') || ''),
+        ),
+      );
+      const assertStable = async () => {
+        const sameItems = await collection.evaluate((items, root) => {
+          const current = [
+            ...root.querySelectorAll<HTMLElement>(
+              '[role="tab"], :scope[focusgroup~="tablist"] > button',
+            ),
+          ].filter(el => {
+            const style = getComputedStyle(el),
+              rect = el.getBoundingClientRect();
+            return (
+              el.closest('[role="tablist"], [focusgroup~="tablist"]') === root &&
+              !el.closest('[hidden],[inert]') &&
+              style.display !== 'none' &&
+              style.visibility === 'visible' &&
+              style.contentVisibility !== 'hidden' &&
+              rect.width > 0 &&
+              rect.height > 0 &&
+              !el.matches(':disabled,[aria-disabled="true"]')
+            );
+          });
+          return (
+            root.isConnected &&
+            items.length === current.length &&
+            items.every((el, index) => el === current[index])
+          );
+        }, list);
+        const samePanels = await originalPanels.evaluate(
+          (panels, items) =>
+            panels.every(
+              (panel, index) =>
+                panel ===
+                  ([...document.querySelectorAll<HTMLElement>('[role="tabpanel"]')].find(
+                    candidate =>
+                      Boolean(items[index].id) &&
+                      (candidate.getAttribute('aria-labelledby') || '')
+                        .split(/\s+/)
+                        .includes(items[index].id),
+                  ) || document.getElementById(items[index].getAttribute('aria-controls') || '')) &&
+                (!panel || panel.isConnected),
+            ),
+          collection,
+        );
+        const safeItems = await collection.evaluate(items =>
+          items.every(el => el instanceof HTMLButtonElement && el.type === 'button'),
+        );
+        const safeRoot =
+          !initial.rootFocusModel ||
+          (await list.evaluate(el => !el.matches('a[href],button,input,select,textarea')));
+        if (!sameItems || !samePanels || !safeItems || !safeRoot)
+          throw new Error('Original tab or panel nodes changed');
+      };
+      const observed = async () => {
+        await assertStable();
+        return snapshot();
+      };
+      const rootModel = initial.rootFocusModel;
+      // Enter is delivered to the root only for its declared active-descendant model.
+      // Child activation remains restricted to the original non-submit button tabs.
+      const receiver = (index: number) => (rootModel ? list : eligible[index]);
+      let networkAttempted = false;
+      const onRequest = () => {
+        networkAttempted = true;
+      };
+      page.on('request', onRequest);
+      const pressKey = async (index: number, key: string) => {
+        await assertStable();
+        const control = receiver(index);
+        await control.focus();
+        await assertStable();
+        if (!(await control.evaluate(el => el === document.activeElement)))
+          throw new Error('Widget does not own keyboard focus');
+        await page.keyboard.press(key);
+        // Sample delayed local rendering, without claiming all network or async outcomes.
+        await page.evaluate(() => new Promise<void>(resolve => setTimeout(resolve, 100)));
+        await assertStable();
+        if (networkAttempted) throw new Error('Dependent network work attempted under quarantine');
+      };
+      const focusIndex = async (index: number) => {
+        await assertStable();
+        if (!rootModel) {
+          await eligible[index].focus();
+          return;
+        }
+        await list.focus();
+        for (let step = 0; step < initial.count; step++) {
+          const current = await observed();
+          if (current.active === index) return;
+          if (current.active < 0) throw new Error('Active descendant unavailable');
+          await pressKey(current.active, current.active < index ? forward : backward);
+        }
+        if ((await observed()).active !== index)
+          throw new Error('Cannot restore active descendant');
+      };
+      const vertical = (await list.getAttribute('aria-orientation')) === 'vertical';
+      const rtl = await list.evaluate(el => getComputedStyle(el).direction === 'rtl');
+      const forward = vertical ? 'ArrowDown' : rtl ? 'ArrowLeft' : 'ArrowRight';
+      const backward = vertical ? 'ArrowUp' : rtl ? 'ArrowRight' : 'ArrowLeft';
+      const interactionFindings: WebFinding[] = [];
+      const warn = (rule: string, evidence: Record<string, unknown>, recommendation: string) =>
+        interactionFindings.push({
+          rule,
+          guide: 'tabs',
+          selector: initial.selector,
+          evidence,
+          recommendation,
+          severity: 'warning',
+        });
+      let started = false;
+      try {
+        await focusIndex(selectedIndex);
+        started = true;
+        const direction = selectedIndex === initial.count - 1 ? -1 : 1;
+        const targetIndex = selectedIndex + direction;
+        await pressKey(selectedIndex, direction > 0 ? forward : backward);
+        const moved = await observed();
+        if (moved.active !== targetIndex)
+          warn(
+            'widget-tabs-keyboard',
+            { initial, moved, expectedIndex: targetIndex },
+            'Move focus or active descendant to the adjacent enabled tab with the orientation-appropriate arrow key.',
+          );
+        if (moved.active === targetIndex && !moved.selected[targetIndex])
+          await pressKey(targetIndex, 'Enter');
+        const activated = await observed();
+        if (
+          moved.active === targetIndex &&
+          (!activated.selected[targetIndex] ||
+            !activated.panelVisible[targetIndex] ||
+            activated.selected.filter(Boolean).length !== 1)
+        )
+          warn(
+            'widget-tabs-activation',
+            { activated, expectedIndex: targetIndex },
+            'Synchronize selected state and visible panel after focus-following or explicit keyboard activation.',
+          );
+        const boundaries: Array<Record<string, unknown>> = [];
+        // Home/End are optional. Unsupported shortcuts are recorded, never demanded.
+        // Only an observed endpoint establishes a boundary; clamped and wrapping arrows are valid.
+        for (const [key, endpoint, arrow] of [
+          ['Home', 0, backward],
+          ['End', initial.count - 1, forward],
+        ] as const) {
+          const before = await observed();
+          if (before.active < 0) break;
+          await pressKey(before.active, key);
+          const shortcut = await observed();
+          if (shortcut.active !== endpoint) {
+            boundaries.push({
+              key,
+              status: 'unverified',
+              reason: 'optional-shortcut-not-observed',
+              shortcut,
+            });
+            continue;
+          }
+          await pressKey(endpoint, arrow);
+          const edge = await observed();
+          const opposite = endpoint === 0 ? initial.count - 1 : 0;
+          const policy =
+            edge.active === endpoint
+              ? 'clamped'
+              : edge.active === opposite
+                ? 'wrapped'
+                : 'unverified';
+          boundaries.push({
+            key,
+            shortcut,
+            edge,
+            policy,
+            status: policy === 'unverified' ? 'unverified' : 'observed',
+          });
+          // Overflow-menu focus transfer is legitimate; absent/foreign focus is not a failing boundary contract.
+          if (edge.active >= 0 && policy === 'unverified')
+            warn(
+              'widget-tabs-keyboard',
+              { key, endpoint, edge, acceptedIndices: [endpoint, opposite] },
+              'Keep boundary navigation consistent with the enabled tab order; clamping or wrapping are both valid.',
+            );
+        }
+        await focusIndex(selectedIndex);
+        if (!(await observed()).selected[selectedIndex]) await pressKey(selectedIndex, 'Enter');
+        const restored = await observed();
+        findings.push(...interactionFindings);
+        tabs.push({
+          initial,
+          moved,
+          activated,
+          boundaries,
+          restored,
+          status: restored.selected[selectedIndex] ? 'observed' : 'unverified',
+          reason: restored.selected[selectedIndex] ? null : 'selection-restoration-unverified',
+          rootFocusModel: rootModel,
+        });
+      } finally {
+        // Best effort recovery uses only the retained controls; never substitute replacement nodes.
+        if (started) {
+          try {
+            await focusIndex(selectedIndex);
+            if (!(await observed()).selected[selectedIndex]) await pressKey(selectedIndex, 'Enter');
+          } catch {
+            /* A rerender or blocked dependency makes restoration unavailable. */
+          }
+        }
+        page.off('request', onRequest);
+        await originalPanels.dispose();
+        await collection.dispose();
+      }
     } catch {
       tabs.push({ status: 'unverified', reason: 'widget-changed-or-dependent-work-blocked' });
     }
@@ -514,6 +687,8 @@ export async function inspectWidgets(page: Page) {
       switches,
       sliders,
       perCategoryLimit: LIMIT,
+      tabKeyboardLimit: 20,
+      tabLocalSettleWindowMs: 100,
       successfulSubmissionAttempted: false,
       customAccordionActionsAttempted: false,
     },

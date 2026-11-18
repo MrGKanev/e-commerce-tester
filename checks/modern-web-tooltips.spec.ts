@@ -23,7 +23,7 @@ async function fixture(page: import('@playwright/test').Page, body: string, scri
 const markup =
   '<button id="trigger" type="button" aria-describedby="hint">Help</button><div id="hint" role="tooltip" hidden class="fixed left-8 top-40 w-48 rounded bg-slate-900 p-3 text-white">private-tooltip-text</div>';
 const behavior = (delay = 0) =>
-  `const trigger=document.getElementById('trigger'),hint=document.getElementById('hint');let timer;const show=()=>{timer=setTimeout(()=>hint.hidden=false,${delay});};const hide=()=>{clearTimeout(timer);hint.hidden=true;};trigger.addEventListener('focus',show);trigger.addEventListener('mouseenter',show);trigger.addEventListener('blur',hide);trigger.addEventListener('mouseleave',hide);document.addEventListener('keydown',event=>{if(event.key==='Escape')hide();});`;
+  `const trigger=document.getElementById('trigger'),hint=document.getElementById('hint');let timer;const show=()=>{timer=setTimeout(()=>hint.hidden=false,${delay});};const hide=()=>{clearTimeout(timer);hint.hidden=true;};trigger.addEventListener('focus',show);trigger.addEventListener('mouseenter',show);trigger.addEventListener('blur',hide);trigger.addEventListener('mouseleave',()=>{timer=setTimeout(hide,250);});hint.addEventListener('mouseenter',()=>clearTimeout(timer));hint.addEventListener('mouseleave',hide);document.addEventListener('keydown',event=>{if(event.key==='Escape')hide();});`;
 
 test('tooltip probes reject unfrozen pages and absent optional scope stays empty', async ({
   page,
@@ -51,6 +51,7 @@ test('delayed focus and hover tooltips dismiss with Escape, restore focus and bl
     status: 'observed',
     focused: { visible: true },
     hovered: { visible: true },
+    hoverability: { status: 'observed', remainsVisible: true },
     escape: { remainsVisible: false },
   });
   expect(report.coverage.pointerRestoration).toBe('caller-supplied-origin');
@@ -58,6 +59,7 @@ test('delayed focus and hover tooltips dismiss with Escape, restore focus and bl
   expect(isolation.guard.counts().blockedRequests).toBeGreaterThan(0);
   expect(JSON.stringify(report)).not.toContain('private-tooltip-text');
   await expect(page.locator('#prior')).toBeFocused();
+  await expect(page.locator('#hint')).toBeHidden();
 });
 
 test('observed hover-only clipped tooltip gives parity and positioning advisories', async ({
@@ -140,10 +142,59 @@ test('Escape fade transitions are allowed and body focus is restored', async ({ 
   await fixture(
     page,
     markup.replace('fixed left-8', 'opacity-100 transition-opacity duration-300 fixed left-8'),
-    `const trigger=document.getElementById('trigger'),hint=document.getElementById('hint');const show=()=>{hint.hidden=false;hint.classList.remove('opacity-0');hint.classList.add('opacity-100');};trigger.addEventListener('focus',show);trigger.addEventListener('mouseenter',show);trigger.addEventListener('blur',()=>hint.hidden=true);trigger.addEventListener('mouseleave',()=>hint.hidden=true);document.addEventListener('keydown',event=>{if(event.key==='Escape'){hint.classList.remove('opacity-100');hint.classList.add('opacity-0');}});`,
+    `const trigger=document.getElementById('trigger'),hint=document.getElementById('hint');const show=()=>{hint.hidden=false;hint.classList.remove('opacity-0');hint.classList.add('opacity-100');};trigger.addEventListener('focus',show);trigger.addEventListener('mouseenter',show);trigger.addEventListener('blur',()=>hint.hidden=true);let closeTimer;trigger.addEventListener('mouseleave',()=>{closeTimer=setTimeout(()=>hint.hidden=true,250);});hint.addEventListener('mouseenter',()=>clearTimeout(closeTimer));hint.addEventListener('mouseleave',()=>hint.hidden=true);document.addEventListener('keydown',event=>{if(event.key==='Escape'){hint.classList.remove('opacity-100');hint.classList.add('opacity-0');}});`,
   );
   const report = await inspectTooltips(page);
   expect(report.findings).toEqual([]);
   expect(report.coverage.observations[0]).toMatchObject({ escape: { remainsVisible: false } });
   expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+});
+
+test('tooltip disappearance while crossing its gap is advisory without activating content', async ({
+  page,
+}) => {
+  await fixture(
+    page,
+    markup,
+    behavior().replace(
+      "trigger.addEventListener('mouseleave',()=>{timer=setTimeout(hide,250);});",
+      "trigger.addEventListener('mouseleave',hide);",
+    ),
+  );
+  const report = await inspectTooltips(page);
+  expect(report.findings.map(finding => finding.rule)).toContain('tooltip-hover-persistence');
+  expect(report.coverage.observations[0]).toMatchObject({
+    hoverability: { status: 'observed', remainsVisible: false },
+  });
+  expect(JSON.stringify(report)).not.toContain('private-tooltip-text');
+});
+
+test('occluded tooltip destination remains unverified rather than a hover failure', async ({
+  page,
+}) => {
+  await fixture(
+    page,
+    markup + '<div class="fixed left-8 top-40 z-50 h-40 w-48 bg-white">Cover</div>',
+    behavior(),
+  );
+  const report = await inspectTooltips(page);
+  expect(report.findings).toEqual([]);
+  expect(report.coverage.observations[0]).toMatchObject({
+    hoverability: { status: 'unverified', reason: 'tooltip-center-outside-viewport-or-occluded' },
+  });
+});
+
+test('tooltip moving away from the sampled destination does not claim hoverability', async ({
+  page,
+}) => {
+  await fixture(
+    page,
+    markup,
+    "const trigger=document.getElementById('trigger'),hint=document.getElementById('hint');trigger.addEventListener('focus',()=>hint.hidden=false);trigger.addEventListener('blur',()=>hint.hidden=true);trigger.addEventListener('mouseenter',()=>hint.hidden=false);hint.addEventListener('mouseenter',()=>hint.classList.replace('left-8','left-64'));document.addEventListener('keydown',e=>{if(e.key==='Escape')hint.hidden=true;});",
+  );
+  const report = await inspectTooltips(page);
+  expect(report.findings).toEqual([]);
+  expect(report.coverage.observations[0]).toMatchObject({
+    hoverability: { status: 'unverified', reason: 'tooltip-moved-away-from-sampled-pointer' },
+  });
 });

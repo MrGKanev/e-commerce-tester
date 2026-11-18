@@ -19,7 +19,7 @@ Continue implementing the remaining Modern Web storefront checks in `/Volumes/RO
 - Branch: `feat/modern-web-coverage-expansion`.
 - Last validated executable commit: `6bc5aa1`; full GitHub CI passed: https://github.com/MrGKanev/e-commerce-tester/actions/runs/44257229541.
 - Documentation handoff commit: `2a9ec11`; later documentation commits may also exist.
-- Catalog: 209 IDs — 1 Covered, 58 Partial, 52 Pending, 98 Not applicable. Partial is not complete; 110 topics still have remaining obligations.
+- Catalog: 209 IDs — 1 Covered, 59 Partial, 51 Pending, 98 Not applicable. Partial is not complete; 110 topics still have remaining obligations.
 - Validation: 375 Modern Web fixtures across five browser projects, 24 actual production-entry scenarios, 40 claims cases and 99 unit tests. The complete local acceptance chain passed; desktop/mobile fixture screenshots were inspected. No live stores were contacted.
 - Dependency PRs #23, #25, #26 and #27 were superseded and closed. At handoff, #29 was the only open PR and ready for review.
 
@@ -31,9 +31,10 @@ Existing implementation modules include:
 
 - `tests/modern-web.ts`: passive orchestration and base rules; ends web-vitals sampling before inspector DOM/style work.
 - `tests/modern-web-forms.ts` and `tests/modern-web-interactions.ts`: semantic autofill hints, guarded empty-field/native-select/checkbox probes and limited live-region observations.
-- `tests/modern-web-widgets.ts`: bounded tabs/native details/switch/slider probes.
+- `tests/modern-web-widgets.ts`: bounded tabs/native details/switch/slider probes, including root-focus active-descendant and optional Home/End boundary observations.
 - `tests/modern-web-dialog-scroll.ts`: already-open native modal wheel samples; stacked modals and unavailable wheel behavior are unverified.
-- `tests/modern-web-tooltips.ts`: explicit tooltip focus/hover/Escape/position samples with bounded delay and transition handling.
+- `tests/modern-web-tooltips.ts`: explicit tooltip focus/hover/Escape/position and hit-tested pointer-gap persistence samples with bounded delay, transition and cleanup handling.
+- `tests/modern-web-carousel.ts`: explicit English named non-submit next/previous controls and single-rendered-slide roundtrip; exact nodes/control ownership retained, optional scope only.
 - `tests/modern-web-resilience.ts`: media timing/hints, canvas alternatives, scroll affordances, single-line and generated-content observations.
 - `tests/modern-web-components.ts`: bounded open-shadow naming/references and observable disabled form participants, without private ElementInternals access.
 - `tests/modern-web-data-widgets.ts`: table relationships/clipping and semantic progress-ring samples.
@@ -41,11 +42,15 @@ Existing implementation modules include:
 - `tests/modern-web-presentation.ts`: viewport/text/preference stress.
 - `tests/43-modern-web.spec.ts`: actual Full entry; Pages reuses passive checks only.
 
+## Current interaction extension
+
+The same branch now adds root-focus tab operation and enabled boundaries (130 cases across five projects), one tooltip hoverability path (50 cases) and explicit carousel next/previous restoration (40 cases). Catalog counts are 1 Covered / 59 Partial / 51 Pending / 98 Not applicable. Full adds seven evidence families. Read the newest handoff/validation section in MODERN-WEB.md for the final acceptance and CI result; do not infer final validation from the earlier 375-case snapshot.
+
 ## Next priorities
 
 Use the exact per-guide matrix to select independent, safely executable work. High-value candidates include:
 
-1. Optional carousel next/previous/pause/autoplay contracts; extend root-focus active-descendant tabs, keyboard boundaries, tooltip hoverability and safe modal dismissal restoration.
+1. Extend bounded carousel samples for autoplay/pause, localized/alternative control contracts and scroll tracks; tab overflow/nesting/typeahead and tooltip arbitrary gap paths remain open. Root-focus tabs, enabled boundaries, one tooltip hoverability path and explicit next/previous carousel restoration now have targeted coverage. Safe modal dismissal restoration remains open.
 2. Controlled font delay/failure/swap and hidden-slide loading, with actual layout/readability evidence and explicit unavailable timing.
 3. Async validation and failed-submit focus/summary behavior in owned fixtures; sandbox autofill/password-manager workflows only with a configured contract. Synthetic composition events must not be credited as trusted OS IME coverage.
 4. Owned policy-enforcement/consent lifecycle fixtures, worker scope and platform parity. Existing authored header observations do not establish enforcement, retention/deletion or legal compliance.

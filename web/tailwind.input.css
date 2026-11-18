@@ -15,3 +15,4 @@
 @source '../scripts/check-modern-web-entry.js';
 @source '../checks/modern-web-data-widgets.spec.ts';
 @source '../checks/modern-web-tooltips.spec.ts';
+@source '../checks/modern-web-carousel.spec.ts';

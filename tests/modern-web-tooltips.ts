@@ -225,11 +225,69 @@ export async function inspectTooltips(page: Page, restorePointer?: Point) {
               'Position or dismiss the tooltip so it does not obscure the focused trigger; this sample checks only the trigger center.',
             );
         }
+        let hoverability: Record<string, unknown> = {
+          status: 'not-probed',
+          reason: 'tooltip-not-visible-on-hover',
+        };
+        if (hovered.visible && !hovered.otherOpenOverlay) {
+          const destination = await target.evaluate(el => {
+            const r = el.getBoundingClientRect();
+            const x = r.left + r.width / 2,
+              y = r.top + r.height / 2;
+            const hit = document.elementFromPoint(x, y);
+            return {
+              x,
+              y,
+              reachable:
+                x > 0 &&
+                y > 0 &&
+                x < innerWidth &&
+                y < innerHeight &&
+                Boolean(hit && (hit === el || el.contains(hit))),
+            };
+          });
+          if (destination.reachable) {
+            // Move through the gap rather than teleporting or focusing tooltip content.
+            await page.mouse.move(destination.x, destination.y, { steps: 12 });
+            await settle(700);
+            const entered = await state();
+            if (!entered.connected) throw new Error('Tooltip nodes changed');
+            const pointerOverTarget = await target.evaluate((el, point) => {
+              const hit = document.elementFromPoint(point.x, point.y);
+              return Boolean(hit && (hit === el || el.contains(hit)));
+            }, destination);
+            hoverability = {
+              status: entered.visible && !pointerOverTarget ? 'unverified' : 'observed',
+              reason:
+                entered.visible && !pointerOverTarget
+                  ? 'tooltip-moved-away-from-sampled-pointer'
+                  : null,
+              pointerOverTarget,
+              remainsVisible: entered.visible,
+              sampleWindowMs: 700,
+              pathSteps: 12,
+            };
+            if (!entered.visible)
+              add(
+                'tooltip-hover-persistence',
+                'interest-triggered-tooltips',
+                hovered.selector,
+                { relationship, remainsVisible: false, sampleWindowMs: 700, pathSteps: 12 },
+                'Allow the pointer to enter and remain over supplemental tooltip content; review the sampled gap path and any intentional content invalidation.',
+              );
+          } else {
+            hoverability = {
+              status: 'unverified',
+              reason: 'tooltip-center-outside-viewport-or-occluded',
+            };
+          }
+        }
         observations.push({
           relationship,
           initial,
           focused,
           hovered,
+          hoverability,
           escape,
           status: focused.visible || hovered.visible ? 'observed' : 'unverified',
           reason:
@@ -253,6 +311,35 @@ export async function inspectTooltips(page: Page, restorePointer?: Point) {
           })
           .catch(() => {});
         await page.mouse.move(0, 0).catch(() => {});
+        // Allow authored loss-of-interest delays before the next probe inherits this page.
+        await page
+          .waitForFunction(
+            el => {
+              const r = el.getBoundingClientRect(),
+                style = getComputedStyle(el);
+              return (
+                !el.isConnected ||
+                r.width <= 0 ||
+                r.height <= 0 ||
+                style.visibility !== 'visible' ||
+                style.display === 'none' ||
+                Number(style.opacity) === 0 ||
+                Boolean(el.closest('[hidden],[inert]'))
+              );
+            },
+            target,
+            { timeout: 700 },
+          )
+          .catch(() => {});
+        const observation = observations.at(-1);
+        if (observation?.status === 'observed' || observation?.status === 'unverified') {
+          const cleaned = await state().catch(() => null);
+          observation.cleanup = {
+            status: cleaned?.connected && !cleaned.visible ? 'restored' : 'unverified',
+            tooltipRemainsVisible: cleaned?.visible ?? null,
+            sampleWindowMs: 700,
+          };
+        }
       }
     }
   } finally {
