@@ -52,7 +52,8 @@ export async function inspectComponents(page: Page) {
           current.hasAttribute('hidden') ||
           current.hasAttribute('inert') ||
           style.display === 'none' ||
-          style.visibility !== 'visible'
+          style.visibility !== 'visible' ||
+          style.contentVisibility === 'hidden'
         )
           return false;
         const parent: Element | null = current.parentElement;
@@ -86,7 +87,14 @@ export async function inspectComponents(page: Page) {
         nameInspectionTruncated = true;
         return false;
       }
-      if (el.matches('[aria-hidden="true"]')) return false;
+      const style = getComputedStyle(el);
+      if (
+        el.matches('[aria-hidden="true"],[hidden],script,style,template') ||
+        style.display === 'none' ||
+        style.visibility !== 'visible' ||
+        style.contentVisibility === 'hidden'
+      )
+        return false;
       if (el instanceof HTMLImageElement && el.alt.trim()) return true;
       if (
         el.matches('svg,[role="img"]') &&
@@ -120,7 +128,11 @@ export async function inspectComponents(page: Page) {
       const reflected = (el as Element & { ariaLabelledByElements?: Element[] | null })
         .ariaLabelledByElements;
       if (reflected?.some(label => Boolean(label.textContent?.trim()))) return true;
-      if ('labels' in el && (el as HTMLInputElement).labels?.length) return true;
+      if (
+        'labels' in el &&
+        [...((el as HTMLInputElement).labels || [])].some(label => contentPresent(label))
+      )
+        return true;
       if (el instanceof HTMLInputElement && el.type === 'image' && el.alt.trim()) return true;
       if (el instanceof HTMLInputElement && ['button', 'submit', 'reset'].includes(el.type))
         return Boolean(el.value.trim()) || el.type !== 'button';

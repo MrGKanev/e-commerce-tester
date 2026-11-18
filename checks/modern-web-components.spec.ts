@@ -230,3 +230,58 @@ test('image input and descendant SVG accessible names avoid shadow naming false 
     [],
   );
 });
+
+test('empty native labels do not count as names while image labels remain supported', async ({
+  page,
+}) => {
+  await fixture(page, '<x-control></x-control>');
+  await page.evaluate(() => {
+    document.querySelector('x-control')!.attachShadow({ mode: 'open' }).innerHTML =
+      '<label for="empty"> </label><input id="empty"><label for="image"><img alt="Search"></label><input id="image">';
+  });
+  await expect(page.locator('#empty')).toHaveAccessibleName('');
+  await expect(page.locator('#image')).toHaveAccessibleName('Search');
+  const report = await inspectComponents(page);
+  expect(report.findings).toEqual([
+    expect.objectContaining({
+      rule: 'shadow-native-control-name',
+      selector: 'tree-1:#empty',
+      severity: 'warning',
+    }),
+  ]);
+});
+
+test('hidden descendant text is not a button name but explicit hidden references remain valid', async ({
+  page,
+}) => {
+  await fixture(page, '<x-control></x-control>');
+  await page.evaluate(() => {
+    document.querySelector('x-control')!.attachShadow({ mode: 'open' }).innerHTML =
+      '<button id="empty"><span hidden>private-hidden-name</span></button><span id="label" hidden>Explicit name</span><button id="named" aria-labelledby="label"></button>';
+  });
+  await expect(page.locator('#empty')).toHaveAccessibleName('');
+  await expect(page.locator('#named')).toHaveAccessibleName('Explicit name');
+  const report = await inspectComponents(page);
+  expect(report.findings).toEqual([
+    expect.objectContaining({ rule: 'shadow-native-control-name', selector: 'tree-1:#empty' }),
+  ]);
+  expect(JSON.stringify(report)).not.toContain('private-hidden-name');
+});
+
+test('content-visibility hidden shadow hosts are outside rendered control and relationship scope', async ({
+  page,
+}) => {
+  await fixture(page, '<x-control></x-control>');
+  await page.evaluate(() => {
+    const host = document.querySelector<HTMLElement>('x-control')!;
+    host.style.contentVisibility = 'hidden';
+    host.attachShadow({ mode: 'open' }).innerHTML = '<button aria-describedby="missing"></button>';
+  });
+  const report = await inspectComponents(page);
+  expect(report.coverage).toMatchObject({
+    openShadowRoots: 1,
+    nativeShadowControls: 0,
+    relationships: 0,
+  });
+  expect(report.findings).toEqual([]);
+});

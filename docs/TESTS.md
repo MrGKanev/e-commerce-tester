@@ -26,6 +26,14 @@ Guarded interaction extension adds `carousel` as Partial: explicit declared sing
 
 The quick carousel follow-up additionally revalidates both retained controls before forward activation and excludes content-visibility-hidden ancestors from active-slide evidence. Three owned regression fixtures cover missing inverse, focus-time inverse submitter mutation and hidden scope; rule IDs/severity/applicability and 59 Partial / 51 Pending remain unchanged. All 55 targeted carousel cases passed across five projects, along with typecheck, focused lint and coverage metadata validation; full acceptance was not repeated for this small follow-up.
 
+Completed small component checks ([evidence and limitations](MODERN-WEB.md#completed-small-component-checks--2026-11-18)):
+
+- [x] Empty native labels are not accepted as detectable names; image labels still work.
+- [x] Hidden descendant text is excluded while explicit hidden label references remain accepted.
+- [x] Content-visibility-hidden shadow scope is excluded from rendered-control/reference observations.
+
+All 55 component cases across five projects, Pages integration, typecheck and focused lint passed. Existing advisory rule IDs, Full/Pages/platform applicability and catalog statuses are unchanged; `accessible-web-components` remains Partial. Full acceptance was not repeated for this small batch.
+
 The remaining partial topics are indexed below. [The complete matrix](MODERN-WEB.md#complete-catalog-mapping) names the exact missing assertion/contract and code evidence for every entry; [the review summary](MODERN-WEB.md#partial-coverage-implementation-review--2026-11-17) groups the manual/device/business constraints.
 
 | Area | Remaining partial guide topics |
