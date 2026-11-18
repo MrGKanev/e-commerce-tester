@@ -19,7 +19,7 @@
     "format": "prettier --write \"tests/**/*.ts\" \"*.ts\"",
     "format:check": "prettier --check \"tests/**/*.ts\" \"*.ts\"",
     "test:unit": "node --test scripts/*.test.js",
-    "test:acceptance:local": "pnpm test:pacing && pnpm test:readiness && pnpm test:reporting && pnpm test:control:local && pnpm test:pages:local && pnpm test:vitals:local && pnpm test:visual:local && pnpm test:commerce:local && pnpm test:woocommerce:local && pnpm test:seo:local && pnpm test:journey:local && pnpm test:claims:local && pnpm test:a11y:local && pnpm test:modern-web:local && pnpm test:modern-web:entry:local && pnpm test:monitoring:local && pnpm test:operations:local",
+    "test:acceptance:local": "pnpm test:pacing && pnpm test:readiness && pnpm test:smoke:local && pnpm test:reporting && pnpm test:control:local && pnpm test:pages:local && pnpm test:vitals:local && pnpm test:visual:local && pnpm test:commerce:local && pnpm test:woocommerce:local && pnpm test:seo:local && pnpm test:journey:local && pnpm test:claims:local && pnpm test:a11y:local && pnpm test:modern-web:local && pnpm test:modern-web:entry:local && pnpm test:monitoring:local && pnpm test:operations:local",
     "check": "pnpm run type-check && pnpm run lint && pnpm run test:unit && pnpm run check:toolchain && pnpm run check:modern-web:coverage",
     "test:pacing": "STORE_URL=http://127.0.0.1:45679 SITE_SLUG=pacing-local REQUEST_DELAY_MS=60 REQUEST_JITTER_MS=0 TEST_DELAY_MS=0 TEST_JITTER_MS=0 playwright test --config=checks/pacing.config.ts",
     "build:css": "tailwindcss -i web/tailwind.input.css -o web/tailwind.css --minify",
@@ -67,7 +67,8 @@
     "test:analytics": "bash run.sh --mode full --grep @analytics",
     "backup": "node scripts/backup.js",
     "check:modern-web:coverage": "node scripts/check-modern-web-coverage.js",
-    "test:modern-web:entry:local": "node scripts/check-modern-web-entry.js"
+    "test:modern-web:entry:local": "node scripts/check-modern-web-entry.js",
+    "test:smoke:local": "STORE_URL=http://127.0.0.1:45997 PRODUCT_HANDLE=smoke-good PRODUCT_HANDLE_2=smoke-missing SITE_SLUG=smoke-local SITE_SETTINGS_JSON='{\"platform\":\"shopify\",\"cookieConsent\":{\"mode\":\"none\"}}' TEST_DELAY_MS=0 TEST_JITTER_MS=0 REQUEST_DELAY_MS=0 REQUEST_JITTER_MS=0 playwright test --config=checks/smoke-regressions.config.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",

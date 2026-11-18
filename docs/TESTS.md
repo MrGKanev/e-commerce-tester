@@ -6,6 +6,14 @@ Latest handoff: [MODERN-WEB.md](MODERN-WEB.md#current-handoff--2026-11-18). Exec
 
 `40-a11y-dynamic.spec.ts` additionally records `dynamic-accessibility.json`: forward/reverse modal focus, explicit menu arrow advance, native light-dismiss/drag boundaries when supported, and developer-controlled close-policy observations. It does not click arbitrary destructive close actions or emulate native mobile system-back gestures.
 
+## Smoke regression fixes — 2026-11-18
+
+- [x] Homepage catalogue discovery selects the first visible matching product/collection link, so a preceding hidden mobile drawer link does not fail a desktop page.
+- [x] Known-product reachability uses the response from its existing beforeEach navigation instead of loading the product twice. HTTP errors and navigation timeouts remain failures; no retry or timeout increase is introduced.
+- [x] `pnpm test:smoke:local` executes the actual homepage/product scenarios with every request intercepted. Desktop/mobile positive fixtures, hidden-only catalogue rejection, HTTP 404 rejection and exactly one navigation per scenario are verified; it is included in local/CI acceptance.
+
+The reported Zerno run `2026-11-18_09-09-43-561` was inspected offline. Its Z2 trace records two document navigations with HTTP 200; the repeated navigation timed out at 35 seconds waiting for DOMContentLoaded. This does not prove 404 or establish that future requests will meet the existing timeout. No live store was revisited, no historic result was rewritten and no active control server/run was restarted. Validation: all 15 production-scenario regressions passed, including four expected failures; all 17 readiness cases and `pnpm check` (99 unit tests, typecheck/lint, toolchain and coverage metadata) passed. Full acceptance and the live store run were not repeated for this targeted fix.
+
 ## Modern Web work remaining — updated 2026-11-18
 
 The original 32 partial guides were reviewed: the initial-visibility instrumentation contract is now Covered, and the other 31 remain Partial with expanded executable evidence and narrower gaps. Heavy-script attribution and native progress naming also advanced from Pending to Partial. Current catalog totals: **1 Covered / 59 Partial / 51 Pending / 98 outside scope** (209 guides). These are guide topics, not test counts. A whole discipline is not complete just because its bounded samples pass.
