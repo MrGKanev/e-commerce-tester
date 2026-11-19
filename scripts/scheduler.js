@@ -5,6 +5,7 @@ const path = require('node:path');
 const os = require('node:os');
 const { randomUUID } = require('node:crypto');
 const { spawn } = require('node:child_process');
+const { createLogRedactor } = require('./artifact-privacy');
 const { loadSites } = require('./site-config');
 const model = require('./scheduler-model');
 const queueStore = require('./run-queue');
@@ -137,10 +138,12 @@ async function runChild(job, settings, control) {
       [child.stdout, process.stdout],
       [child.stderr, process.stderr],
     ]) {
-      stream.on('data', chunk => {
+      const redactor = createLogRedactor(chunk => {
         output.write(chunk);
         if (settings.logFile) fs.appendFileSync(settings.logFile, chunk);
       });
+      stream.on('data', chunk => redactor.write(chunk));
+      stream.on('end', () => redactor.end());
     }
     let outcome = '';
     let killTimer;

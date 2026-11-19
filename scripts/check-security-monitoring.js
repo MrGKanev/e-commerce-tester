@@ -127,10 +127,20 @@ async function main() {
       let baseline;
       for (const candidate of candidates) {
         assert.equal(candidate.status, 'needs-review');
-        baseline = approve(candidate, baseline, { reviewed: true }); // Owned, deterministic local fixtures only.
+        baseline = approve(candidate, baseline, {
+          reviewed: true,
+          reason: 'Owned local fixture review',
+        }); // Owned, deterministic local fixtures only.
       }
+      assert.equal(
+        baseline.history.length,
+        candidates.length,
+        'Every explicit fixture approval must retain an audit record',
+      );
+      assert.ok(baseline.history.every(entry => entry.reason === 'Owned local fixture review'));
       fs.mkdirSync(path.dirname(path.join(root, baselineFile)), { recursive: true });
       fs.writeFileSync(path.join(root, baselineFile), JSON.stringify(baseline), { flag: 'wx' });
+      const approvedBytes = fs.readFileSync(path.join(root, baselineFile), 'utf8');
       settings.securityMonitoring.mode = 'strict';
       settings.securityMonitoring.baselineFile = baselineFile;
       for (const observed of await run('approved', 0))
@@ -166,6 +176,11 @@ async function main() {
             ),
           );
       }
+      assert.equal(
+        fs.readFileSync(path.join(root, baselineFile), 'utf8'),
+        approvedBytes,
+        'Storefront runs must never mutate approval history',
+      );
       assert.equal(
         writes.length,
         previousWrites,

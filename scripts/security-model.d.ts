@@ -61,16 +61,30 @@ export type Stage = {
   findings: Finding[];
   status: string;
 };
+export type Approval = {
+  scope: Scope;
+  approvedAt: string;
+  signature: {
+    scripts: Array<{ key: string; sha256: string }>;
+    destinations: string[];
+    payment: Omit<Payment, 'sampleTruncated' | 'framesInspected'>;
+  };
+};
+export type ReviewOptions = { replace?: boolean; addVariant?: boolean };
 export type Baseline = {
   schemaVersion: 1;
-  approvals: Array<{
-    scope: Scope;
-    approvedAt: string;
-    signature: {
-      scripts: Array<{ key: string; sha256: string }>;
-      destinations: string[];
-      payment: Omit<Payment, 'sampleTruncated' | 'framesInspected'>;
-    };
+  approvals: Approval[];
+  history?: Array<{
+    id: string;
+    previousId: string | null;
+    at: string;
+    reason: string;
+    mode: 'create' | 'replace' | 'add-variant';
+    candidateHash: string;
+    reviewHash: string;
+    beforeHash: string;
+    afterHash: string;
+    changes: Array<{ before: Approval | null; after: Approval }>;
   }>;
 };
 export function hash(value: string | Buffer): string;
@@ -84,5 +98,57 @@ export function loadBaseline(file: string, repositoryRoot?: string): Baseline | 
 export function approve(
   candidate: unknown,
   existing?: Baseline,
-  options?: { reviewed?: boolean; replace?: boolean; addVariant?: boolean },
+  options?: ReviewOptions & { reviewed?: boolean; reason?: string; reviewHash?: string },
 ): Baseline;
+
+export function review(
+  candidate: unknown,
+  existing?: Baseline,
+  options?: ReviewOptions,
+): {
+  schemaVersion: number;
+  mode: string;
+  baseHash: string;
+  candidateHash: string;
+  approvable: boolean;
+  reviewHash: string;
+  issues: Array<{ scopeHash: string; code: string }>;
+  scopes: Array<{
+    scopeHash: string;
+    scope: Scope;
+    complete: boolean;
+    state: string;
+    approvedAt: string | null;
+    scripts: Array<{ keyHash: string; origin: string | null; before: string[]; after: string[] }>;
+    destinations: {
+      added: Array<{ keyHash: string; origin: string | null }>;
+      removed: Array<{ keyHash: string; origin: string | null }>;
+    };
+    payment: Array<{ field: string; before: unknown; after: unknown }>;
+  }>;
+};
+
+export function history(
+  existing: Baseline,
+  options?: { limit?: number; before?: string },
+): {
+  schemaVersion: number;
+  baselineHash: string;
+  total: number;
+  legacy: boolean;
+  nextBefore: string | null;
+  entries: Array<{
+    id: string;
+    previousId: string | null;
+    at: string;
+    reason: string;
+    mode: string;
+    candidateHash: string;
+    reviewHash: string;
+    beforeHash: string;
+    afterHash: string;
+    scopes: Array<
+      Omit<ReturnType<typeof review>['scopes'][number], 'complete' | 'state' | 'approvedAt'>
+    >;
+  }>;
+};

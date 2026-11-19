@@ -57,7 +57,7 @@ pnpm dashboard:preview
 
 Visual checks compare with an explicitly approved version per store. Review and approve candidates in the control panel; runs never update approval automatically. See [Visual baselines](docs/RUNNING.md#visual-baselines).
 
-Opt-in script-content, outbound destination and checkout-interface monitoring supports Shopify/WooCommerce with reviewed baselines. See [Security monitoring](docs/SECURITY-MONITORING.md).
+Opt-in script-content, outbound destination and checkout-interface monitoring supports Shopify/WooCommerce with reviewed baselines. See [Security monitoring](docs/SECURITY-MONITORING.md). Persisted diagnostics use a [shared privacy filter](docs/ARTIFACT-PRIVACY.md); raw browser HTML/trace/image artifacts remain sensitive.
 
 The dashboard preview uses offline sample data. Live runs use request pacing, no automatic retries and one worker. For unattended checks across multiple stores, use the [long-running Docker scheduler](docs/SCHEDULER.md) with configurable intervals and cooldowns. Optional features may be skipped; review coverage and skip reasons alongside pass rate.
 

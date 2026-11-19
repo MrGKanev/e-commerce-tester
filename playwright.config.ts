@@ -1,3 +1,4 @@
+import { privateResultsFile } from './scripts/artifact-privacy';
 import { defineConfig, devices } from '@playwright/test';
 import { STORAGE_STATE } from './config/global-setup';
 import { BASE, USER_AGENT, LOCALE, TIMEZONE_ID } from './tests/helpers';
@@ -16,6 +17,8 @@ const reportDir = siteSlug ? `./reports/${siteSlug}/${runDate}` : `./reports/${r
 
 process.env.PAGE_INVENTORY_FILE ||= `${reportDir}/page-inventory.json`;
 const baseline = pin(baselineRoot(), siteSlug, runDate);
+
+const stagedResults = privateResultsFile(`${reportDir}/results.json`);
 
 export default defineConfig({
   testDir: './tests',
@@ -43,7 +46,11 @@ export default defineConfig({
     ['list'],
     ['./config/run-metadata-reporter.ts', { outputFile: `${reportDir}/run-metadata.json` }],
     ['html', { outputFolder: `${reportDir}/html`, open: 'never' }],
-    ['json', { outputFile: `${reportDir}/results.json` }],
+    ['json', { outputFile: stagedResults }],
+    [
+      './config/artifact-privacy-reporter.ts',
+      { inputFile: stagedResults, outputFile: `${reportDir}/results.json` },
+    ],
   ],
 
   use: {

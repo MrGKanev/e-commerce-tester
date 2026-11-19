@@ -56,6 +56,10 @@ The opt-in shared [`44-security-monitoring.spec.ts`](../tests/44-security-monito
 
 Local validation: `pnpm check` passed (110 unit tests, typecheck/lint, toolchain and coverage metadata); 85 owned security fixtures passed across Chromium desktop/mobile, Firefox, WebKit and mobile WebKit; 72 real production-entry fixture cases across Shopify/WooCommerce, including 24 expected strict content-drift failures. Pending/oversized/failed evidence refuses approval. No live stores or merchant baselines are used. See [remaining work](TESTS.md#script-and-payment-monitoring--2026-11-18).
 
+## Supporting artifact privacy and baseline review — 2026-11-19
+
+The security workflow now applies a shared privacy filter at selected persisted-output boundaries and adds explicit offline baseline diff/reason/history review. These are tester safeguards, not additional storefront verdict rules: catalog totals remain **1 Covered / 61 Partial / 49 Pending / 98 Not applicable**. Request execution and original store configuration are not rewritten. Security fingerprint evidence must remain exact. Raw browser HTML/trace/image artifacts and arbitrary unknown sensitive data are not certified safe to publish; see [privacy boundaries](ARTIFACT-PRIVACY.md), [approval workflow](SECURITY-MONITORING.md) and [validation](TESTS.md#artifact-privacy-and-baseline-review--2026-11-19).
+
 ## Passive CSP violation telemetry — 2026-11-19
 
 [`security-csp.ts`](../tests/security-csp.ts) extends the opt-in shared security suite with native `securitypolicyviolation` events in main/child documents. Rules `security-csp-violation` and `security-csp-report-only-violation` are warning evidence; only the former can record enforced disposition. CSP presence/zero events do not prove effective policy coverage. Report-only events never mean denial. Strict mode requires review even against an otherwise matching baseline. Sources: `security`, `privacy`; both remain Partial. See [schema, budgets, attribution and trust limitations](SECURITY-MONITORING.md#csp-violation-telemetry--2026-11-19).

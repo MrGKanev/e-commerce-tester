@@ -95,7 +95,10 @@ test('actual same-origin bytes are hashed without repeat fetching and secrets ar
   ).toMatchObject({ sha256: hash('window.fixtureLoaded=true;'), status: 'hashed' });
   expect(server.counts().scriptRequests).toBe(1);
   expect(JSON.stringify(report)).not.toMatch(/private-token|window.fixtureLoaded|variant=/);
-  const baseline = approve(report, undefined, { reviewed: true });
+  const baseline = approve(report, undefined, {
+    reviewed: true,
+    reason: 'Owned local fixture review',
+  });
   expect((await observe(page, config(), baseline)).status).toBe('matches-baseline');
 });
 
@@ -103,7 +106,10 @@ test('the same script URL with changed contents is reviewable even on a trusted 
   page,
 }) => {
   await fixture(page);
-  const baseline = approve(await observe(page), undefined, { reviewed: true });
+  const baseline = approve(await observe(page), undefined, {
+    reviewed: true,
+    reason: 'Owned local fixture review',
+  });
   await page
     .context()
     .route('**/same.js?**', route =>
@@ -118,14 +124,21 @@ test('a reviewed alternative digest is accepted without trusting all future vend
   page,
 }) => {
   await fixture(page);
-  const baseline = approve(await observe(page), undefined, { reviewed: true });
+  const baseline = approve(await observe(page), undefined, {
+    reviewed: true,
+    reason: 'Owned local fixture review',
+  });
   await page
     .context()
     .route('**/same.js?**', route =>
       route.fulfill({ contentType: 'application/javascript', body: 'window.variantB=true;' }),
     );
   const next = await observe(page);
-  const variants = approve(next, baseline, { reviewed: true, addVariant: true });
+  const variants = approve(next, baseline, {
+    reviewed: true,
+    reason: 'Owned local fixture review',
+    addVariant: true,
+  });
   expect((await observe(page, config(), variants)).status).toBe('matches-baseline');
 });
 
@@ -199,7 +212,9 @@ for (const source of ['/large.js', '/failed.js'])
     );
     expect(report.status).toBe('unverified');
     expect(report.stages[0].coverage.complete).toBe(false);
-    expect(() => approve(report, undefined, { reviewed: true })).toThrow('complete');
+    expect(() =>
+      approve(report, undefined, { reviewed: true, reason: 'Owned local fixture review' }),
+    ).toThrow('complete');
   });
 
 test('request/inline/frame bounds retain explicit incomplete coverage', async ({ page }) => {
@@ -322,7 +337,10 @@ test('explicit first-party card fields and approved frames are accepted as legit
   });
   const report = await observe(page, settings, undefined, { role: 'checkout' });
   expect(report.stages[0].findings.filter(f => f.rule !== 'security-baseline-missing')).toEqual([]);
-  const baseline = approve(report, undefined, { reviewed: true });
+  const baseline = approve(report, undefined, {
+    reviewed: true,
+    reason: 'Owned local fixture review',
+  });
   expect((await observe(page, settings, baseline, { role: 'checkout' })).status).toBe(
     'matches-baseline',
   );
@@ -399,7 +417,9 @@ test('a script requested inside the window with no response cannot be approved',
   const report = await observe(page);
   expect(report.status).toBe('unverified');
   expect(report.stages[0].coverage.incomplete).toContain('script-response-pending');
-  expect(() => approve(report, undefined, { reviewed: true })).toThrow('complete');
+  expect(() =>
+    approve(report, undefined, { reviewed: true, reason: 'Owned local fixture review' }),
+  ).toThrow('complete');
 });
 
 test('real CSP script/connect/frame/form violations are separated from mere policy presence', async ({
@@ -488,7 +508,9 @@ test('CSP event bounds and duplicate grouping never hide truncated evidence', as
   expect(report.stages[0].policy.events[0].count).toBe(200);
   expect(report.stages[0].coverage.incomplete).toContain('csp-event-limit');
   expect(report.status).toBe('unverified');
-  expect(() => approve(report, undefined, { reviewed: true })).toThrow('complete');
+  expect(() =>
+    approve(report, undefined, { reviewed: true, reason: 'Owned local fixture review' }),
+  ).toThrow('complete');
 });
 
 test('post-reject CSP violations belong to the post-reject scope', async ({ page }) => {

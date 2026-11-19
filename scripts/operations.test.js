@@ -28,6 +28,7 @@ test('backup restores configuration, approved pixels, security baselines and inc
   write(path.join(source, 'reports/shop/.monitoring/state.json'), { incident: true });
   write(path.join(source, 'security-baselines/shop.json'), { schemaVersion: 1, approvals: [] });
   write(path.join(source, 'scheduler-state/schedule.json'), { jobs: {} });
+  write(path.join(source, 'security-baselines/shop.json.lock'), { temporary: true });
   assert.equal(backup(source, archive).files, 5);
   assert.equal(restore(archive, restored).files, 5);
   assert.equal(
@@ -38,6 +39,7 @@ test('backup restores configuration, approved pixels, security baselines and inc
     JSON.parse(fs.readFileSync(path.join(restored, 'security-baselines/shop.json'))),
     { schemaVersion: 1, approvals: [] },
   );
+  assert.equal(fs.existsSync(path.join(restored, 'security-baselines/shop.json.lock')), false);
   assert.throws(() => restore(archive, restored), /nonexistent/);
   fs.writeFileSync(path.join(archive, 'visual-baselines/shop/approved.json'), 'corrupt');
   assert.throws(() => restore(archive, path.join(root, 'bad')), /checksum/);

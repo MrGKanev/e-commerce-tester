@@ -15,6 +15,7 @@
 const { spawnSync, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { stringifyArtifact } = require('./artifact-privacy');
 
 const root        = path.join(__dirname, '..');
 const reportsDir  = path.join(root, 'reports');
@@ -185,6 +186,6 @@ function die(msg) {
 
 
 function writeMetadata(file, metadata) {
-  fs.writeFileSync(file + '.tmp', JSON.stringify(metadata, null, 2));
+  fs.writeFileSync(file + '.tmp', stringifyArtifact(metadata, null, 2));
   fs.renameSync(file + '.tmp', file);
 }
