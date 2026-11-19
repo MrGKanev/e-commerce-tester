@@ -34,6 +34,10 @@ Start as advisory `needs-review` evidence. New or changed code is not synonymous
 
 Local acceptance should include legitimate mutable-vendor updates, same-origin infected-asset simulations, delayed injected loaders, new beacon/POST destinations, consent-phase differences, approved payment frames and unexpected form/iframe destinations. Verify missing/opaque/oversized evidence cannot become a clean verdict. Public reports should contain hashes, bounded structural metadata and redacted destinations, not raw cookies, request bodies, customer data, credentials or complete sensitive bundles.
 
+## Supporting workflow improvements — implemented 2026-11-19
+
+The [shared artifact privacy filter](ARTIFACT-PRIVACY.md) now covers selected newly persisted diagnostics and managed logs, with raw browser/file artifacts explicitly excluded. The [baseline workflow](SECURITY-MONITORING.md#evidence-and-approval) now includes read-only old/new review, required approval reasons/current review hashes and paginated hash-linked history. Existing references remain readable; runs never approve their own evidence. These changes do not close the administrator, server-integrity or comprehensive data-flow gaps below. Validation is recorded in [TESTS.md](TESTS.md#artifact-privacy-and-baseline-review--2026-11-19).
+
 ## Follow-up controls and limits
 
 - Passive native CSP violation telemetry is implemented (2026-11-19), including enforced/report-only disposition and bounded redaction; see [coverage and limits](SECURITY-MONITORING.md#csp-violation-telemetry--2026-11-19). Continue extending effective policy diagnostics across enforced/report-only `script-src`, `connect-src`, `form-action`, `frame-src` and `worker-src`, with observed CSP violations where available. A compromised already-authorized vendor can pass an origin allowlist. Integrity pinning is useful for stable versioned resources; automatically pinning mutable A/B snippets creates breakage and noise.

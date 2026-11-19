@@ -93,6 +93,12 @@ The default difference ratio is 0.03. Per-store `thresholds.visual.components` o
 
 Local lifecycle checks: `pnpm test:visual:local` checks desktop/mobile Chromium; `VISUAL_CHECK_ALL_BROWSERS=1 pnpm test:visual:local` checks all five projects after installing Firefox and WebKit too. These commands use intercepted local pages and temporary approval stores.
 
+## Security monitoring and approval
+
+Configure [security monitoring](SECURITY-MONITORING.md) before running `pnpm test:security --site=my-store`; this visits the authorized store. Monitoring is opt-in and supports report/strict modes, scoped consent scenarios and checkout contracts. Run `pnpm test:security:local` and `pnpm test:security:entry:local` for owned offline fixtures instead.
+
+Approve security baselines offline through the documented `review` → `approve` workflow. CLI approval requires the current review hash, a reason and `--reviewed`; `history` displays previous approvals. Test runs never promote references. These files are independent of visual baselines. Docker Compose exposes `security-baselines/` read-only; perform approvals on the host.
+
 ## Docker
 
 The commands below run once. For a persistent service, see [Docker scheduler](SCHEDULER.md).
@@ -110,6 +116,7 @@ docker build -t e2e .
 docker run --rm --env-file .env \
   -v "$PWD/reports:/app/reports" \
   -v "$PWD/visual-baselines:/app/visual-baselines" \
+  -v "$PWD/security-baselines:/app/security-baselines:ro" \
   -v "$PWD/sites.json:/app/sites.json:ro" \
   e2e
 ```
