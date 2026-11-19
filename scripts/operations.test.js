@@ -18,7 +18,7 @@ function write(file, value) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(value));
 }
-test('backup restores configuration, approved pixels and incident state, rejects tampering and existing destinations', t => {
+test('backup restores configuration, approved pixels, security baselines and incident state, rejects tampering and existing destinations', t => {
   const root = temporary(t),
     source = path.join(root, 'source'),
     archive = path.join(root, 'backup'),
@@ -26,12 +26,17 @@ test('backup restores configuration, approved pixels and incident state, rejects
   write(path.join(source, 'managed-config/configuration.json'), { sites: [] });
   write(path.join(source, 'visual-baselines/shop/approved.json'), { revision: 'one' });
   write(path.join(source, 'reports/shop/.monitoring/state.json'), { incident: true });
+  write(path.join(source, 'security-baselines/shop.json'), { schemaVersion: 1, approvals: [] });
   write(path.join(source, 'scheduler-state/schedule.json'), { jobs: {} });
-  assert.equal(backup(source, archive).files, 4);
-  assert.equal(restore(archive, restored).files, 4);
+  assert.equal(backup(source, archive).files, 5);
+  assert.equal(restore(archive, restored).files, 5);
   assert.equal(
     fs.readFileSync(path.join(restored, 'visual-baselines/shop/approved.json'), 'utf8'),
     '{"revision":"one"}',
+  );
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(path.join(restored, 'security-baselines/shop.json'))),
+    { schemaVersion: 1, approvals: [] },
   );
   assert.throws(() => restore(archive, restored), /nonexistent/);
   fs.writeFileSync(path.join(archive, 'visual-baselines/shop/approved.json'), 'corrupt');

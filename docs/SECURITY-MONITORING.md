@@ -1,0 +1,101 @@
+# Third-party script and payment monitoring
+
+`44-security-monitoring.spec.ts` (`@full`, `@security`) runs on Shopify and WooCommerce, including desktop/mobile. It observes real browser script responses, destination changes and payment-interface structure. These are change-detection checks, not malware attribution or certification that a store is uncompromised. Legacy `38-third-party-scripts.spec.ts` stays an independent external-script inventory.
+
+## Configuration
+
+Add this to the store's settings, replacing the example origins and selectors with reviewed values:
+
+```json
+{
+  "securityMonitoring": {
+    "enabled": true,
+    "mode": "report",
+    "profile": "anonymous-bg",
+    "observeMs": 1000,
+    "phases": ["initial", "reject", "accept"],
+    "pages": [
+      { "name": "home", "path": "/", "role": "storefront" },
+      { "name": "cart", "path": "/cart", "role": "storefront" },
+      { "name": "checkout", "path": "/checkout", "role": "checkout" }
+    ],
+    "consent": {
+      "acceptSelector": "#consent-accept",
+      "rejectSelector": "#consent-reject"
+    },
+    "payment": {
+      "checkoutOrigins": ["https://store.example"],
+      "formOrigins": ["https://store.example"],
+      "frameOrigins": ["https://payments.example"],
+      "allowTopDocumentCardFields": false
+    }
+  }
+}
+```
+
+Monitoring defaults to disabled, except legacy `monitorScripts: true` enables it unless explicitly overridden. Without `pages`, the configured inventory URLs run as storefronts; checkout must be explicitly designated. Checkout URLs on a different origin require an explicit `checkoutOrigins` entry. Public page validation rejects administrator routes, URL credentials and fragments. Configure only authorized reachable pages; the monitor never fills cards, adds products or submits checkout forms to make a checkout reachable.
+
+Each page/choice gets a fresh browser context with empty storage. Automatic consent handling is disabled for this suite. Reject/accept choices observe an initial stage, click their explicitly configured unique visible enabled native button, and observe the chosen stage. A form submitter is refused. Configuration is an authorization contract: verify selectors target consent actions. A site button's JavaScript still runs and can make requests. Navigation or consent-control failures fail even report mode.
+
+`profile`, browser project, page name, role, consent choice/stage, locale and timezone isolate baseline scopes. A profile is a label, not a geographic proxy; configure the actual execution environment separately. Native mobile devices and additional regions need separate coverage.
+
+```bash
+# Visits the configured store; use only for authorized stores.
+pnpm test:security --site=my-store
+
+# Offline verification against owned fixtures only.
+pnpm test:security:local
+pnpm test:security:entry:local
+```
+
+## Evidence and approval
+
+Every scenario attaches `security-monitoring.json` and a concise text summary. Status is `needs-review` when no baseline exists or a comparison/contract finding appears; `unverified` when known evidence is incomplete; otherwise `matches-baseline` for that exercised scope. `report` mode preserves findings without failing a successful page/consent scenario. `strict` mode fails changes, missing approval and incomplete observations. Neither mode automatically changes a baseline or merchant configuration.
+
+Review candidate evidence with known-good release/vendor provenance before approval. The first observation may already contain compromised code. Collect every required browser/page/consent/profile scope in report mode; approve each JSON attachment offline into a separate version-controlled baseline:
+
+```bash
+pnpm security:baseline approve --candidate /path/to/security-monitoring.json \
+  --baseline security-baselines/my-store.json --reviewed
+```
+
+Then set `securityMonitoring.baselineFile` to `security-baselines/my-store.json` and optionally `mode` to `strict`. An explicitly configured missing/invalid baseline is an error. Files must stay under the repository's `security-baselines/` directory, without symlinks. Approval refuses incomplete candidates and existing scopes. After reviewing a release, `--replace` replaces matching scopes; `--add-variant` only adds reviewed script digests for unchanged script keys, destinations and payment structure. It cannot approve a new destination or a different checkout contract. Protect review of this directory separately from run artifacts. The existing backup/restore commands include security baselines and verify their archive checksums. Docker Compose mounts this directory read-only into runners/control/scheduler; run approval on the host. Baselines are excluded from image build context. Approval records a timestamp, not an authenticated human identity or cryptographic provenance. Owned acceptance fixtures use temporary baselines and delete them afterward; no merchant baseline is supplied or auto-approved.
+
+Hashes are observations of potentially untrusted bytes. They are never injected as SRI or treated as trust without review. Query strings are excluded from stable script grouping; different returned bytes at the same origin/path/context still trigger content drift. Approved variants allow only their exact hashes, not arbitrary future vendor updates.
+
+## CSP violation telemetry — 2026-11-19
+
+Monitoring now installs a passive `securitypolicyviolation` listener before scenario navigation, in main and child documents. Random ephemeral document markers avoid dependence on privacy-rounded clocks; a bounded startup queue handles binding initialization order. `policy.events` records only normalized effective directive, `enforce`/`report` disposition, blocked/document origin, main/frame context, blocked kind (URL/inline/eval/etc.) and grouped count. It never exports `originalPolicy`, `sample`, nonce/hash source tokens, source-file URLs, report endpoint values, paths or queries. Synthetic DOM violation events (`isTrusted: false`) are ignored. No prohibited probe, policy, script, form submission or reporting endpoint is injected into a live storefront. Owned local fixtures alone exercise deliberate CSP denials.
+
+`security-csp-violation` and `security-csp-report-only-violation` are warning findings. Enforced events record browser-reported denial; report-only events do not mean a resource was blocked. Strict mode requires review of either type, even when script/destination/payment baselines match. Approving a baseline cannot suppress these warnings. A listener being installed, a CSP header being present, or zero events never proves that a policy is effective or comprehensive. Browser console messages, site callbacks, workers, reporting-server delivery and violations occurring outside the scenario window are not fully covered.
+
+There is a 200-event budget per document and per stage; equivalent normalized events are grouped. Saturation is explicit and makes coverage unverified, including later stages after document-budget exhaustion. Missing listener/feature/document evidence also remains unverified. The document readiness check is bounded; inaccessible frame content is skipped with an explicit coverage gap. Attribution uses binding receipt time (`phaseAttribution: binding-receipt`); a queued event can cross a consent boundary. Same-page telemetry is not tamper-resistant against hostile JavaScript (`tamperResistant: false`), and the ephemeral Playwright binding is not an authenticated browser security-reporting channel. Stopping the collector disposes its binding and future init script and discards subsequent callbacks. Existing page listeners live only until their isolated context closes; the suite closes that context afterward.
+
+## Rules
+
+| Rule | Severity | Evidence / meaning |
+| --- | --- | --- |
+| `security-baseline-missing` | warning | No approval for the exact scope |
+| `security-script-added`, `security-script-removed` | warning | Executable response/inline key added or absent |
+| `security-script-content-changed` | warning | SHA-256 differs from all reviewed variants for the key |
+| `security-destination-added` | warning | New origin/resource type/method/source kind, including redirect/navigation hops |
+| `security-payment-interface-changed` | warning | Document/form/frame origins, hashed form-action paths or card-field/overlay counts differ |
+| `security-payment-contract-unconfigured` | warning | Checkout lacks explicit origin/field policy |
+| `security-checkout-origin`, `security-storefront-origin` | high | Observed page origin violates the configured scenario |
+| `security-payment-form-origin`, `security-payment-frame-origin` | high | A form/frame origin is outside the explicit checkout contract |
+| `security-top-document-card-fields` | high | Visible autocomplete-marked card fields violate an explicit prohibition |
+| `security-csp-violation` | warning | Browser CSP violation event; disposition and directive retained, enforcement only attributed when reported as enforced |
+| `security-csp-report-only-violation` | warning | Browser report-only violation; resource may still execute/send |
+| `security-consent-control-unavailable` | warning | Configured control cannot be exercised safely; coverage is incomplete |
+
+High severity means a contract violation requiring review, not proof of a skimmer. Every checkout iframe is inventoried; payment purpose is unverified. Legitimate first-party card fields are supported through explicit `allowTopDocumentCardFields: true`. Empty origin lists mean unconfigured, not deny-all. Form-action queries are not compared; same-origin endpoint payloads are outside this monitor.
+
+## Coverage limits and privacy
+
+Actual JavaScript response bodies are hashed without additional fetches, including same-origin assets, module/JavaScript MIME responses and redirect final responses. Current executable inline scripts are sampled in main/child frames; snapshots do not prove execution and miss removed scripts. Responses can arrive after the configured observation window. Pending, failed, oversized, truncated or unavailable evidence stays unverified. Dedicated workers are recorded; unavailable worker code is explicit. Firefox can report an unresolved worker URL; that observation remains unverified. Service workers are blocked in these isolated contexts, so production service-worker behavior is untested. Blob/eval/dynamic code, worker WebSockets, WebRTC, cached existing sessions, shadow DOM, covert traffic, automation-aware/geo-targeted or delayed attacks are not comprehensively covered.
+
+Destination comparison groups origin, resource type, method and source kind; it does not inspect request bodies, cookies, headers, WebSocket frames or field values. Allowed origins can still receive leaked data. Reports retain origins and SHA-256 fingerprints of URL/path/code, never plaintext script bodies, URL paths/queries/credentials or request payloads. Hashes are pseudonymous fingerprints, not irreversible anonymization of guessable inputs. These guarantees apply to the security JSON/text attachments; other runner logs, Playwright failure contexts and existing report families have their own policies and may contain page text/URLs. Protect artifacts accordingly.
+
+Default limits: 100 script responses, 500 requests, 20 frames, five pages, 2 MiB per script and 8 MiB total script bytes. Configurable ceilings are validated in the settings schema. DOM forms/iframes are sampled up to 100 per frame. The body reader uses Playwright's buffered `response.body()`; declared content length is checked first, but undeclared/compressed bodies can allocate more memory before rejection. These are observation/retention budgets, not a hard streaming memory cap. The window defaults to 1000 ms plus a bounded two-second response drain; reported elapsed time includes navigation and inspection. It is unrelated to field INP.
+
+No merchant CSP, vendor permissions, app/plugin configuration or server files are changed. Admin publishing rights, WooCommerce filesystem/plugin integrity, effective CSP enforcement and sandboxed canary data-flow probes remain separate authorized work. See [the research and remaining controls](THIRD-PARTY-SECURITY-PLAN.md).

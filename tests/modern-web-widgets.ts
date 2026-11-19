@@ -1,3 +1,7 @@
+import { inspectMenubarSwitching } from './modern-web-menubar-switching';
+import { inspectMenuNavigation } from './modern-web-menu-navigation';
+import { inspectComposites } from './modern-web-composites';
+import { inspectCustomAccordions } from './modern-web-accordions';
 import type { Page, ElementHandle } from '@playwright/test';
 import { safeAuditUrl, type WebFinding } from './modern-web';
 
@@ -678,6 +682,15 @@ export async function inspectWidgets(page: Page) {
       sliders.push({ status: 'unverified', reason: 'slider-changed' });
     }
   }
+  const menuNavigation = await inspectMenuNavigation(page);
+  const { findings: menuFindings, ...menuCoverage } = menuNavigation;
+  const switching = await inspectMenubarSwitching(page);
+  const { findings: switchingFindings, ...switchingCoverage } = switching;
+  const composites = await inspectComposites(page);
+  const customAccordions = await inspectCustomAccordions(page);
+  const { findings: compositeFindings, ...compositeCoverage } = composites;
+  const { findings: accordionFindings, ...accordionCoverage } = customAccordions;
+  findings.push(...menuFindings, ...switchingFindings, ...compositeFindings, ...accordionFindings);
   return {
     schemaVersion: 1,
     url: safeAuditUrl(page.url()),
@@ -688,9 +701,13 @@ export async function inspectWidgets(page: Page) {
       sliders,
       perCategoryLimit: LIMIT,
       tabKeyboardLimit: 20,
+      composites: compositeCoverage,
+      menuNavigation: menuCoverage,
+      menubarSwitching: switchingCoverage,
+      customAccordions: accordionCoverage,
       tabLocalSettleWindowMs: 100,
       successfulSubmissionAttempted: false,
-      customAccordionActionsAttempted: false,
+      customAccordionActionsAttempted: customAccordions.activationAttempts > 0,
     },
     findings,
   };

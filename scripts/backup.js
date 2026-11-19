@@ -9,6 +9,7 @@ const ROOTS = [
   'scheduler-state',
   'reports',
   'visual-baselines',
+  'security-baselines',
   'sites.json',
   'scheduler.json',
 ];

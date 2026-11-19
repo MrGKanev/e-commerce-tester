@@ -67,7 +67,11 @@ export const test = base.extend<{ politeRun: void }>({
       visitedUrls = new Set();
       vitalSessions = [];
       const file = path.basename(testInfo.file);
-      automateConsent = file !== '15-gdpr.spec.ts';
+      automateConsent = ![
+        '15-gdpr.spec.ts',
+        '44-security-monitoring.spec.ts',
+        'security-monitoring.spec.ts',
+      ].includes(file);
       if (!compatibleSpec(file, settings.platform)) {
         testInfo.annotations.push({
           type: 'not-applicable',

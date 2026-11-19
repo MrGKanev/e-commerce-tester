@@ -17,10 +17,32 @@ const families = [
   'modern-web-presentation',
 ];
 const css = fs.readFileSync(path.join(root, 'web/tailwind.css'));
+const switchingFixture = `<label for="entry-switch-before">Before command bar</label><input id="entry-switch-before"><div role="menubar" id="entry-switch-bar" aria-label="Local application commands" class="relative flex w-fit rounded border">${[0, 1].map(index => `<button type="button" id="entry-switch-${index}" role="menuitem" aria-haspopup="menu" aria-controls="entry-switch-menu-${index}" aria-expanded="false" tabindex="${index ? -1 : 0}" class="min-h-10 px-3 py-2 focus-visible:outline-2">${index ? 'View' : 'Tools'}</button><div id="entry-switch-menu-${index}" role="menu" aria-label="Local commands" hidden class="absolute left-0 top-full z-10 min-w-36 rounded border bg-white p-2"><button type="button" role="menuitem" tabindex="-1" class="min-h-10 px-3 py-2 focus-visible:outline-2">Local preview</button></div>`).join('')}</div><label for="entry-switch-after">After command bar</label><input id="entry-switch-after">`;
+const compositeFixture = `<div role="toolbar" aria-label="Local toolbar" class="flex gap-2 rounded border p-2">${['First', 'Second', 'Third'].map((label, index) => `<button type="button" tabindex="${index ? -1 : 0}" class="min-h-10 rounded border px-3 focus-visible:outline-2">${label}</button>`).join('')}</div>${switchingFixture}`;
+const switchingScript = `{
+const bar=document.getElementById('entry-switch-bar'),buttons=[...bar.querySelectorAll(':scope > button')],menus=[...bar.querySelectorAll(':scope > [role="menu"]')];let current=-1,ignoreFocus=false;
+const closeAll=()=>{menus.forEach((menu,index)=>{menu.hidden=true;buttons[index].setAttribute('aria-expanded','false');});current=-1;};
+const show=index=>{closeAll();menus[index].hidden=false;buttons[index].setAttribute('aria-expanded','true');current=index;};
+const preview=index=>{show(index);buttons.forEach((button,i)=>button.tabIndex=i===index?0:-1);buttons[index].focus();};
+buttons.forEach((button,index)=>{button.addEventListener('focus',()=>{if(!ignoreFocus)show(index);});button.addEventListener('pointerenter',()=>{if(current>=0)preview(index);});button.addEventListener('keydown',event=>{if(event.key==='ArrowDown'){event.preventDefault();show(index);menus[index].querySelector('button').focus();}});menus[index].addEventListener('keydown',event=>{if(['ArrowRight','ArrowLeft'].includes(event.key)){event.preventDefault();event.stopPropagation();preview(1-index);}});});
+bar.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();const previous=current;closeAll();if(previous>=0){ignoreFocus=true;buttons[previous].focus();ignoreFocus=false;}}if(event.key==='Tab'){event.preventDefault();closeAll();document.getElementById(event.shiftKey?'entry-switch-before':'entry-switch-after').focus();}});
+document.addEventListener('focusin',event=>{if(!bar.contains(event.target))closeAll();});
+}`;
+const compositeScript = `document.querySelectorAll('[role="toolbar"],[role="menubar"]').forEach(root=>{const items=[...root.querySelectorAll(':scope > button')];root.addEventListener('keydown',event=>{if(!['ArrowRight','ArrowLeft'].includes(event.key))return;event.preventDefault();const index=items.indexOf(document.activeElement),next=(index+(event.key==='ArrowRight'?1:-1)+items.length)%items.length;items.forEach((item,i)=>item.tabIndex=i===next?0:-1);items[next].focus();});});
+const question=document.getElementById('entry-question'),answer=document.getElementById('entry-answer');question.addEventListener('click',()=>{answer.hidden=!answer.hidden;question.setAttribute('aria-expanded',String(!answer.hidden));fetch('/probe-accordion',{method:'POST'}).catch(()=>{});});`;
+const menuNavigationFixture = `<button type="button" id="entry-menu-before" class="rounded border p-2 focus-visible:outline-2">Before menu</button><button type="button" id="entry-menu-trigger" aria-haspopup="menu" aria-expanded="false" aria-controls="entry-menu" class="rounded border p-2 focus-visible:outline-2">Tools</button><div id="entry-menu" role="menu" aria-label="Tools" hidden class="space-y-2 rounded border p-2"><button type="button" role="menuitem" tabindex="-1" id="entry-menu-first">Preview</button><button type="button" role="menuitem" tabindex="-1" id="entry-submenu-trigger" aria-haspopup="menu" aria-expanded="false" aria-controls="entry-submenu">More previews</button><div id="entry-submenu" role="menu" aria-label="More previews" hidden class="rounded border p-2"><button type="button" role="menuitem" tabindex="-1" id="entry-menu-leaf">Details</button></div></div><button type="button" id="entry-menu-after" class="rounded border p-2 focus-visible:outline-2">After menu</button>`;
+const menuNavigationScript = `{
+const trigger=document.getElementById('entry-menu-trigger'),menu=document.getElementById('entry-menu'),nested=document.getElementById('entry-submenu-trigger'),child=document.getElementById('entry-submenu');
+const closeChild=()=>{child.hidden=true;nested.setAttribute('aria-expanded','false');};const closeRoot=()=>{closeChild();menu.hidden=true;trigger.setAttribute('aria-expanded','false');};
+trigger.addEventListener('keydown',event=>{if(event.key==='ArrowDown'){event.preventDefault();menu.hidden=false;trigger.setAttribute('aria-expanded','true');document.getElementById('entry-menu-first').focus();}});
+nested.addEventListener('keydown',event=>{if(event.key==='ArrowRight'){event.preventDefault();event.stopPropagation();child.hidden=false;nested.setAttribute('aria-expanded','true');document.getElementById('entry-menu-leaf').focus();}});
+child.addEventListener('keydown',event=>{if(['Escape','ArrowLeft'].includes(event.key)){event.preventDefault();event.stopPropagation();closeChild();nested.focus();}});
+menu.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();closeRoot();trigger.focus();}if(event.key==='Tab'){event.preventDefault();closeRoot();document.getElementById(event.shiftKey?'entry-menu-before':'entry-menu-after').focus();}});
+}`;
 const fixture = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Local storefront Modern Web entry fixture</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/tailwind.css"></head><body class="bg-white text-slate-900"><main class="mx-auto max-w-3xl space-y-3 p-4"><h1 class="text-2xl font-bold">Local store fixture</h1>
 <form><label for="country">Country</label><select id="country" name="country" autocomplete="country" required aria-invalid="false"><option value="" disabled selected>Choose country</option><option value="bg">Bulgaria</option></select><p id="country-error" hidden>Choose a country.</p><div id="announcer" aria-live="polite"></div></form>
 <form><label for="address">Address</label><input id="address" name="address1" autocomplete="shipping street-address"><label for="account">Account email</label><input id="account" type="email" autocomplete="username" spellcheck="false"><label for="password">New password</label><input id="password" type="password" autocomplete="new-password"></form>
-<details><summary>Delivery details</summary><p>Local delivery information.</p></details><label><input type="checkbox" role="switch">Preview preference</label><label for="range">Preview quantity</label><input id="range" type="range" min="0" max="10" value="4"><section aria-roledescription="carousel" role="region" aria-label="Local gallery"><button type="button" aria-label="Previous slide">Previous</button><button type="button" aria-label="Next slide">Next</button><div role="group" aria-roledescription="slide" aria-label="1 of 2" id="slide-a">First view</div><div role="group" aria-roledescription="slide" aria-label="2 of 2" id="slide-b" hidden>Second view</div></section></main><script>
+<details><summary>Delivery details</summary><p>Local delivery information.</p></details><label><input type="checkbox" role="switch">Preview preference</label><label for="range">Preview quantity</label><input id="range" type="range" min="0" max="10" value="4"><section aria-roledescription="carousel" role="region" aria-label="Local gallery"><button type="button" aria-label="Previous slide">Previous</button><button type="button" aria-label="Next slide">Next</button><div role="group" aria-roledescription="slide" aria-label="1 of 2" id="slide-a">First view</div><div role="group" aria-roledescription="slide" aria-label="2 of 2" id="slide-b" hidden>Second view</div></section>${compositeFixture}<section aria-label="Questions"><h2><button type="button" id="entry-question" aria-expanded="false" class="rounded border p-2 focus-visible:outline-2">Local question</button></h2><div id="entry-answer" hidden>Local answer</div></section>${menuNavigationFixture}</main><script>${compositeScript}${menuNavigationScript}${switchingScript}
 const slides=[document.getElementById('slide-a'),document.getElementById('slide-b')];document.querySelectorAll('[aria-label="Next slide"],[aria-label="Previous slide"]').forEach(button=>button.addEventListener('click',()=>{slides.forEach(slide=>slide.hidden=!slide.hidden);fetch('/probe-carousel',{method:'POST'}).catch(()=>{});}));
 const select=document.getElementById('country'),error=document.getElementById('country-error');
 const sync=()=>{const invalid=!select.validity.valid;select.setAttribute('aria-invalid',String(invalid));error.hidden=!invalid;if(invalid)select.setAttribute('aria-describedby','country-error');else select.removeAttribute('aria-describedby');};
@@ -168,6 +190,33 @@ async function main() {
           result.attachments.find(item => item.name === 'modern-web-widgets.json'),
         );
         assert.equal(widgets.coverage.accordions.length, 1);
+        assert.equal(widgets.coverage.composites.menubars[0].status, 'observed');
+        assert.equal(widgets.coverage.composites.toolbars[0].status, 'observed');
+        assert.equal(widgets.coverage.composites.commandActivationAttempted, false);
+        const nestedMenu = widgets.coverage.menuNavigation.observations.find(
+          observation => observation.initial?.selector === '#entry-menu-trigger',
+        );
+        assert.ok(nestedMenu, 'The standalone nested-menu contract must be observed');
+        assert.equal(nestedMenu.status, 'observed');
+        assert.equal(nestedMenu.submenus.length, 2);
+        assert.equal(nestedMenu.tabExit.steps.length, 2);
+        assert.equal(widgets.coverage.menuNavigation.commandActivationAttempted, false);
+        assert.equal(widgets.coverage.menubarSwitching.observations[0].keyboard.status, 'observed');
+        assert.equal(widgets.coverage.menubarSwitching.observations[0].restoration.closed, true);
+        assert.equal(widgets.coverage.menubarSwitching.commandActivationAttempted, false);
+        assert.equal(widgets.coverage.menubarSwitching.pointerClicksAttempted, false);
+        assert.equal(
+          widgets.coverage.menubarSwitching.observations[0].pointer.status,
+          widgets.coverage.menubarSwitching.hoverSupported ? 'observed' : 'not-probed',
+        );
+        assert.equal(widgets.coverage.composites.toolbars[0].tabTraversal.status, 'observed');
+        assert.equal(widgets.coverage.customAccordions.observations[0].status, 'unverified');
+        assert.equal(
+          widgets.coverage.customAccordions.observations[0].reason,
+          'dependent-work-blocked',
+        );
+        assert.ok(widgets.coverage.customAccordions.activationAttempts >= 2);
+        assert.equal(widgets.coverage.customAccordionActionsAttempted, true);
         assert.equal(widgets.coverage.switches.length, 1);
         assert.equal(widgets.coverage.sliders.length, 1);
         const carousel = attachmentJson(

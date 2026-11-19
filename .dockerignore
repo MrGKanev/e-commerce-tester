@@ -13,3 +13,5 @@ storageState.*.json
 
 managed-config/
 visual-baselines/
+
+security-baselines/

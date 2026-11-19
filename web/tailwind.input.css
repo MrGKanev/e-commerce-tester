@@ -16,3 +16,8 @@
 @source '../checks/modern-web-data-widgets.spec.ts';
 @source '../checks/modern-web-tooltips.spec.ts';
 @source '../checks/modern-web-carousel.spec.ts';
+
+@source '../checks/modern-web-composites.spec.ts';
+@source '../checks/modern-web-menu-navigation.spec.ts';
+@source '../checks/modern-web-menubar-switching.spec.ts';
+@source '../checks/security-monitoring.spec.ts';

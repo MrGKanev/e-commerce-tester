@@ -52,6 +52,14 @@ export async function inspectDataWidgets(page: Page) {
         evidence,
         recommendation,
       });
+    // Count only IDs actually referenced by the bounded cell sample. Hidden duplicate
+    // targets still make a document ID ambiguous; unrelated duplicates are out of scope.
+    const targetCounts = new Map<string, number>();
+    const targetCount = (id: string) => {
+      if (!targetCounts.has(id))
+        targetCounts.set(id, document.querySelectorAll('#' + CSS.escape(id)).length);
+      return targetCounts.get(id)!;
+    };
     const allTables = [...document.querySelectorAll<HTMLTableElement>('table')].filter(
       el => visible(el) && !el.matches('[role="presentation"],[role="none"]'),
     );
@@ -65,6 +73,7 @@ export async function inspectDataWidgets(page: Page) {
       const rows = [...table.rows].filter(row => row.closest('table') === table);
       const dataIntentExplicit = table.getAttribute('role') === 'table' || Boolean(table.caption);
       let invalidReferences = 0;
+      let ambiguousReferences = 0;
       for (const cell of cells) {
         const scope = cell.getAttribute('scope');
         if (
@@ -81,6 +90,17 @@ export async function inspectDataWidgets(page: Page) {
           );
         const ids = (cell.getAttribute('headers') || '').split(/\s+/).filter(Boolean);
         if (!ids.length) continue;
+        const ambiguous = [...new Set(ids)].filter(id => targetCount(id) > 1);
+        if (ambiguous.length) {
+          ambiguousReferences += ambiguous.length;
+          add(
+            'table-header-reference-ambiguous',
+            'responsive-table',
+            cell,
+            { ambiguousReferenceCount: ambiguous.length, uniqueTargetVerified: false },
+            'Give each explicitly referenced header a unique document ID and update headers references; verify the resulting associations with assistive technology.',
+          );
+        }
         const invalid = ids.filter(id => {
           const target = document.getElementById(id);
           return !target || target.localName !== 'th' || target.closest('table') !== table;
@@ -159,6 +179,7 @@ export async function inspectDataWidgets(page: Page) {
         renderedSampledCells: cells.length,
         cellsTruncated: ownCells.length > cellLimit,
         invalidReferences,
+        ambiguousReferences,
         clippedByAncestor: clipped,
         horizontalScrollContainer: Boolean(scrollContainer),
         scrollContainerHasName: scrollContainer ? named(scrollContainer) : null,

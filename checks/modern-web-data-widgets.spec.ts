@@ -199,3 +199,57 @@ test('content-visibility hidden table and progress ancestors are outside rendere
   expect(report.coverage).toMatchObject({ tables: 0, progressIndicators: 0 });
   expect(report.findings).toEqual([]);
 });
+
+test('explicit header references detect duplicate IDs even when the first target is valid', async ({
+  page,
+}) => {
+  await load(
+    page,
+    `<table><tr><th id="private-duplicate">Header</th></tr><tr><td headers="private-duplicate private-duplicate">Private value</td></tr></table>
+    <span hidden id="private-duplicate">Hidden duplicate</span>`,
+  );
+  const before = await page.locator('body').innerHTML();
+  const report = await inspectDataWidgets(page);
+  expect(report.findings).toEqual([
+    expect.objectContaining({
+      rule: 'table-header-reference-ambiguous',
+      severity: 'warning',
+      evidence: { ambiguousReferenceCount: 1, uniqueTargetVerified: false },
+    }),
+  ]);
+  expect(report.observations.tables[0]).toMatchObject({
+    invalidReferences: 0,
+    ambiguousReferences: 1,
+  });
+  expect(JSON.stringify(report)).not.toMatch(/private-duplicate|Private value|Hidden duplicate/);
+  expect(await page.locator('body').innerHTML()).toBe(before);
+});
+
+test('unique punctuation IDs and repeated header tokens are accepted; unrelated duplicates are ignored', async ({
+  page,
+}) => {
+  await load(
+    page,
+    `<span id="unrelated">One</span><span id="unrelated">Two</span>
+    <table><tr><th id="column:1">Header</th></tr><tr><td headers="column:1 column:1">Value</td></tr></table>`,
+  );
+  const report = await inspectDataWidgets(page);
+  expect(report.findings).toEqual([]);
+  expect(report.observations.tables[0]).toMatchObject({
+    invalidReferences: 0,
+    ambiguousReferences: 0,
+  });
+});
+
+test('duplicate header references in hidden cells remain outside rendered scope', async ({
+  page,
+}) => {
+  await load(
+    page,
+    `<table><tr><th id="duplicate">Header</th><th id="duplicate">Other</th></tr>
+    <tr><td hidden headers="duplicate">Hidden data</td><td>Visible data</td></tr></table>`,
+  );
+  const report = await inspectDataWidgets(page);
+  expect(report.findings).toEqual([]);
+  expect(report.observations.tables[0].ambiguousReferences).toBe(0);
+});
