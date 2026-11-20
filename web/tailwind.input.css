@@ -39,3 +39,18 @@
 @source '../checks/modern-web-table-spans.spec.ts';
 
 @source '../checks/modern-web-ancestor-clipping.spec.ts';
+
+@source '../checks/modern-web-table-grid.spec.ts';
+
+@source '../checks/modern-web-table-columns.spec.ts';
+
+@source '../checks/modern-web-table-implied-rows.spec.ts';
+
+@source '../checks/modern-web-table-group-scopes.spec.ts';
+
+@source '../checks/modern-web-table-header-scan.spec.ts';
+
+@source '../checks/modern-web-table-header-union.spec.ts';
+
+@source '../checks/modern-web-field-variants.spec.ts';
+@source '../checks/modern-web-field-sizing.spec.ts';

@@ -8,7 +8,13 @@ import type { Page, ElementHandle } from '@playwright/test';
 import type { WebFinding } from './modern-web';
 import { safeAuditUrl } from './modern-web';
 import { inspectCheckboxes } from './modern-web-checkboxes';
-import { inspectFieldContent, inspectHorizontalFieldContent } from './modern-web-field-content';
+import {
+  inspectFieldContent,
+  inspectHorizontalFieldContent,
+  inspectRtlFieldContent,
+  inspectBidiFieldContent,
+  inspectInputFieldContent,
+} from './modern-web-field-content';
 
 /** Install before navigation. Freeze network and prevent submissions before exercising controls. */
 export async function prepareInteractionProbe(page: Page) {
@@ -504,6 +510,14 @@ export async function inspectInteractions(page: Page) {
   findings.push(...fieldContent.findings);
   const horizontalFieldContent = await inspectHorizontalFieldContent(page);
   findings.push(...horizontalFieldContent.findings);
+  const rtlFieldContent = await inspectRtlFieldContent(page);
+  const bidiFieldContent = await inspectBidiFieldContent(page);
+  const inputFieldContent = await inspectInputFieldContent(page);
+  findings.push(
+    ...rtlFieldContent.findings,
+    ...bidiFieldContent.findings,
+    ...inputFieldContent.findings,
+  );
   return {
     schemaVersion: 1,
     url: safeAuditUrl(page.url()),
@@ -511,6 +525,9 @@ export async function inspectInteractions(page: Page) {
       fields,
       fieldContent,
       horizontalFieldContent,
+      rtlFieldContent,
+      bidiFieldContent,
+      inputFieldContent,
       checkboxes,
       selects,
       selectLimit: 5,

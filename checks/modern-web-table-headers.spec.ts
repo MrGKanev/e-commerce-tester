@@ -50,8 +50,10 @@ const cases = [
     duplicates: 0,
   },
   {
+    // Acyclic references still need a real group for scope=colgroup.
+    // https://html.spec.whatwg.org/multipage/tables.html#attr-th-scope
     name: 'acyclic-spans',
-    body: '<thead><tr><th id="private-group" colspan="2" scope="colgroup">Group</th></tr><tr><th id="private-a" headers="private-group" scope="col">A</th><th id="private-b" headers="private-group" scope="col">B</th></tr></thead><tbody><tr><td headers="private-group private-a">Data</td><td headers="private-group private-b">Data</td></tr></tbody>',
+    body: '<colgroup span="2"></colgroup><thead><tr><th id="private-group" colspan="2" scope="colgroup">Group</th></tr><tr><th id="private-a" headers="private-group" scope="col">A</th><th id="private-b" headers="private-group" scope="col">B</th></tr></thead><tbody><tr><td headers="private-group private-a">Data</td><td headers="private-group private-b">Data</td></tr></tbody>',
     cycles: 0,
     duplicates: 0,
   },

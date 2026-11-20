@@ -11,9 +11,19 @@ import type { WebFinding } from './modern-web';
 export async function inspectFieldContent(
   page: Page,
   axis: 'vertical' | 'horizontal' = 'vertical',
+  variant: 'default' | 'rtl' | 'bidi' | 'input' = 'default',
 ) {
   const horizontal = axis === 'horizontal';
-  const keyName = horizontal ? 'ArrowRight' : 'ArrowDown';
+  const rtl = variant === 'rtl',
+    mixed = variant === 'bidi',
+    input = variant === 'input';
+  const keyName = horizontal ? (rtl ? 'ArrowLeft' : 'ArrowRight') : 'ArrowDown';
+  const mutationLimit = variant === 'default' ? 5 : 1;
+  const selectorBase = input
+    ? 'input:not([type]),input[type="text" i],input[type="search" i],input[type="tel" i],input[type="url" i]'
+    : horizontal
+      ? 'textarea[wrap="off" i]'
+      : 'textarea';
   if (
     !(await page.evaluate(
       () => (window as unknown as { __modernWebProbe?: boolean }).__modernWebProbe,
@@ -22,14 +32,20 @@ export async function inspectFieldContent(
     throw new Error('Field content probes require prepareInteractionProbe(...).freeze() first');
   const findings: WebFinding[] = [];
   const observations: Array<Record<string, unknown>> = [];
-  // Horizontal scope is explicit non-wrapping LTR native textareas only. Do not
-  // change wrap/direction to manufacture overflow or guess bidi caret movement.
+  // Do not rewrite merchant direction/wrapping. RTL uses a pure Hebrew sample
+  // and leftward/negative scrolling; mixed LTR/RTL includes surrogate/combining
+  // characters but tests only bounded end reachability, not visual/grapheme order.
+  // Input/select sizing and field-sizing adoption are separate from reachability.
   // Source: field sizing guide above permits normal internal scrolling; forms
   // calls for keyboard testing. The 80-character/82-key bounds are local policy.
   const sample = horizontal
-    ? 'abcdefghij'.repeat(8)
+    ? rtl
+      ? 'אבגדהוזחטי'.repeat(8)
+      : mixed
+        ? 'ab אבג مرحبا 12 😀e\u0301 '.repeat(4)
+        : 'abcdefghij'.repeat(8)
     : Array.from({ length: 12 }, (_, i) => `Probe line ${i + 1}`).join('\n');
-  const keyLimit = horizontal ? sample.length + 2 : 14;
+  const keyLimit = horizontal ? sample.length * (mixed ? 2 : 1) + 2 : 14;
   const previousFocus = await page.evaluateHandle(() => document.activeElement);
   const previousScroll = await page.evaluate(() => ({ x: scrollX, y: scrollY }));
   let dependent = false;
@@ -38,18 +54,28 @@ export async function inspectFieldContent(
   };
   page.context().on('request', activity);
   page.on('websocket', activity);
-  const controls = (await page
-    .locator(horizontal ? 'textarea[wrap="off" i]' : 'textarea')
-    .elementHandles()) as ElementHandle<HTMLTextAreaElement>[];
+  const controls = (await page.locator(selectorBase).elementHandles()) as ElementHandle<
+    HTMLTextAreaElement | HTMLInputElement
+  >[];
+  let probes = 0;
   try {
     for (const [index, control] of controls.slice(0, 5).entries()) {
       dependent = false;
-      const selector = `${horizontal ? 'textarea[wrap="off" i]' : 'textarea'} >> nth=${index}`;
+      const selector = `${selectorBase} >> nth=${index}`;
       const observation: Record<string, unknown> = { selector };
       let touched = false;
+      const owner = await control.evaluateHandle(el => ({
+        parent: el.parentNode,
+        form: el.form,
+        name: el.name,
+        type: el instanceof HTMLInputElement ? el.type : 'textarea',
+        defaultValue: el.defaultValue,
+        maxLength: el.maxLength,
+        autocomplete: el.autocomplete,
+      }));
       const state = () =>
         control.evaluate(
-          (el, { sample, horizontal }) => {
+          (el, { sample, horizontal, rtl, input, owner }) => {
             const s = getComputedStyle(el),
               r = el.getBoundingClientRect();
             let hidden = false;
@@ -61,11 +87,23 @@ export async function inspectFieldContent(
                 // Focus and ancestor visibility are owned in this document;
                 // skip shadow scopes instead of mutating before discovering a host.
                 el.getRootNode() === document &&
+                el.parentNode === owner.parent &&
+                el.form === owner.form &&
+                el.name === owner.name &&
+                el.defaultValue === owner.defaultValue &&
+                el.maxLength === owner.maxLength &&
+                el.autocomplete === owner.autocomplete &&
+                (el instanceof HTMLInputElement
+                  ? input &&
+                    el.type === owner.type &&
+                    ['text', 'search', 'tel', 'url'].includes(el.type)
+                  : !input) &&
                 (!horizontal ||
-                  (el.wrap.toLowerCase() === 'off' &&
-                    s.direction === 'ltr' &&
+                  ((input ||
+                    (el instanceof HTMLTextAreaElement && el.wrap.toLowerCase() === 'off')) &&
+                    s.direction === (rtl ? 'rtl' : 'ltr') &&
                     !s.unicodeBidi.includes('override') &&
-                    s.whiteSpace === 'pre')) &&
+                    (input || s.whiteSpace === 'pre'))) &&
                 !el.matches(':disabled,[readonly],[aria-disabled="true"]') &&
                 !el.closest(
                   '[hidden],[inert],[aria-hidden="true"],[contenteditable]:not([contenteditable="false"])',
@@ -91,12 +129,13 @@ export async function inspectFieldContent(
               top: el.scrollTop,
               left: el.scrollLeft,
               paddingRight: parseFloat(s.paddingRight) || 0,
+              paddingLeft: parseFloat(s.paddingLeft) || 0,
               paddingBottom: parseFloat(s.paddingBottom) || 0,
               caretAtEnd: el.selectionStart === sample.length && el.selectionEnd === sample.length,
               animating: el.getAnimations({ subtree: true }).some(a => a.playState === 'running'),
             };
           },
-          { sample, horizontal },
+          { sample, horizontal, rtl, input, owner },
         );
       const keyboard = await control.evaluateHandle((el, keyName) => {
         const evidence = { seen: false, cancelled: false };
@@ -122,6 +161,11 @@ export async function inspectFieldContent(
           });
           continue;
         }
+        if (probes >= mutationLimit) {
+          Object.assign(observation, { status: 'not-probed', reason: 'mutation-limit' });
+          continue;
+        }
+        probes++;
         touched = true;
         await control.fill(sample, { timeout: 1500 });
         await page.evaluate(
@@ -189,15 +233,17 @@ export async function inspectFieldContent(
         const keys = await keyboard.evaluate(k => k.evidence);
         // Source: https://drafts.csswg.org/cssom-view/#scrolling-area
         // The scrollable area includes bottom padding. Native caret scrolling may
-        // expose the text end without exposing trailing blank bottom/right padding
+        // expose the text end without exposing trailing blank padding (left for RTL)
         // (Firefox observed range=50, top=42, padding=8). Compare the text end,
         // not mandatory scrollbar exhaustion; this is not glyph/ancestor visibility.
+        // CSSOM View uses a rightward-increasing x coordinate. RTL text that
+        // grows leftward therefore reaches its end at a negative scrollLeft.
         const textRange = Math.max(
           0,
-          end.range - (horizontal ? end.paddingRight : end.paddingBottom),
+          end.range - (horizontal ? (rtl ? end.paddingLeft : end.paddingRight) : end.paddingBottom),
         );
         const tailInScrollport =
-          textRange <= 2 || (horizontal ? end.left : end.top) >= textRange - 3;
+          textRange <= 2 || (horizontal ? (rtl ? -end.left : end.left) : end.top) >= textRange - 3;
         const reached = end.caretAtEnd && tailInScrollport;
         const blocked = !reached && keys.seen && keys.cancelled;
         Object.assign(observation, {
@@ -208,6 +254,9 @@ export async function inspectFieldContent(
               ? 'authored-arrow-cancellation'
               : 'native-keyboard-policy-or-layout-unverified',
           axis,
+          variant,
+          direction: rtl ? 'rtl' : 'ltr',
+          keyName,
           sampleLines: horizontal ? 1 : 12,
           sampleCharacters: sample.length,
           keyLimit,
@@ -215,20 +264,31 @@ export async function inspectFieldContent(
           caretAtEnd: end.caretAtEnd,
           tailInScrollport,
           geometry: horizontal
-            ? { range: end.range, left: end.left, paddingRight: end.paddingRight }
+            ? {
+                range: end.range,
+                left: end.left,
+                paddingRight: end.paddingRight,
+                paddingLeft: end.paddingLeft,
+              }
             : { range: end.range, top: end.top, paddingBottom: end.paddingBottom },
           keyboard: keys,
         });
         if (blocked)
           findings.push({
-            rule: horizontal
-              ? 'field-content-horizontal-navigation'
-              : 'field-content-arrow-navigation',
+            rule: input
+              ? 'field-content-input-navigation'
+              : rtl
+                ? 'field-content-rtl-navigation'
+                : mixed
+                  ? 'field-content-bidi-navigation'
+                  : horizontal
+                    ? 'field-content-horizontal-navigation'
+                    : 'field-content-arrow-navigation',
             guide: 'form-fields-automatically-fit-contents',
             severity: 'warning',
             selector,
             evidence: { caretAtEnd: end.caretAtEnd, tailInScrollport, keyboard: keys },
-            recommendation: `Review cancelled textarea ${keyName} editing: the bounded ${horizontal ? 'non-wrapping' : 'multiline'} sample did not reach its end. Preserve native editing or an equivalent keyboard path; automatic sizing is optional.`,
+            recommendation: `Review cancelled ${input ? 'input' : 'textarea'} ${keyName} editing: the bounded ${horizontal ? 'non-wrapping' : 'multiline'} sample did not reach its end. Preserve native editing or an equivalent keyboard path; automatic sizing is optional.`,
           });
       } catch {
         Object.assign(observation, {
@@ -238,23 +298,37 @@ export async function inspectFieldContent(
       } finally {
         observation.restoration = touched
           ? await control
-              .evaluate((el, sample) => {
-                if (
-                  !el.isConnected ||
-                  el.value !== sample ||
-                  el.matches(':disabled,[readonly],[aria-disabled="true"]') ||
-                  el.closest('[inert],[aria-hidden="true"]')
-                )
-                  return { status: 'not-restored', reason: 'ownership-changed' };
-                Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(
-                  el,
-                  '',
-                );
-                el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-                el.scrollTop = 0;
-                el.scrollLeft = 0;
-                return { status: el.isConnected && el.value === '' ? 'restored' : 'not-restored' };
-              }, sample)
+              .evaluate(
+                (el, { sample, owner }) => {
+                  if (
+                    !el.isConnected ||
+                    el.value !== sample ||
+                    el.parentNode !== owner.parent ||
+                    el.form !== owner.form ||
+                    el.name !== owner.name ||
+                    el.defaultValue !== owner.defaultValue ||
+                    el.maxLength !== owner.maxLength ||
+                    el.autocomplete !== owner.autocomplete ||
+                    (el instanceof HTMLInputElement && el.type !== owner.type) ||
+                    el.matches(':disabled,[readonly],[aria-disabled="true"]') ||
+                    el.closest('[inert],[aria-hidden="true"]')
+                  )
+                    return { status: 'not-restored', reason: 'ownership-changed' };
+                  Object.getOwnPropertyDescriptor(
+                    el instanceof HTMLInputElement
+                      ? HTMLInputElement.prototype
+                      : HTMLTextAreaElement.prototype,
+                    'value',
+                  )!.set!.call(el, '');
+                  el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+                  el.scrollTop = 0;
+                  el.scrollLeft = 0;
+                  return {
+                    status: el.isConnected && el.value === '' ? 'restored' : 'not-restored',
+                  };
+                },
+                { sample, owner },
+              )
               .catch(() => ({ status: 'not-restored', reason: 'control-unavailable' }))
           : { status: 'unchanged' };
         // Restore only while focus still belongs to this retained control. Never
@@ -278,6 +352,7 @@ export async function inspectFieldContent(
         }
         await keyboard.evaluate(k => k.dispose()).catch(() => {});
         await keyboard.dispose();
+        await owner.dispose();
         observations.push(observation);
       }
     }
@@ -291,6 +366,12 @@ export async function inspectFieldContent(
     observations,
     findings,
     limit: 5,
+    mutationLimit,
+    probes,
+    variant,
+    keyName,
+    graphemeAndVisualOrderVerified: false,
+    imeVerified: false,
     axis,
     sampleLines: horizontal ? 1 : 12,
     sampleCharacters: sample.length,
@@ -303,4 +384,14 @@ export async function inspectFieldContent(
 
 export async function inspectHorizontalFieldContent(page: Page) {
   return inspectFieldContent(page, 'horizontal');
+}
+
+export async function inspectRtlFieldContent(page: Page) {
+  return inspectFieldContent(page, 'horizontal', 'rtl');
+}
+export async function inspectBidiFieldContent(page: Page) {
+  return inspectFieldContent(page, 'horizontal', 'bidi');
+}
+export async function inspectInputFieldContent(page: Page) {
+  return inspectFieldContent(page, 'horizontal', 'input');
 }

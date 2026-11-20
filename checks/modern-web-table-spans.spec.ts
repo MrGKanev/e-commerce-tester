@@ -44,15 +44,15 @@ const cases = [
   {
     name: 'implicit-rows',
     body: '<tr><th rowspan="3">A</th><th>B</th></tr><tr><td>C</td></tr>',
-    reason: 'implicit-rows-unverified',
+    overlaps: 0,
   },
   {
     name: 'discard-partial',
     body:
       '<tbody>' +
       overlap +
-      '</tbody><tbody><tr><td rowspan="2">Later implicit row</td></tr></tbody>',
-    reason: 'implicit-rows-unverified',
+      '</tbody><tbody><tr><td rowspan="101">Later unbounded implied row</td></tr></tbody>',
+    reason: 'model-row-limit',
   },
   { name: 'column-boundary', body: '<tr><th colspan="128">A</th></tr>', overlaps: 0 },
   { name: 'column-limit', body: '<tr><th colspan="129">A</th></tr>', reason: 'column-limit' },

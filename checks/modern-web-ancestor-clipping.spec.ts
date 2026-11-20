@@ -89,9 +89,33 @@ test('touch/keyboard descriptor state survives guarded checkbox and presentation
     touchPoints: navigator.maxTouchPoints,
   }));
   expect(descriptor.coarse).toBe(touch);
-  expect(descriptor.touchPoints > 0).toBe(touch);
-  if (touch) await page.locator('label').tap();
-  else {
+  // WebKit on this macOS runner exposes zero maxTouchPoints even with
+  // hasTouch/coarse pointer enabled. Verify actual trusted pointer delivery
+  // instead of manufacturing a navigator value or calling this a real iPhone.
+  if (!info.project.name.includes('WebKit')) expect(descriptor.touchPoints > 0).toBe(touch);
+  await info.attach('emulated-input-capabilities.json', {
+    body: JSON.stringify({
+      project: info.project.name,
+      hasTouch: touch,
+      ...descriptor,
+      realDeviceVerified: false,
+    }),
+    contentType: 'application/json',
+  });
+  await page.evaluate(() => {
+    document.addEventListener('pointerdown', event => {
+      (window as unknown as { probePointer: { type: string; trusted: boolean } }).probePointer = {
+        type: event.pointerType,
+        trusted: event.isTrusted,
+      };
+    });
+  });
+  if (touch) {
+    await page.locator('label').tap();
+    expect(
+      await page.evaluate(() => (window as unknown as { probePointer: unknown }).probePointer),
+    ).toEqual({ type: 'touch', trusted: true });
+  } else {
     await page.locator('input').focus();
     await page.keyboard.press('Space');
   }
@@ -104,9 +128,9 @@ test('touch/keyboard descriptor state survives guarded checkbox and presentation
     expect(checkboxes.findings).toEqual([]);
     expect(checkboxes.observations[0]).toMatchObject({
       keysSent: 2,
-      before: { checked: true },
-      toggled: { checked: false },
-      restored: { checked: true },
+      before: { checked: 'true' },
+      toggled: { checked: 'false' },
+      restored: { checked: 'true' },
       restoration: { status: 'restored', method: 'keyboard' },
     });
     const presentation = await inspectPresentation(page);
@@ -123,3 +147,25 @@ test('touch/keyboard descriptor state survives guarded checkbox and presentation
     ).toEqual({ reduced: true, dark: true, coarse: touch });
   }
 });
+
+for (const scenario of ['candidate-limit', 'depth-limit', 'display-contents', 'opacity-zero']) {
+  test(`ancestor clipping exclusions: ${scenario}`, async ({ page }) => {
+    const button = '<button type="button" class="mt-24 block h-11 w-24">Continue</button>';
+    const depth = '<div>'.repeat(33) + button + '</div>'.repeat(33);
+    await page.route('**/*', route =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: `<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Clipping bounds</title><style>${css}</style><body><main><h1>Clipping bounds</h1>${scenario === 'candidate-limit' ? '<input hidden>'.repeat(100) : ''}<div class="${scenario === 'display-contents' ? 'contents' : 'flow-root'} h-16 w-48 overflow-hidden ${scenario === 'opacity-zero' ? 'opacity-0' : ''}">${scenario === 'depth-limit' ? depth : button}</div></main></body></html>`,
+      }),
+    );
+    await page.goto('http://127.0.0.1:45996/clipping-bounds');
+    const report = await inspectPresentation(page);
+    expect(
+      report.findings.filter(item => item.rule === 'presentation-control-ancestor-clip'),
+    ).toEqual([]);
+    // Hidden text inputs consume the initial candidate budget; a later
+    // control must not be sampled by filtering and then refilling that budget.
+    if (scenario === 'candidate-limit')
+      expect(report.coverage.states[0].ancestorSampleLimited).toBe(true);
+  });
+}

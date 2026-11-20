@@ -16,7 +16,7 @@ for (const headersAvailable of [true, false])
           'content-security-policy-report-only': 'report-to owned-private-group',
           'reporting-endpoints': 'other="/owned-private-receiver?token=owned-private-value"',
         },
-        body: '<!doctype html><html lang="en"><head><title>Local shared page</title><link rel="canonical" href="http://127.0.0.1:45986/"></head><body><main><h1>Local shared page</h1><p>Welcome to the store.</p><table><caption>Sizes</caption><colgroup span="2"></colgroup><tr><th id="page-group" colspan="2" scope="colgroup">Group</th></tr><tr><th id="page-size" headers="page-group" scope="col">Size</th><th id="page-length" headers="page-group" scope="col">Length</th></tr><tr><td headers="page-group page-size">Small</td><td headers="page-group page-length">Ten</td></tr></table></main></body></html>',
+        body: '<!doctype html><html lang="en"><head><title>Local shared page</title><link rel="canonical" href="http://127.0.0.1:45986/"></head><body><main><h1>Local shared page</h1><p>Welcome to the store.</p><table><caption>Sizes</caption><colgroup span="2"></colgroup><tr><th id="page-group" colspan="2" scope="colgroup">Group</th></tr><tr><th id="page-size" headers="page-group" scope="col">Size</th><th id="page-length" headers="page-group" scope="col">Length</th></tr><tr><td headers="page-group page-size">Small</td><td headers="page-group page-length">Ten</td></tr></table><table><caption>Availability</caption><tr><th scope="col">Size</th><th scope="col">Availability</th></tr><tr><td>Small</td><td>Available</td></tr></table><table><caption>Implied tail</caption><tr><th rowspan="3" scope="rowgroup">Period</th><td rowspan="3">Value</td></tr></table></main></body></html>',
       });
     });
     const response = await page.goto('http://127.0.0.1:45986/');
@@ -53,10 +53,109 @@ for (const headersAvailable of [true, false])
       spanOccupancy: {
         status: 'observed',
         overlapPlacements: 0,
+        groupScopes: {
+          status: 'observed',
+          columnGroupHeaders: 1,
+          columnGroupCandidatePairs: 0,
+          explicitHeadersCells: 4,
+          unanchoredColumnGroupHeaders: 0,
+          completeHeaderAssociationsVerified: false,
+        },
+        gridCoverage: {
+          status: 'observed',
+          declaredColumns: 2,
+          columnGroups: 1,
+          columnElements: 0,
+          uncoveredSlots: 0,
+          rowsWithoutAnchors: 0,
+          columnsWithoutAnchors: 0,
+        },
         automaticHeaderAssociationsVerified: false,
         otherTableModelErrorsVerified: false,
       },
     });
+    // Source: https://html.spec.whatwg.org/multipage/tables.html#forming-a-table
+    // Serialize observed simple and declared-column grids
+    // through Pages without a second document visit or any active probing.
+    expect(evidence.dataWidgets.observations.tables[1].spanOccupancy.gridCoverage).toMatchObject({
+      status: 'observed',
+      checkedRows: 2,
+      checkedColumns: 2,
+      uncoveredSlots: 0,
+      rowsWithoutAnchors: 0,
+      columnsWithoutAnchors: 0,
+      headerAssociationsVerified: false,
+      renderedGapsVerified: false,
+    });
+    // Source: west/north header scanning does not replace explicit headers.
+    // https://html.spec.whatwg.org/multipage/tables.html#algorithm-for-assigning-header-cells
+    expect(evidence.dataWidgets.observations.tables[0].spanOccupancy.headerScan).toMatchObject({
+      status: 'observed',
+      explicitHeadersCells: 4,
+      scannedPairs: 0,
+    });
+    expect(evidence.dataWidgets.observations.tables[1].spanOccupancy.headerScan).toMatchObject({
+      status: 'observed',
+      columnScanPairs: 2,
+      automaticDataCells: 2,
+      dataCellsWithScannedHeaders: 2,
+      completeHeaderAssociationsVerified: false,
+      speechVerified: false,
+    });
+    // Source: final header assignment after explicit precedence and set cleanup.
+    // https://html.spec.whatwg.org/multipage/tables.html#algorithm-for-assigning-header-cells
+    expect(
+      evidence.dataWidgets.observations.tables[0].spanOccupancy.headerAssignments,
+    ).toMatchObject({
+      status: 'observed',
+      assignedPairs: 6,
+      explicitPairs: 6,
+      explicitCells: 4,
+      dataCellsWithHeaders: 2,
+      structuralAssignmentSubsetVerified: true,
+      accessibilityTreeVerified: false,
+    });
+    expect(
+      evidence.dataWidgets.observations.tables[1].spanOccupancy.headerAssignments,
+    ).toMatchObject({ status: 'observed', assignedPairs: 2, automaticPairs: 2 });
+    expect(
+      evidence.dataWidgets.observations.tables[2].spanOccupancy.headerAssignments,
+    ).toMatchObject({ status: 'observed', assignedPairs: 1, automaticPairs: 1 });
+    // HTML group closure creates two logical rows without DOM tr elements.
+    // https://html.spec.whatwg.org/multipage/tables.html#forming-a-table
+    expect(evidence.dataWidgets.observations.tables[2].spanOccupancy).toMatchObject({
+      status: 'observed',
+      checkedRows: 1,
+      modeledRows: 3,
+      impliedRows: 2,
+      groupScopes: {
+        status: 'observed',
+        rowGroupHeaders: 1,
+        rowGroupCandidatePairs: 1,
+        speechVerified: false,
+      },
+      gridCoverage: {
+        checkedRows: 3,
+        declaredRows: 1,
+        modeledRows: 3,
+        impliedRows: 2,
+        uncoveredSlots: 0,
+        rowsWithoutAnchors: 2,
+      },
+    });
+    expect(evidence.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          rule: 'table-grid-anchors',
+          severity: 'warning',
+          evidence: expect.objectContaining({
+            modeledRows: 3,
+            impliedRows: 2,
+            rowsWithoutAnchors: 2,
+          }),
+        }),
+      ]),
+    );
     if (headersAvailable) {
       expect(evidence.documentPolicies).toMatchObject({
         responseHeadersObserved: true,

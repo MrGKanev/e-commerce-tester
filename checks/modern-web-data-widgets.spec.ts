@@ -150,9 +150,11 @@ test('empty scope, sample limits and passive execution remain explicit', async (
 test('unknown authored header scope is advisory while standard and omitted scopes are accepted', async ({
   page,
 }) => {
+  // Keep keyword parsing separate from the colgroup anchor constraint.
+  // https://html.spec.whatwg.org/multipage/tables.html#attr-th-scope
   await load(
     page,
-    '<table><tr><th id="bad-scope" scope="private-invalid-axis">Bad</th><th scope="ROW">Row</th><th scope="col">Column</th><th scope="rowgroup">Rows</th><th scope="colgroup">Columns</th><th>Auto</th><th scope="">Empty auto</th></tr></table>',
+    '<table><colgroup span="7"></colgroup><tr><th id="bad-scope" scope="private-invalid-axis">Bad</th><th scope="ROW">Row</th><th scope="col">Column</th><th scope="rowgroup">Rows</th><th scope="colgroup">Columns</th><th>Auto</th><th scope="">Empty auto</th></tr></table>',
   );
   const report = await inspectDataWidgets(page);
   expect(report.findings).toEqual([

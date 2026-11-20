@@ -41,8 +41,8 @@ menu.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDe
 }`;
 const fixture = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Local storefront Modern Web entry fixture</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/tailwind.css"></head><body class="bg-white text-slate-900"><main class="mx-auto max-w-3xl space-y-3 p-4"><h1 class="text-2xl font-bold">Local store fixture</h1><div id="entry-table-scroll" role="region" tabindex="0" aria-label="Local comparison" class="w-[240px] overflow-x-auto border focus-visible:outline-2"><table class="w-[900px]"><caption>Comparison</caption><tr><th id="entry-header" headers="entry-header entry-header" scope="col">Item</th><td rowspan="2">Local option</td></tr><tr><td colspan="2">Local span</td></tr></table></div>
 <form><label for="country">Country</label><select id="country" name="country" autocomplete="country" required aria-invalid="false"><option value="" disabled selected>Choose country</option><option value="bg">Bulgaria</option></select><p id="country-error" hidden>Choose a country.</p><div id="announcer" aria-live="polite"></div></form>
-<form><label for="entry-message">Message</label><textarea id="entry-message" rows="2" class="block w-full overflow-auto rounded border p-2"></textarea><label for="entry-long-line">Long message</label><textarea id="entry-long-line" wrap="off" rows="2" class="block w-64 max-w-full overflow-auto rounded border p-2"></textarea><label for="address">Address</label><input id="address" required name="address1" autocomplete="shipping street-address"><label for="account">Account email</label><input id="account" type="email" autocomplete="username" spellcheck="false"><label for="password">New password</label><input id="password" type="password" autocomplete="new-password"></form>
-<details><summary>Delivery details</summary><p>Local delivery information.</p></details><label><input type="checkbox" role="switch">Preview preference</label><label for="range">Preview quantity</label><input id="range" type="range" min="0" max="10" value="4"><section aria-roledescription="carousel" role="region" aria-label="Local gallery"><button type="button" aria-label="Previous slide">Previous</button><button type="button" aria-label="Next slide">Next</button><div role="group" aria-roledescription="slide" aria-label="1 of 2" id="slide-a">First view</div><div role="group" aria-roledescription="slide" aria-label="2 of 2" id="slide-b" hidden>Second view</div></section>${compositeFixture}<section aria-label="Questions"><h2><button type="button" id="entry-question" aria-expanded="false" class="rounded border p-2 focus-visible:outline-2">Local question</button></h2><div id="entry-answer" hidden>Local answer</div></section>${menuNavigationFixture}</main><script>${compositeScript}${menuNavigationScript}${switchingScript}
+<form><label for="entry-message">Message</label><textarea id="entry-message" rows="2" class="block w-full overflow-auto rounded border p-2"></textarea><label for="entry-long-line">Long message</label><textarea id="entry-long-line" wrap="off" rows="2" class="block w-64 max-w-full overflow-auto rounded border p-2"></textarea><label for="entry-rtl-line">RTL message</label><textarea id="entry-rtl-line" wrap="off" dir="rtl" rows="2" class="block w-64 max-w-full overflow-auto rounded border p-2"></textarea><label for="entry-input-line">Line editing</label><input id="entry-input-line" type="text" name="local-line" class="block w-48 max-w-full rounded border p-2"><label for="address">Address</label><input id="address" required name="address1" autocomplete="shipping street-address"><label for="account">Account email</label><input id="account" type="email" autocomplete="username" spellcheck="false"><label for="password">New password</label><input id="password" type="password" autocomplete="new-password"></form>
+<details><summary>Delivery details</summary><p>Local delivery information.</p></details><label><input type="checkbox" role="switch">Preview preference</label><label for="range">Preview quantity</label><input id="range" type="range" min="0" max="10" value="4"><section aria-roledescription="carousel" role="region" aria-label="Local gallery"><button type="button" aria-label="Previous slide">Previous</button><button type="button" aria-label="Next slide">Next</button><div role="group" aria-roledescription="slide" aria-label="1 of 2" id="slide-a">First view</div><div role="group" aria-roledescription="slide" aria-label="2 of 2" id="slide-b" hidden>Second view</div></section>${compositeFixture}<section aria-label="Questions"><h2><button type="button" id="entry-question" aria-expanded="false" class="rounded border p-2 focus-visible:outline-2">Local question</button></h2><div id="entry-answer" hidden>Local answer</div></section>${menuNavigationFixture}<table class="w-full border-separate border-spacing-2"><caption>Local grid model</caption><colgroup span="3"></colgroup><tbody><tr><th colspan="2" scope="colgroup">Group</th></tr><tr><td rowspan="2">Local value</td></tr></tbody></table><table class="w-full border-separate border-spacing-2"><caption>Local scope anchor</caption><tbody><tr><th scope="colgroup">Local ungrouped header</th><td>Local value</td></tr></tbody></table><table class="w-full border-separate border-spacing-2"><caption>Local header scan</caption><tr><th scope="col">Item</th><th scope="col">Value</th></tr><tr><th scope="row">Sample</th><td>Local</td></tr></table><div class="flow-root h-8 overflow-hidden"><input type="text" readonly aria-label="Local partial clip" class="mt-4 block h-11 w-32"></div><div class="flow-root h-16 w-48 overflow-hidden"><button type="button" disabled class="mt-24 block h-11 w-24">Local clipped control</button></div></main><script>${compositeScript}${menuNavigationScript}${switchingScript}
 document.getElementById('entry-table-scroll').onkeydown=event=>{if(['ArrowRight','ArrowLeft'].includes(event.key)){event.preventDefault();event.currentTarget.scrollLeft+=event.key==='ArrowRight'?40:-40;}};
 const slides=[document.getElementById('slide-a'),document.getElementById('slide-b')];document.querySelectorAll('[aria-label="Next slide"],[aria-label="Previous slide"]').forEach(button=>button.addEventListener('click',()=>{slides.forEach(slide=>slide.hidden=!slide.hidden);fetch('/probe-carousel',{method:'POST'}).catch(()=>{});}));
 const select=document.getElementById('country'),error=document.getElementById('country-error');
@@ -199,6 +199,51 @@ async function main() {
         assert.equal(passive.dataWidgets.observations.tables[0].spanOccupancy.status, 'observed');
         assert.equal(passive.dataWidgets.observations.tables[0].spanOccupancy.overlapPlacements, 1);
         assert.equal(passive.dataWidgets.observations.tables[0].spanOccupancy.renderedOverlapVerified, false);
+        // Sources: complete-grid requirement and forming-a-table step 20.
+        // https://html.spec.whatwg.org/multipage/tables.html#forming-a-table
+        // Empty positions and absent anchors remain separate numeric advisories.
+        assert.ok(passive.findings.some(item => item.rule === 'table-grid-gap'));
+        assert.ok(passive.findings.some(item => item.rule === 'table-grid-anchors'));
+        assert.equal(passive.dataWidgets.observations.tables[1].spanOccupancy.gridCoverage.status, 'observed');
+        // Step 9: colgroup establishes width 3 even though row cells reach only 2.
+        assert.equal(passive.dataWidgets.observations.tables[1].spanOccupancy.gridCoverage.declaredColumns, 3);
+        assert.equal(passive.dataWidgets.observations.tables[1].spanOccupancy.gridCoverage.uncoveredSlots, 5);
+        assert.equal(passive.dataWidgets.observations.tables[1].spanOccupancy.gridCoverage.columnsWithoutAnchors, 2);
+        // Ending the row group adds one logical row; DOM tr count stays two.
+        // https://html.spec.whatwg.org/multipage/tables.html#forming-a-table
+        assert.equal(passive.dataWidgets.observations.tables[1].spanOccupancy.checkedRows, 2);
+        assert.equal(passive.dataWidgets.observations.tables[1].spanOccupancy.modeledRows, 3);
+        assert.equal(passive.dataWidgets.observations.tables[1].spanOccupancy.impliedRows, 1);
+        assert.equal(passive.dataWidgets.observations.tables[1].spanOccupancy.gridCoverage.rowsWithoutAnchors, 1);
+
+        // Scope's colgroup keyword requires a real anchor group. Colspan alone
+        // is insufficient; verify the advisory and separate candidate counters.
+        // https://html.spec.whatwg.org/multipage/tables.html#attr-th-scope
+        assert.ok(passive.findings.some(item => item.rule === 'table-header-colgroup-anchor'));
+        assert.equal(passive.dataWidgets.observations.tables[1].spanOccupancy.groupScopes.columnGroupCandidatePairs, 1);
+        assert.equal(passive.dataWidgets.observations.tables[1].spanOccupancy.groupScopes.unanchoredColumnGroupHeaders, 0);
+        assert.equal(passive.dataWidgets.observations.tables[2].spanOccupancy.groupScopes.unanchoredColumnGroupHeaders, 1);
+        assert.equal(passive.dataWidgets.observations.tables[2].spanOccupancy.groupScopes.completeHeaderAssociationsVerified, false);
+        // Source: native west/north scanning; row header itself also receives
+        // its column header. Three unique pairs are distinct from group pairs.
+        // https://html.spec.whatwg.org/multipage/tables.html#algorithm-for-assigning-header-cells
+        const headerScan = passive.dataWidgets.observations.tables[3].spanOccupancy.headerScan;
+        assert.equal(headerScan.status, 'observed');
+        assert.equal(headerScan.rowScanPairs, 1);
+        assert.equal(headerScan.columnScanPairs, 2);
+        assert.equal(headerScan.scannedPairs, 3);
+        assert.equal(headerScan.automaticDataCells, 1);
+        assert.equal(headerScan.dataCellsWithScannedHeaders, 1);
+        assert.equal(headerScan.completeHeaderAssociationsVerified, false);
+        // Final bounded assignment unions directional/group sets, but explicit
+        // headers overrides automatic selection. AX/speech remain unverified.
+        const assignments = passive.dataWidgets.observations.tables[3].spanOccupancy.headerAssignments;
+        assert.equal(assignments.status, 'observed');
+        assert.equal(assignments.assignedPairs, 3);
+        assert.equal(assignments.structuralAssignmentSubsetVerified, true);
+        assert.equal(assignments.accessibilityTreeVerified, false);
+        assert.equal(passive.dataWidgets.observations.tables[1].spanOccupancy.headerAssignments.assignedPairs, 1);
+
         assert.ok(passive.findings.some(item => item.rule === 'policy-csp-reporting-endpoint'));
         assert.doesNotMatch(
           JSON.stringify(passive),
@@ -208,6 +253,18 @@ async function main() {
           passive.findings.some(item => item.severity === 'error'),
           false,
         );
+        // Source: form-factor-adaptation forbids parent overflow clipping.
+        // Require advisory geometry in real Full output without changing verdicts.
+        // https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/user-experience/form-factor-adaptation.md
+        const presentation = attachmentJson(
+          result.attachments.find(item => item.name === 'modern-web-presentation.json'),
+        );
+        assert.ok(presentation.findings.some(item => item.rule === 'presentation-control-ancestor-clip'));
+        assert.ok(presentation.findings.some(item => item.rule === 'presentation-control-partial-ancestor-clip'));
+        assert.ok(presentation.coverage.states.some(state => state.fieldSizing?.some(field => field.kind === 'select')));
+        assert.ok(presentation.coverage.states.some(state => state.fieldSizing?.some(field => field.kind === 'input')));
+
+        assert.ok(presentation.coverage.states.some(state => state.partialControlAndGlyphClippingVerified === false));
         const interactions = attachmentJson(
           result.attachments.find(item => item.name === 'modern-web-interactions.json'),
         );
@@ -225,6 +282,20 @@ async function main() {
         assert.equal(interactions.coverage.horizontalFieldContent.observations[0].tailInScrollport, true);
         assert.equal(interactions.coverage.horizontalFieldContent.observations[0].overflow, true);
         assert.equal(interactions.coverage.horizontalFieldContent.observations[0].restoration.status, 'restored');
+        // Source: forms keyboard testing + fixed/internal-scroll field fallback.
+        // RTL uses the native negative scrollLeft direction. Bidi verifies the
+        // bounded end only; visual/grapheme/IME order is explicitly unverified.
+        const rtl = interactions.coverage.rtlFieldContent.observations.find(item => item.status === 'observed');
+        assert.equal(rtl.caretAtEnd, true);
+        assert.equal(rtl.tailInScrollport, true);
+        assert.equal(rtl.restoration.status, 'restored');
+        assert.equal(interactions.coverage.bidiFieldContent.observations[0].caretAtEnd, true);
+        assert.equal(interactions.coverage.bidiFieldContent.observations[0].tailInScrollport, true);
+        assert.equal(interactions.coverage.bidiFieldContent.observations[0].restoration.status, 'restored');
+        assert.equal(interactions.coverage.inputFieldContent.observations[0].caretAtEnd, true);
+        assert.equal(interactions.coverage.inputFieldContent.observations[0].restoration.status, 'restored');
+        assert.equal(interactions.coverage.inputFieldContent.mutationLimit, 1);
+
         assert.equal(interactions.coverage.fields[0].status, 'observed');
         assert.equal(interactions.coverage.fields[0].restoration.status, 'restored');
         assert.equal(interactions.coverage.selects[0].status, 'observed');
