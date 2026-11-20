@@ -1,3 +1,10 @@
+// Rule sources (implementation rationale; see docs/MODERN-WEB.md for remaining gaps):
+// html: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/html/html.md
+// accessibility: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/accessibility/accessibility.md
+// security: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/security/security.md
+// privacy: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/privacy/privacy.md
+// Base registry implements observable advisory contracts, not adoption requirements.
+// Only definite broken active descriptions block; upstream sync alone changes no verdict.
 import { inspectDataWidgets } from './modern-web-data-widgets';
 import { inspectComponents } from './modern-web-components';
 import { inspectFormPurposes } from './modern-web-forms';

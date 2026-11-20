@@ -21,3 +21,21 @@
 @source '../checks/modern-web-menu-navigation.spec.ts';
 @source '../checks/modern-web-menubar-switching.spec.ts';
 @source '../checks/security-monitoring.spec.ts';
+
+@source '../checks/modern-web-table-scroll.spec.ts';
+
+@source '../checks/modern-web-field-content.spec.ts';
+
+@source '../checks/modern-web-table-headers.spec.ts';
+
+@source '../checks/modern-web-field-horizontal.spec.ts';
+
+@source '../checks/modern-web-select-ownership.spec.ts';
+
+@source '../checks/modern-web-select-scope.spec.ts';
+
+@source '../checks/modern-web-checkbox-ownership.spec.ts';
+
+@source '../checks/modern-web-table-spans.spec.ts';
+
+@source '../checks/modern-web-ancestor-clipping.spec.ts';

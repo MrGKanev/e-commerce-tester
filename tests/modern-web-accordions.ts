@@ -1,3 +1,7 @@
+// Rule sources (implementation rationale; see docs/MODERN-WEB.md for remaining gaps):
+// accordion: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/ui-components/accordion.md
+// Toggle only retained heading-owned safe native buttons under quarantine.
+// Check authored expanded/visible/focus state and restore; do not submit forms.
 import type { ElementHandle, Page } from '@playwright/test';
 import type { WebFinding } from './modern-web';
 

@@ -1,3 +1,8 @@
+// Rule sources (implementation rationale; see docs/MODERN-WEB.md for remaining gaps):
+// forms: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/forms/forms.md
+// autofill-sign-in-form: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/forms/autofill-sign-in-form.md
+// Observe authored field purposes and constraints without signing in or submitting.
+// Autofill hints are not evidence that an OS/password manager completed a workflow.
 import type { Page } from '@playwright/test';
 import type { WebFinding } from './modern-web';
 import { safeAuditUrl } from './modern-web';

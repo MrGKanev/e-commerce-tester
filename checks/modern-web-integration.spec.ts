@@ -20,6 +20,13 @@ for (const platform of ['shopify', 'woocommerce'])
       if (route.request().method() !== 'GET') writes++;
       return route.fulfill({
         contentType: 'text/html',
+        // Reporting API endpoint processing: a matching name is not a usable URL.
+        // https://www.w3.org/TR/reporting-1/#process-header
+        // Carry the advisory through the real shared inspector/attachment path.
+        headers: {
+          'content-security-policy-report-only': 'report-to integration-url',
+          'reporting-endpoints': 'integration-url="data:text/plain,private-integration-token"',
+        },
         body: `<!doctype html><html lang="en"><head><title>Local ${platform} probe integration</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body class="bg-white text-slate-900"><main class="mx-auto max-w-3xl space-y-6 p-4 sm:p-8"><h1 class="text-2xl font-bold">Local store fixture</h1><p>Combined store observations</p><form class="space-y-3"><label class="block" for="country">Country</label><select id="country" required aria-invalid="false" class="w-full rounded border border-slate-500 p-2"><option value="">Choose</option><option value="bg">Bulgaria</option></select><p id="error" hidden>Choose a country.</p><div id="announcer" aria-live="polite"></div></form><details class="rounded border border-slate-300 p-3"><summary>Delivery details</summary><p>Local delivery information.</p></details><label class="flex gap-2"><input id="switch" type="checkbox" role="switch">Show details</label><label class="block" for="range">Quantity preview</label><input id="range" type="range" min="0" max="10" value="4" class="w-full"><section role="region" aria-roledescription="carousel" aria-label="Local gallery" class="space-y-3 rounded border border-slate-300 p-3"><div class="flex flex-wrap gap-3"><button type="button" aria-label="Previous slide" class="rounded border border-slate-500 px-3 py-2 focus-visible:outline-2">Previous</button><button type="button" aria-label="Next slide" class="rounded border border-slate-500 px-3 py-2 focus-visible:outline-2">Next</button></div><div id="slide-a" role="group" aria-roledescription="slide" aria-label="1 of 2">First gallery view</div><div id="slide-b" role="group" aria-roledescription="slide" aria-label="2 of 2" hidden>Second gallery view</div></section></main><script>
       document.querySelectorAll('[aria-label="Next slide"],[aria-label="Previous slide"]').forEach(button=>button.addEventListener('click',()=>{for(const id of ['slide-a','slide-b']){const slide=document.getElementById(id);slide.hidden=!slide.hidden;}}));
       const country=document.getElementById('country'),error=document.getElementById('error');
@@ -51,6 +58,15 @@ for (const platform of ['shopify', 'woocommerce'])
     expect(writes).toBe(0);
     expect(guard.counts().blockedRequests).toBeGreaterThan(0);
     expect(passive.documentPolicies.responseHeadersObserved).toBe(true);
+    expect(passive.findings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ rule: 'policy-csp-reporting-url', severity: 'warning' }),
+      ]),
+    );
+    const policyAttachment = info.attachments.find(item => item.name === 'modern-web.json')!;
+    expect(policyAttachment.body!.toString()).not.toMatch(
+      /private-integration-token|integration-url/,
+    );
     expect(passive.formPurposes.autofillBehaviorVerified).toBe(false);
     expect(passive.resilience.passive).toBe(true);
     expect(passive.components.closedRootsUnobservable).toBe(true);

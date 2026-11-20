@@ -1,3 +1,7 @@
+// Rule sources (implementation rationale; see docs/MODERN-WEB.md for remaining gaps):
+// carousel: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/ui-components/carousel.md
+// Only explicitly associated reversible next/previous controls are exercised.
+// No slide labels, autoplay semantics, gestures or asynchronous completion are guessed.
 import type { Page, ElementHandle } from '@playwright/test';
 import { safeAuditUrl, type WebFinding } from './modern-web';
 

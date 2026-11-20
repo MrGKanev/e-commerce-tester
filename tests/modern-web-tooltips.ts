@@ -1,3 +1,8 @@
+// Rule sources (implementation rationale; see docs/MODERN-WEB.md for remaining gaps):
+// position-aware-tooltips: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/ui-atoms/position-aware-tooltips.md
+// interest-triggered-tooltips: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/ui-behaviors/interest-triggered-tooltips.md
+// Use retained trigger/tooltip associations and bounded focus/pointer observations.
+// An absent hint within the window stays unverified; no Anchor/Interest API mandate.
 import type { Page, ElementHandle } from '@playwright/test';
 import { safeAuditUrl, type WebFinding } from './modern-web';
 

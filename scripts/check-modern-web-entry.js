@@ -39,10 +39,11 @@ nested.addEventListener('keydown',event=>{if(event.key==='ArrowRight'){event.pre
 child.addEventListener('keydown',event=>{if(['Escape','ArrowLeft'].includes(event.key)){event.preventDefault();event.stopPropagation();closeChild();nested.focus();}});
 menu.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();closeRoot();trigger.focus();}if(event.key==='Tab'){event.preventDefault();closeRoot();document.getElementById(event.shiftKey?'entry-menu-before':'entry-menu-after').focus();}});
 }`;
-const fixture = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Local storefront Modern Web entry fixture</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/tailwind.css"></head><body class="bg-white text-slate-900"><main class="mx-auto max-w-3xl space-y-3 p-4"><h1 class="text-2xl font-bold">Local store fixture</h1>
+const fixture = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Local storefront Modern Web entry fixture</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/tailwind.css"></head><body class="bg-white text-slate-900"><main class="mx-auto max-w-3xl space-y-3 p-4"><h1 class="text-2xl font-bold">Local store fixture</h1><div id="entry-table-scroll" role="region" tabindex="0" aria-label="Local comparison" class="w-[240px] overflow-x-auto border focus-visible:outline-2"><table class="w-[900px]"><caption>Comparison</caption><tr><th id="entry-header" headers="entry-header entry-header" scope="col">Item</th><td rowspan="2">Local option</td></tr><tr><td colspan="2">Local span</td></tr></table></div>
 <form><label for="country">Country</label><select id="country" name="country" autocomplete="country" required aria-invalid="false"><option value="" disabled selected>Choose country</option><option value="bg">Bulgaria</option></select><p id="country-error" hidden>Choose a country.</p><div id="announcer" aria-live="polite"></div></form>
-<form><label for="address">Address</label><input id="address" name="address1" autocomplete="shipping street-address"><label for="account">Account email</label><input id="account" type="email" autocomplete="username" spellcheck="false"><label for="password">New password</label><input id="password" type="password" autocomplete="new-password"></form>
+<form><label for="entry-message">Message</label><textarea id="entry-message" rows="2" class="block w-full overflow-auto rounded border p-2"></textarea><label for="entry-long-line">Long message</label><textarea id="entry-long-line" wrap="off" rows="2" class="block w-64 max-w-full overflow-auto rounded border p-2"></textarea><label for="address">Address</label><input id="address" required name="address1" autocomplete="shipping street-address"><label for="account">Account email</label><input id="account" type="email" autocomplete="username" spellcheck="false"><label for="password">New password</label><input id="password" type="password" autocomplete="new-password"></form>
 <details><summary>Delivery details</summary><p>Local delivery information.</p></details><label><input type="checkbox" role="switch">Preview preference</label><label for="range">Preview quantity</label><input id="range" type="range" min="0" max="10" value="4"><section aria-roledescription="carousel" role="region" aria-label="Local gallery"><button type="button" aria-label="Previous slide">Previous</button><button type="button" aria-label="Next slide">Next</button><div role="group" aria-roledescription="slide" aria-label="1 of 2" id="slide-a">First view</div><div role="group" aria-roledescription="slide" aria-label="2 of 2" id="slide-b" hidden>Second view</div></section>${compositeFixture}<section aria-label="Questions"><h2><button type="button" id="entry-question" aria-expanded="false" class="rounded border p-2 focus-visible:outline-2">Local question</button></h2><div id="entry-answer" hidden>Local answer</div></section>${menuNavigationFixture}</main><script>${compositeScript}${menuNavigationScript}${switchingScript}
+document.getElementById('entry-table-scroll').onkeydown=event=>{if(['ArrowRight','ArrowLeft'].includes(event.key)){event.preventDefault();event.currentTarget.scrollLeft+=event.key==='ArrowRight'?40:-40;}};
 const slides=[document.getElementById('slide-a'),document.getElementById('slide-b')];document.querySelectorAll('[aria-label="Next slide"],[aria-label="Previous slide"]').forEach(button=>button.addEventListener('click',()=>{slides.forEach(slide=>slide.hidden=!slide.hidden);fetch('/probe-carousel',{method:'POST'}).catch(()=>{});}));
 const select=document.getElementById('country'),error=document.getElementById('country-error');
 const sync=()=>{const invalid=!select.validity.valid;select.setAttribute('aria-invalid',String(invalid));error.hidden=!invalid;if(invalid)select.setAttribute('aria-describedby','country-error');else select.removeAttribute('aria-describedby');};
@@ -99,6 +100,8 @@ async function main() {
       response.writeHead(200, {
         'Content-Type': 'text/html; charset=utf-8',
         'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy-Report-Only': 'report-to owned-private-group',
+        'Reporting-Endpoints': 'unrelated="/owned-private-report?token=owned-report-secret"',
       });
       response.end(fixture);
     }
@@ -173,6 +176,34 @@ async function main() {
         assert.ok(passive.resilience);
         assert.ok(passive.components);
         assert.ok(passive.documentPolicies);
+        assert.ok(
+          passive.documentPolicies.policies.some(
+            policy =>
+              policy.disposition === 'report' &&
+              policy.reporting?.endpointNameObserved === false &&
+              policy.reporting.deliveryVerified === false,
+          ),
+          'Production evidence must retain reporting configuration gaps without claiming delivery',
+        );
+        // Source: https://html.spec.whatwg.org/multipage/tables.html#attr-tdth-headers
+        // The actual Full entry must serialize the advisory graph/token findings;
+        // these warnings must not become blocking Modern Web failures.
+        assert.ok(passive.findings.some(item => item.rule === 'table-header-cycle'));
+        assert.ok(passive.findings.some(item => item.rule === 'table-header-reference-duplicate'));
+        assert.equal(passive.dataWidgets.observations.tables[0].cyclicRenderedHeaders, 1);
+        assert.equal(passive.dataWidgets.observations.tables[0].duplicateReferenceTokens, 1);
+        // Source: HTML row processing. Verify a real structural advisory without
+        // turning it into a CSS overlap or inferred-header claim.
+        // https://html.spec.whatwg.org/multipage/tables.html#algorithm-for-processing-rows
+        assert.ok(passive.findings.some(item => item.rule === 'table-span-overlap'));
+        assert.equal(passive.dataWidgets.observations.tables[0].spanOccupancy.status, 'observed');
+        assert.equal(passive.dataWidgets.observations.tables[0].spanOccupancy.overlapPlacements, 1);
+        assert.equal(passive.dataWidgets.observations.tables[0].spanOccupancy.renderedOverlapVerified, false);
+        assert.ok(passive.findings.some(item => item.rule === 'policy-csp-reporting-endpoint'));
+        assert.doesNotMatch(
+          JSON.stringify(passive),
+          /owned-private-group|owned-private-report|owned-report-secret/,
+        );
         assert.equal(
           passive.findings.some(item => item.severity === 'error'),
           false,
@@ -180,7 +211,36 @@ async function main() {
         const interactions = attachmentJson(
           result.attachments.find(item => item.name === 'modern-web-interactions.json'),
         );
+        // Source: forms guide, input/blur validation. Exercise the real Full entry
+        // and require retained-node cleanup evidence, not just a unit fixture.
+        // https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/forms/forms.md
+        assert.equal(interactions.coverage.fieldContent.observations[0].status, 'observed');
+        assert.equal(interactions.coverage.fieldContent.observations[0].caretAtEnd, true);
+        assert.equal(interactions.coverage.fieldContent.observations[0].tailInScrollport, true);
+        assert.equal(interactions.coverage.fieldContent.observations[0].restoration.status, 'restored');
+        // Source: field-sizing fallback + forms keyboard guidance (see probe).
+        // Require the horizontal native editing path in actual Full evidence.
+        assert.equal(interactions.coverage.horizontalFieldContent.observations[0].status, 'observed');
+        assert.equal(interactions.coverage.horizontalFieldContent.observations[0].caretAtEnd, true);
+        assert.equal(interactions.coverage.horizontalFieldContent.observations[0].tailInScrollport, true);
+        assert.equal(interactions.coverage.horizontalFieldContent.observations[0].overflow, true);
+        assert.equal(interactions.coverage.horizontalFieldContent.observations[0].restoration.status, 'restored');
+        assert.equal(interactions.coverage.fields[0].status, 'observed');
+        assert.equal(interactions.coverage.fields[0].restoration.status, 'restored');
         assert.equal(interactions.coverage.selects[0].status, 'observed');
+        // Retained option identity/order and the expected selection gate cleanup.
+        // https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/forms/select-menu-interaction.md
+        assert.equal(interactions.coverage.selects[0].restoration.status, 'restored');
+        // Source: checkbox guide; require real two-Space reversal, not a property
+        // cleanup that could otherwise conceal a broken keyboard interaction.
+        // https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/ui-components/checkbox.md
+        assert.equal(interactions.coverage.checkboxes[0].status, 'observed');
+        assert.equal(interactions.coverage.checkboxes[0].keysSent, 2);
+        assert.equal(interactions.coverage.checkboxes[0].before.checked, 'false');
+        assert.equal(interactions.coverage.checkboxes[0].toggled.checked, 'true');
+        assert.equal(interactions.coverage.checkboxes[0].restored.checked, 'false');
+        assert.equal(interactions.coverage.checkboxes[0].restoration.method, 'keyboard');
+        assert.equal(interactions.coverage.selectOptionOwnershipLimit, 512);
         assert.ok(
           interactions.coverage.blockedRequests >= 2,
           'Select requests must be quarantined',
@@ -188,6 +248,14 @@ async function main() {
         assert.equal(interactions.coverage.networkDependentStatesUnverified, true);
         const widgets = attachmentJson(
           result.attachments.find(item => item.name === 'modern-web-widgets.json'),
+        );
+        assert.ok(
+          widgets.coverage.tableScroll.observations.some(
+            item =>
+              item.status === 'observed' &&
+              item.samples.some(sample => sample.canMove && sample.moved),
+          ),
+          'Actual Full entry must retain table keyboard movement evidence',
         );
         assert.equal(widgets.coverage.accordions.length, 1);
         assert.equal(widgets.coverage.composites.menubars[0].status, 'observed');

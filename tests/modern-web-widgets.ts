@@ -1,7 +1,14 @@
+// Rule sources (implementation rationale; see docs/MODERN-WEB.md for remaining gaps):
+// tabs: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/ui-components/tabs.md
+// switch: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/forms/switch.md
+// slider: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/forms/slider.md
+// Exercise declared retained owners and safe reversible actions, not commands.
+// Equivalent native/scripted behavior is accepted; absent modern APIs are not defects.
 import { inspectMenubarSwitching } from './modern-web-menubar-switching';
 import { inspectMenuNavigation } from './modern-web-menu-navigation';
 import { inspectComposites } from './modern-web-composites';
 import { inspectCustomAccordions } from './modern-web-accordions';
+import { inspectTableScroll } from './modern-web-table-scroll';
 import type { Page, ElementHandle } from '@playwright/test';
 import { safeAuditUrl, type WebFinding } from './modern-web';
 
@@ -688,9 +695,12 @@ export async function inspectWidgets(page: Page) {
   const { findings: switchingFindings, ...switchingCoverage } = switching;
   const composites = await inspectComposites(page);
   const customAccordions = await inspectCustomAccordions(page);
+  const tableScroll = await inspectTableScroll(page);
+  const { findings: tableFindings, ...tableCoverage } = tableScroll;
   const { findings: compositeFindings, ...compositeCoverage } = composites;
   const { findings: accordionFindings, ...accordionCoverage } = customAccordions;
   findings.push(...menuFindings, ...switchingFindings, ...compositeFindings, ...accordionFindings);
+  findings.push(...tableFindings);
   return {
     schemaVersion: 1,
     url: safeAuditUrl(page.url()),
@@ -705,6 +715,7 @@ export async function inspectWidgets(page: Page) {
       menuNavigation: menuCoverage,
       menubarSwitching: switchingCoverage,
       customAccordions: accordionCoverage,
+      tableScroll: tableCoverage,
       tabLocalSettleWindowMs: 100,
       successfulSubmissionAttempted: false,
       customAccordionActionsAttempted: customAccordions.activationAttempts > 0,

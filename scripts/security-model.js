@@ -1,4 +1,9 @@
 'use strict';
+// Repository approval policy: docs/SECURITY-MONITORING.md#evidence-and-approval
+// Source context: https://www.w3.org/TR/SRI/ (integrity is not provenance/trust).
+// Never let a store run approve its own hashes. Explicit offline review/history
+// is our operational policy, not a claim that CSP/SRI authenticates a vendor.
+
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -288,7 +293,10 @@ function history(existing, options = {}) {
     limit = options.limit ?? 20;
   if (!Number.isInteger(limit) || limit < 1 || limit > 100)
     throw new Error('History limit must be from 1 to 100');
-  const entries = [...(baseline.history || [])].reverse();
+  // Source: modern-web-guidance js, immutable array copies. Approval history is
+  // validated dense JSON; preserve persisted order while presenting newest first.
+  // https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/js/js.md
+  const entries = (baseline.history || []).toReversed();
   let start = 0;
   if (options.before !== undefined) {
     if (typeof options.before !== 'string' || !/^[a-f0-9]{64}$/.test(options.before))
@@ -473,7 +481,7 @@ function validateBaseline(value) {
     }
     if (previousAfter && previousAfter !== approvalsHash(value)) fail();
     const restored = { approvals: structuredClone(value.approvals) };
-    for (const entry of [...value.history].reverse()) {
+    for (const entry of value.history.toReversed()) {
       if (approvalsHash(restored) !== entry.afterHash) fail();
       for (const change of entry.changes) {
         const index = restored.approvals.findIndex(

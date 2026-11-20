@@ -1,3 +1,8 @@
+// Rule sources (implementation rationale; see docs/MODERN-WEB.md for remaining gaps):
+// lazy-load-video-and-audio: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/performance/lazy-load-video-and-audio.md
+// accessible-generated-content: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/accessibility/accessible-generated-content.md
+// Current geometry is not historical visibility; timing presence does not prove
+// resource criticality. Passive samples never play media or require a new loading API.
 import type { Page } from '@playwright/test';
 import type { WebFinding } from './modern-web';
 import { safeAuditUrl } from './modern-web';

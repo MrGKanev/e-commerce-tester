@@ -1,3 +1,9 @@
+// Rule sources (implementation rationale; see docs/MODERN-WEB.md for remaining gaps):
+// responsive-design: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/css/responsive-design.md
+// typography: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/visual-design/typography.md
+// color: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/visual-design/color.md
+// Use reversible viewport/preference/text stress on the isolated page.
+// This is not real OS text scaling, field metrics or complete theme/AT certification.
 import type { Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import type { WebFinding } from './modern-web';
@@ -40,6 +46,62 @@ export async function inspectPresentation(page: Page) {
                 1) +
               ')',
         );
+      // Source: form-factor-adaptation forbids clipping controls on parents.
+      // https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/user-experience/form-factor-adaptation.md
+      // Only report a whole border box outside a simple overflow:hidden/clip
+      // ancestor. Scrollable containers, transforms, positioned escape paths,
+      // clip margins and glyph visibility need a different model; leave unknown.
+      const ancestorClipped: string[] = [];
+      const controls = [
+        ...document.querySelectorAll('input:not([type="hidden"]),select,textarea,button'),
+      ];
+      for (const [index, el] of controls.slice(0, 100).entries()) {
+        if (!visible(el) || el.closest('[hidden],[inert],[aria-hidden="true"]')) continue;
+        const lineage: Element[] = [];
+        let parent: Element | null = el;
+        while (parent && lineage.length < 33) {
+          lineage.push(parent);
+          parent = parent.parentElement;
+        }
+        if (
+          parent ||
+          lineage.some(node => {
+            const style = getComputedStyle(node);
+            return (
+              style.transform !== 'none' ||
+              (style.translate && style.translate !== 'none') ||
+              (style.rotate && style.rotate !== 'none') ||
+              (style.scale && style.scale !== 'none') ||
+              (style.zoom && !['1', 'normal'].includes(style.zoom)) ||
+              style.perspective !== 'none' ||
+              style.clipPath !== 'none' ||
+              ['absolute', 'fixed'].includes(style.position) ||
+              style.contentVisibility === 'hidden'
+            );
+          })
+        )
+          continue;
+        const r = el.getBoundingClientRect();
+        if (
+          lineage.slice(1).some(node => {
+            if (node === document.body || node === document.documentElement) return false;
+            const style = getComputedStyle(node);
+            if (style.overflowClipMargin && style.overflowClipMargin !== '0px') return false;
+            const box = node.getBoundingClientRect();
+            const left = box.left + node.clientLeft,
+              top = box.top + node.clientTop;
+            return (
+              (['hidden', 'clip'].includes(style.overflowX) &&
+                (r.right < left - 1 || r.left > left + node.clientWidth + 1)) ||
+              (['hidden', 'clip'].includes(style.overflowY) &&
+                (r.bottom < top - 1 || r.top > top + node.clientHeight + 1))
+            );
+          })
+        )
+          ancestorClipped.push(
+            `:is(input:not([type="hidden"]),select,textarea,button) >> nth=${index}`,
+          );
+      }
       const targets = [
         ...document.querySelectorAll(
           'main h1, main button[type="submit"], main [name="add"], main [data-add-to-cart]',
@@ -60,6 +122,11 @@ export async function inspectPresentation(page: Page) {
         width: document.documentElement.clientWidth,
         overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 5,
         clipped: [...new Set(clipped)],
+        ancestorClipped,
+        ancestorControlLimit: 100,
+        ancestorDepthLimit: 32,
+        ancestorSampleLimited: controls.length > 100,
+        partialControlAndGlyphClippingVerified: false,
         occluded,
       };
     });
@@ -85,6 +152,14 @@ export async function inspectPresentation(page: Page) {
           'document',
           { requested: size, observedWidth: state.width },
           'Remove page-level horizontal scrolling at narrow/landscape sizes, allowing necessary two-dimensional regions.',
+        );
+      for (const selector of state.ancestorClipped)
+        add(
+          'presentation-control-ancestor-clip',
+          'form-factor-adaptation',
+          selector,
+          { requested: size, wholeBorderBoxOutsideClip: true },
+          'Keep controls inside the visible area of their clipping ancestors; this bounded geometry sample does not verify glyphs or partial clipping.',
         );
       for (const selector of state.occluded)
         add(

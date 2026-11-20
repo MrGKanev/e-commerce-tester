@@ -1,6 +1,6 @@
 # Third-party script compromise: monitoring recommendation
 
-Research date: 2026-11-18. This is a proposed implementation plan, not new executable coverage or a malware-clean certification. No live stores were tested for this review.
+Research date: 2026-11-18; implementation status updated 2026-11-19. This document tracks implemented monitoring and remaining controls; it is not a malware-clean certification. Executable coverage and local validation are linked below. No live stores were tested for this work.
 
 ## Incident and platform boundaries
 
@@ -37,6 +37,30 @@ Local acceptance should include legitimate mutable-vendor updates, same-origin i
 ## Supporting workflow improvements — implemented 2026-11-19
 
 The [shared artifact privacy filter](ARTIFACT-PRIVACY.md) now covers selected newly persisted diagnostics and managed logs, with raw browser/file artifacts explicitly excluded. The [baseline workflow](SECURITY-MONITORING.md#evidence-and-approval) now includes read-only old/new review, required approval reasons/current review hashes and paginated hash-linked history. Existing references remain readable; runs never approve their own evidence. These changes do not close the administrator, server-integrity or comprehensive data-flow gaps below. Validation is recorded in [TESTS.md](TESTS.md#artifact-privacy-and-baseline-review--2026-11-19).
+
+## Authored CSP fallback diagnostics — implemented 2026-11-19
+
+The shared Modern Web Full/Pages inspector now records per-policy script/connect/frame/worker/form source-list selection, including CSP3 fallback order, empty overrides and the lack of form-action fallback. See [evidence and validation](MODERN-WEB.md#csp-source-list-fallback-diagnostics--2026-11-19). This narrows the authored-policy diagnostics gap; it does not prove effective enforcement or add warnings to the security baseline suite. Native violation telemetry remains separate. Full policy matching, worker response policies and reporting-server delivery remain open.
+
+## Worker CSP boundary — implemented 2026-11-19
+
+Native document worker-creation violations now have owned explicit/fallback/report-only calibration. Dedicated-worker execution without worker-internal telemetry explicitly makes current/later security scopes unverified, even when code hashes match; strict runs and baseline approval cannot treat that gap as clean. See [behavior, rule IDs and validation](TESTS.md#worker-csp-boundaries--2026-11-19). This narrows the worker-boundary gap without claiming worker-internal CSP coverage or report delivery.
+
+## Reporting configuration and owned receipt — implemented 2026-11-19
+
+Modern Web now records token-free CSP reporting configuration and warns about an unambiguous missing `report-to` name in `Reporting-Endpoints`; legacy/unsupported configurations stay explicitly unverified. Native legacy `report-uri` delivery is calibrated against an owned loopback receiver, including enforce/report-only 204 and a failing 503 endpoint. Security evidence always labels reporting-server delivery as unverified. [Scope, rule, evidence and validation](TESTS.md#csp-reporting-configuration-and-owned-receipt--2026-11-19). Modern Reporting API uploads and merchant-side receipt/ingestion remain open; no live reporting endpoint was probed.
+
+## Modern upload calibration and Pages headers — implemented 2026-11-19
+
+Native modern `report-to` uploads now have an owned HTTPS full-Chromium desktop/mobile calibration (enforced/report-only 204 and failing 503 receiver), with redacted receipt metadata. `pnpm test:security:reporting:local` is part of offline acceptance; its temporary TLS pin/debug delay never affect merchant runs. Pages additionally forwards its existing navigation headers into the passive Modern Web inspector for configured/discovered pages. See [rule applicability, setup, validation and limits](TESTS.md#modern-reporting-api-upload-and-pages-headers--2026-11-19). Normal headless-shell/cross-engine upload parity and merchant-side receipt, durable ingestion, alerting and worker-internal reporting remain open. Live evidence still does not claim delivery verification.
+
+## Additional negative and redirect tests — 2026-11-19
+
+Modern upload calibration now brackets five missing/malformed/invalid endpoint cases with actual successful same-context reports from separate documents, guarding against false negatives and accidental origin-wide configuration inheritance. Pages now has real loopback redirect fixtures proving only final-response policy evidence is used without audit refetches. [Cases, bounded observation limits and validation](TESTS.md#reporting-negative-controls-and-redirected-pages--2026-11-19). This adds local regression tests, not new production delivery certification or storefront rule IDs.
+
+## Cross-origin reporting regression tests — 2026-11-19
+
+Owned HTTPS source/receiver pairs now verify native cross-origin preflight allow/deny behavior and cookie omission, bracketed by real same-origin reports that do carry the synthetic fixture cookie. Cases include missing/wrong allowed origin and a missing allowed content-type header. [Evidence, bounds and validation](TESTS.md#cross-origin-reporting-preflight-and-cookies--2026-11-19). This extends local test coverage without changing store rules or claiming merchant-side report ingestion.
 
 ## Follow-up controls and limits
 

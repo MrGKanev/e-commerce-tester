@@ -1,3 +1,7 @@
+// Rule sources (implementation rationale; see docs/MODERN-WEB.md for remaining gaps):
+// prevent-page-scroll-under-modal-dialog: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/ui-behaviors/prevent-page-scroll-under-modal-dialog.md
+// Observe wheel containment only for a single already-open native modal.
+// Do not open/close overlays; CSS syntax support alone cannot establish containment.
 import type { Page, ElementHandle } from '@playwright/test';
 import { safeAuditUrl, type WebFinding } from './modern-web';
 

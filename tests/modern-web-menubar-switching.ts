@@ -1,3 +1,8 @@
+// Rule sources (implementation rationale; see docs/MODERN-WEB.md for remaining gaps):
+// app-menus: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/ui-components/app-menus.md
+// natural-interactions: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/user-experience/natural-interactions.md
+// Observe explicit adjacent menu switching without commands or clicks.
+// Primary fine-pointer support gates hover; coarse/touch contexts do not require hover.
 import type { ElementHandle, Page } from '@playwright/test';
 import type { WebFinding } from './modern-web';
 import { menuFor, menuState } from './modern-web-menu-navigation';

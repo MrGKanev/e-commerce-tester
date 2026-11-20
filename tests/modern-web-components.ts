@@ -1,3 +1,8 @@
+// Rule sources (implementation rationale; see docs/MODERN-WEB.md for remaining gaps):
+// accessible-web-components: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/html/accessible-web-components.md
+// web-components: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/html/web-components.md
+// Inspect only reachable open roots and exposed semantics; absent authored ARIA
+// does not prove ElementInternals semantics are missing. Closed roots remain unknown.
 import type { Page } from '@playwright/test';
 import { safeAuditUrl, type WebFinding } from './modern-web';
 

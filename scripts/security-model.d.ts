@@ -56,6 +56,9 @@ export type Stage = {
     installed: boolean;
     phaseAttribution: 'binding-receipt';
     tamperResistant: false;
+    reportDeliveryVerified?: false;
+    workerCreationTelemetry?: 'document-events-only';
+    workerExecutionTelemetry?: 'unavailable' | 'not-observed';
   };
   coverage: { complete: boolean; [key: string]: unknown };
   findings: Finding[];

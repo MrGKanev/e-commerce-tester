@@ -1,3 +1,7 @@
+// Test contract: docs/SECURITY-MONITORING.md#evidence-and-approval
+// Native CSP source: https://www.w3.org/TR/CSP3/#report-violation
+// Expected strict failures are deliberate fixtures, not ignored regressions. Assert
+// their exact count/status and unchanged baseline bytes so runs cannot self-approve.
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -18,13 +22,20 @@ function attachment(result) {
 }
 async function main() {
   let changed = false,
-    policyMode = false;
+    policyMode = false,
+    workerMode = false;
   const writes = [];
   const server = http.createServer((request, response) => {
     if (request.method !== 'GET') writes.push(request.url);
     if (request.url === '/vendor.js') {
       response.writeHead(200, { 'content-type': 'application/javascript' });
-      response.end(changed ? 'window.vendorVersion=2;' : 'window.vendorVersion=1;');
+      response.end(
+        (changed ? 'window.vendorVersion=2;' : 'window.vendorVersion=1;') +
+          (workerMode ? 'window.localWorker=new Worker("/worker.js");' : ''),
+      );
+    } else if (request.url === '/worker.js') {
+      response.writeHead(200, { 'content-type': 'application/javascript' });
+      response.end('self.postMessage("ready");');
     } else if (request.url === '/consent') {
       response.writeHead(204);
       response.end();
@@ -74,7 +85,7 @@ async function main() {
           },
         },
       };
-      async function run(label, expectedFailures) {
+      async function run(label, expectedFailures, incompleteWorkers = false) {
         const reportFile = path.join(output, `${platform}-${label}.json`);
         const exit = await new Promise((resolve, reject) => {
           const child = spawn(
@@ -117,12 +128,20 @@ async function main() {
         return cases.map(test => {
           assert.equal(test.results.length, 1);
           const observed = attachment(test.results[0]);
-          for (const stage of observed.stages) assert.equal(stage.coverage.complete, true);
+          for (const stage of observed.stages) {
+            assert.equal(stage.policy.reportDeliveryVerified, false);
+            assert.equal(stage.coverage.complete, !incompleteWorkers);
+            if (incompleteWorkers) {
+              assert.equal(stage.policy.workerExecutionTelemetry, 'unavailable');
+              assert.ok(stage.coverage.incomplete.includes('csp-worker-execution-unobserved'));
+            }
+          }
           return observed;
         });
       }
       changed = false;
       policyMode = false;
+      workerMode = false;
       const candidates = await run('candidate', 0);
       let baseline;
       for (const candidate of candidates) {
@@ -186,6 +205,15 @@ async function main() {
         previousWrites,
         'Enforced CSP must prevent owned consent POSTs from reaching the server',
       );
+      policyMode = false;
+      workerMode = true;
+      for (const observed of await run('worker-unverified', 12, true))
+        assert.equal(observed.status, 'unverified');
+      assert.equal(
+        fs.readFileSync(path.join(root, baselineFile), 'utf8'),
+        approvedBytes,
+        'Incomplete worker runs must never change the approved baseline',
+      );
     }
     assert.ok(writes.length > 0, 'Explicit consent controls must be exercised');
     assert.ok(
@@ -193,7 +221,7 @@ async function main() {
       'No checkout or payment form may be submitted',
     );
     console.log(
-      `Security production entry: ${count} local cases verified, including 24 expected strict drift failures and 16 expected CSP failures.`,
+      `Security production entry: ${count} local cases verified, including 24 expected strict drift failures, 16 expected CSP failures and 24 expected incomplete-worker failures.`,
     );
   } finally {
     for (const file of baselines) fs.rmSync(file, { force: true });

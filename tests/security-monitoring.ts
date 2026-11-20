@@ -14,14 +14,19 @@ import {
   type Baseline,
 } from '../scripts/security-model';
 
-/** Observe actual responses only. Never refetch assets or capture request/WS payloads. */
+/** Rationale/source: security guide, dynamic third-party dependencies and reporting:
+ * https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/security/security.md
+ * Hash the actual browser response instead of refetching mutable vendor code.
+ * These hashes detect change; they neither authorize SRI nor establish malware absence.
+ * Observe actual responses only. Never refetch assets or capture request/WS payloads. */
 export async function startSecurityObservation(context: BrowserContext, config: SecuritySettings) {
   const startedAt = new Map<string, number>([['initial', Date.now()]]);
   let phase = 'initial',
     closed = false,
     requests = 0,
     totalBytes = 0,
-    scriptSlots = 0;
+    scriptSlots = 0,
+    workerExecutionObserved = false;
   const csp = await startCspObservation(context, () => phase);
   const records: Array<{ phase: string; script: Script }> = [];
   const destinations: Array<{ phase: string; destination: Destination }> = [];
@@ -182,6 +187,11 @@ export async function startSecurityObservation(context: BrowserContext, config: 
     const listen = (socket: import('@playwright/test').WebSocket) =>
       destination(socket.url(), 'websocket', 'CONNECT', 'page-websocket');
     const worker = (worker: import('@playwright/test').Worker) => {
+      // Init scripts/bindings observe documents, not WorkerGlobalScope. Keep
+      // this gap sticky across consent phases, even if the worker later exits
+      // or the bounded inventory is full. A script hash is not CSP telemetry.
+      if (closed) return;
+      workerExecutionObserved = true;
       const id = identity(worker.url());
       if (workers.length < config.limits.scripts)
         workers.push({
@@ -195,6 +205,7 @@ export async function startSecurityObservation(context: BrowserContext, config: 
     };
     page.on('websocket', listen);
     page.on('worker', worker);
+    page.workers().forEach(worker);
     sockets.push({ page, listen, worker });
   };
   context.on('request', onRequest);
@@ -395,7 +406,14 @@ export async function startSecurityObservation(context: BrowserContext, config: 
           !scripts.some(script => script.urlHash === worker.urlHash && script.status === 'hashed')
         )
           flag(stage, 'worker-response-unavailable');
-      const policy = csp.snapshot(stage);
+      const policy = {
+        ...csp.snapshot(stage),
+        workerCreationTelemetry: 'document-events-only' as const,
+        workerExecutionTelemetry: workerExecutionObserved
+          ? ('unavailable' as const)
+          : ('not-observed' as const),
+      };
+      if (workerExecutionObserved) flag(stage, 'csp-worker-execution-unobserved');
       if (policy.truncated) flag(stage, 'csp-event-limit');
       const incomplete = [...(flags.get(stage) || [])];
       const findings: Finding[] = [];

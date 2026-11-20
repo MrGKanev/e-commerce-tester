@@ -1,3 +1,8 @@
+// Sources: native CSP event/report contracts, not a malware attribution oracle.
+// https://www.w3.org/TR/CSP3/#report-violation
+// https://www.w3.org/TR/CSP3/#directive-worker-src
+// Real owned denials calibrate document/worker boundaries. Browser response hashes
+// use the bytes already received, and failed/incomplete observations cannot be approved.
 import fs from 'node:fs';
 import http from 'node:http';
 import crypto from 'node:crypto';
@@ -6,6 +11,7 @@ import { test, expect } from '../tests/fixtures';
 import { resolveSiteSettings } from '../config/site-settings';
 import { observeSecurityScenario, startSecurityObservation } from '../tests/security-monitoring';
 import { approve, hash, type Scope, type Baseline } from '../scripts/security-model';
+import { inspectDocumentPolicies } from '../tests/modern-web-policy';
 const css = fs.readFileSync(path.resolve(__dirname, '../web/tailwind.css'), 'utf8');
 const origin = 'http://127.0.0.1:45996';
 const scope = {
@@ -564,3 +570,253 @@ test('child-frame CSP events are attributed without collecting source URLs or sc
   );
   expect(JSON.stringify(report)).not.toMatch(/frame-nonce|private=child-csp|frame-blocked/);
 });
+
+for (const [name, policy] of [
+  ['explicit', "worker-src 'none'; child-src *; script-src 'unsafe-inline' 'self'"],
+  ['child fallback', "child-src 'none'; script-src 'unsafe-inline' 'self'"],
+  ['script fallback', "script-src 'unsafe-inline'"],
+  ['default fallback', "default-src 'unsafe-inline'"],
+] as const)
+  test(`CSP worker creation denial uses ${name} policy without running worker code`, async ({
+    page,
+  }) => {
+    await fixture(
+      page,
+      '<script>try { window.localWorker = new Worker("/worker.js?private=worker-denial"); window.localWorker.onerror=()=>window.workerDenied=true; window.localWorker.onmessage=()=>window.workerRan=true; } catch { window.workerDenied=true; }</script>',
+      '',
+      { 'content-security-policy': policy },
+    );
+    let fetched = 0;
+    await page.context().route('**/worker.js?*', route => {
+      fetched++;
+      return route.fulfill({
+        contentType: 'application/javascript',
+        body: 'self.postMessage("ready");',
+      });
+    });
+    const report = await observe(page, config({ observeMs: 400 }));
+    await expect
+      .poll(() =>
+        page.evaluate(() => Boolean((window as unknown as Record<string, unknown>).workerDenied)),
+      )
+      .toBe(true);
+    expect(
+      await page.evaluate(() => Boolean((window as unknown as Record<string, unknown>).workerRan)),
+    ).toBe(false);
+    expect(fetched).toBe(0);
+    expect(report.stages[0].policy.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          directive: 'worker-src',
+          disposition: 'enforce',
+          context: 'main',
+        }),
+      ]),
+    );
+    expect(report.stages[0].findings.map(f => f.rule)).toContain('security-csp-violation');
+    expect(JSON.stringify(report)).not.toMatch(/private=worker-denial|unsafe-inline/);
+  });
+
+test('CSP report-only worker denial still runs the worker and exposes its telemetry gap', async ({
+  page,
+}) => {
+  await fixture(
+    page,
+    '<script>window.localWorker = new Worker("/worker.js?private=worker-report"); window.localWorker.onmessage=()=>window.workerRan=true;</script>',
+    '',
+    {
+      'content-security-policy-report-only':
+        "worker-src 'none'; report-uri /private-report-endpoint",
+    },
+  );
+  const report = await observe(page, config({ observeMs: 500 }));
+  await expect
+    .poll(() =>
+      page.evaluate(() => Boolean((window as unknown as Record<string, unknown>).workerRan)),
+    )
+    .toBe(true);
+  expect(report.stages[0].policy.events).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ directive: 'worker-src', disposition: 'report', context: 'main' }),
+    ]),
+  );
+  expect(report.stages[0].policy).toMatchObject({
+    workerCreationTelemetry: 'document-events-only',
+    workerExecutionTelemetry: 'unavailable',
+  });
+  expect(report.stages[0].coverage.incomplete).toContain('csp-worker-execution-unobserved');
+  expect(report.status).toBe('unverified');
+  expect(() =>
+    approve(report, undefined, { reviewed: true, reason: 'Owned worker fixture' }),
+  ).toThrow('complete');
+  expect(JSON.stringify(report)).not.toMatch(/private=worker-report|private-report-endpoint/);
+});
+
+test('worker response CSP denial stays unverified without leaking worker reports into document events', async ({
+  page,
+}) => {
+  await fixture(
+    page,
+    '<script>window.localWorker = new Worker("/worker.js?private=worker-response"); window.localWorker.onmessage=event=>window.workerResult=event.data;</script>',
+    '',
+    { 'content-security-policy': "worker-src 'self'; connect-src *" },
+  );
+  let fetches = 0;
+  await page.context().route('**/worker.js?*', route =>
+    route.fulfill({
+      contentType: 'application/javascript',
+      headers: { 'content-security-policy': "connect-src 'none'" },
+      body: 'fetch("/private-worker-fetch?secret=worker-only").then(()=>postMessage("allowed"),()=>postMessage("blocked"));',
+    }),
+  );
+  await page.context().route('**/private-worker-fetch?*', route => {
+    fetches++;
+    return route.fulfill({ body: 'ok' });
+  });
+  const report = await observe(page, config({ observeMs: 500 }));
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as Record<string, unknown>).workerResult))
+    .toBe('blocked');
+  expect(fetches).toBe(0);
+  expect(report.stages[0].policy.events).toEqual([]);
+  expect(report.stages[0].policy.workerExecutionTelemetry).toBe('unavailable');
+  expect(report.stages[0].coverage.incomplete).toContain('csp-worker-execution-unobserved');
+  expect(report.status).toBe('unverified');
+  expect(() =>
+    approve(report, undefined, { reviewed: true, reason: 'Owned worker fixture' }),
+  ).toThrow('complete');
+  expect(JSON.stringify(report)).not.toMatch(
+    /private-worker-fetch|worker-only|private=worker-response/,
+  );
+});
+
+test('worker CSP coverage gaps persist after consent even with exhausted worker inventory', async ({
+  page,
+}) => {
+  await fixture(
+    page,
+    '<button type="button" id="reject">Reject</button><script>window.localWorker=new Worker("/worker.js"); window.secondWorker=new Worker("/worker.js?second"); window.localWorker.onmessage=()=>window.workerRan=true; document.getElementById("reject").onclick=()=>{window.localWorker.terminate();window.secondWorker.terminate();};</script>',
+  );
+  const report = await observe(
+    page,
+    config({
+      observeMs: 400,
+      phases: ['reject'],
+      consent: { rejectSelector: '#reject' },
+      limits: { scripts: 1 },
+    }),
+    undefined,
+    { choice: 'reject' },
+  );
+  expect(report.stages).toHaveLength(2);
+  expect(report.stages[0].coverage.incomplete).toContain('worker-limit');
+  for (const stage of report.stages) {
+    expect(stage.policy.workerExecutionTelemetry).toBe('unavailable');
+    expect(stage.coverage.incomplete).toContain('csp-worker-execution-unobserved');
+    expect(stage.status).toBe('unverified');
+  }
+});
+
+test('workers already running when observation starts retain the explicit CSP gap', async ({
+  page,
+}) => {
+  await fixture(
+    page,
+    '<script>window.localWorker=new Worker("/worker.js"); window.localWorker.onmessage=()=>window.workerReady=true;</script>',
+  );
+  await page.goto(origin + '/page');
+  await expect
+    .poll(() =>
+      page.evaluate(() => Boolean((window as unknown as Record<string, unknown>).workerReady)),
+    )
+    .toBe(true);
+  const observer = await startSecurityObservation(page.context(), config());
+  try {
+    const stage = await observer.snapshot({ ...scope, stage: 'initial' }, page, true);
+    expect(stage.policy.workerExecutionTelemetry).toBe('unavailable');
+    expect(stage.coverage.observedWorkers).toHaveLength(1);
+    expect(stage.coverage.incomplete).toContain('csp-worker-execution-unobserved');
+    expect(stage.status).toBe('unverified');
+  } finally {
+    await observer.stop();
+  }
+});
+
+for (const [disposition, statusCode] of [
+  ['enforce', 204],
+  ['report', 204],
+  ['enforce', 503],
+] as const)
+  test(`owned CSP report receipt is separate from DOM telemetry: ${disposition} HTTP ${statusCode}`, async ({
+    page,
+  }) => {
+    const receipts: Array<{ directive: string; responseStatus: number }> = [];
+    let scriptRequests = 0;
+    const policyHeader =
+      disposition === 'enforce' ? 'content-security-policy' : 'content-security-policy-report-only';
+    const policy = "script-src 'none'; report-uri /private-report?token=owned-only";
+    const server = http.createServer((request, response) => {
+      const pathname = new URL(request.url!, 'http://127.0.0.1').pathname;
+      if (pathname === '/private-report' && request.method === 'POST') {
+        let bytes = 0;
+        const chunks: Buffer[] = [];
+        request.on('data', (chunk: Buffer) => {
+          bytes += chunk.length;
+          if (bytes <= 65536) chunks.push(chunk);
+        });
+        request.on('end', () => {
+          if (bytes <= 65536) {
+            try {
+              const packet = JSON.parse(Buffer.concat(chunks).toString())['csp-report'];
+              // Only owned synthetic data is parsed. Raw policies/URLs/samples
+              // stay in this transient buffer and are never attached or logged.
+              if (
+                typeof packet?.['effective-directive'] === 'string' &&
+                packet['effective-directive'].startsWith('script-src')
+              )
+                receipts.push({ directive: 'script-src', responseStatus: statusCode });
+            } catch {
+              /* An invalid report cannot count as receipt evidence. */
+            }
+          }
+          response.writeHead(statusCode);
+          response.end();
+        });
+      } else if (pathname === '/asset.js') {
+        scriptRequests++;
+        response.writeHead(200, { 'content-type': 'application/javascript' });
+        response.end('window.ownedScriptExecuted=true;');
+      } else if (pathname === '/page') {
+        response.writeHead(200, { 'content-type': 'text/html', [policyHeader]: policy });
+        response.end(
+          '<!doctype html><html lang="en"><title>Owned reporting fixture</title><script src="/asset.js?private=owned-asset"></script></html>',
+        );
+      } else {
+        response.writeHead(204);
+        response.end();
+      }
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const url = `http://127.0.0.1:${(server.address() as import('node:net').AddressInfo).port}/page`;
+    try {
+      const report = await observeSecurityScenario(page, config({ observeMs: 400 }), scope, url);
+      await expect.poll(() => receipts.length, { timeout: 5000 }).toBeGreaterThan(0);
+      expect(receipts[0]).toEqual({ directive: 'script-src', responseStatus: statusCode });
+      expect(scriptRequests).toBe(disposition === 'enforce' ? 0 : 1);
+      expect(report.stages[0].policy.events).toEqual(
+        expect.arrayContaining([expect.objectContaining({ disposition })]),
+      );
+      expect(report.stages[0].policy.reportDeliveryVerified).toBe(false);
+      const authored = await inspectDocumentPolicies(page, { [policyHeader]: policy });
+      expect(authored.coverage.policies[0]).toMatchObject({
+        reporting: { reportUriPresent: true, deliveryVerified: false },
+      });
+      expect(JSON.stringify({ report, authored, receipts })).not.toMatch(
+        /private-report|owned-only|owned-asset|ownedScriptExecuted/,
+      );
+    } finally {
+      await page.goto('about:blank');
+      server.closeAllConnections();
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
+  });

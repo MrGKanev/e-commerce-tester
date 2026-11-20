@@ -37,7 +37,13 @@ const directives = [
   'other',
 ];
 
-/** Passive browser-event telemetry only. Never inject a policy, blocked request or form submission. */
+/** Sources: CSP3 violation DOM events / reporting algorithm:
+ * https://www.w3.org/TR/CSP3/#securitypolicyviolationevent
+ * https://www.w3.org/TR/CSP3/#report-violation
+ * Listen before navigation; keep native disposition, discard samples/policy tokens.
+ * isTrusted excludes synthetic DOM dispatch, not hostile-page tampering. DOM event
+ * receipt is not reporting-server acknowledgement (see reportDeliveryVerified).
+ * Passive browser-event telemetry only. Never inject a policy, blocked request or form submission. */
 export async function startCspObservation(context: BrowserContext, phase: () => string) {
   const binding = '__securityCsp_' + randomUUID().replaceAll('-', '');
   const ready = new WeakMap<Frame, { id: string; supported: boolean }>();
@@ -228,6 +234,8 @@ export async function startCspObservation(context: BrowserContext, phase: () => 
         installed,
         phaseAttribution: 'binding-receipt' as const,
         tamperResistant: false as const,
+        // A DOM event is not an acknowledgement from a reporting server.
+        reportDeliveryVerified: false as const,
       };
     },
     async stop() {

@@ -212,6 +212,11 @@ test('explicit header references detect duplicate IDs even when the first target
   const report = await inspectDataWidgets(page);
   expect(report.findings).toEqual([
     expect.objectContaining({
+      rule: 'table-header-reference-duplicate',
+      severity: 'warning',
+      evidence: { duplicateTokenCount: 1, uniqueReferenceCount: 1 },
+    }),
+    expect.objectContaining({
       rule: 'table-header-reference-ambiguous',
       severity: 'warning',
       evidence: { ambiguousReferenceCount: 1, uniqueTargetVerified: false },
@@ -225,7 +230,7 @@ test('explicit header references detect duplicate IDs even when the first target
   expect(await page.locator('body').innerHTML()).toBe(before);
 });
 
-test('unique punctuation IDs and repeated header tokens are accepted; unrelated duplicates are ignored', async ({
+test('punctuation IDs resolve; repeated tokens warn and unrelated duplicate IDs are ignored', async ({
   page,
 }) => {
   await load(
@@ -234,7 +239,16 @@ test('unique punctuation IDs and repeated header tokens are accepted; unrelated 
     <table><tr><th id="column:1">Header</th></tr><tr><td headers="column:1 column:1">Value</td></tr></table>`,
   );
   const report = await inspectDataWidgets(page);
-  expect(report.findings).toEqual([]);
+  // Source: https://html.spec.whatwg.org/multipage/tables.html#attr-tdth-headers
+  // Repeated tokens violate authoring syntax even though the target resolves;
+  // the advisory does not claim duplicate AT announcements or a broken target.
+  expect(report.findings).toEqual([
+    expect.objectContaining({
+      rule: 'table-header-reference-duplicate',
+      severity: 'warning',
+      evidence: { duplicateTokenCount: 1, uniqueReferenceCount: 1 },
+    }),
+  ]);
   expect(report.observations.tables[0]).toMatchObject({
     invalidReferences: 0,
     ambiguousReferences: 0,

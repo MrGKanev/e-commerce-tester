@@ -1,3 +1,8 @@
+// Rule sources (implementation rationale; see docs/MODERN-WEB.md for remaining gaps):
+// app-menus: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/ui-components/app-menus.md
+// toolbar: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/ui-components/toolbar.md
+// Focus-only arrow samples accept roving/root-focus/native focusgroup contracts.
+// Never invoke commands or change business values to test keyboard navigation.
 import { inspectCompositeTabs } from './modern-web-tab-traversal';
 import type { ElementHandle, JSHandle, Page } from '@playwright/test';
 import type { WebFinding } from './modern-web';

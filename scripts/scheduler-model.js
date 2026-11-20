@@ -335,7 +335,10 @@ function readyAt(state, job, now = 0) {
   );
 }
 function nextJob(state, config, now = 0) {
-  return [...config.jobs].sort(
+  // Source: js copying array methods. Preserve configured job order; retain the
+  // existing due-time/tie-break comparator rather than sorting persistent config.
+  // https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/js/js.md
+  return config.jobs.toSorted(
     (a, b) =>
       readyAt(state, a, now) - readyAt(state, b, now) ||
       state.jobs[a.key].nextAt - state.jobs[b.key].nextAt ||

@@ -1,3 +1,7 @@
+// Rule sources (implementation rationale; see docs/MODERN-WEB.md for remaining gaps):
+// menu: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/ui-components/menu.md
+// Follow only a uniquely associated retained hierarchy, reversing inline keys in RTL.
+// Ambiguous portals/unsafe buttons are excluded; commands and links are never activated.
 import type { ElementHandle, JSHandle, Page } from '@playwright/test';
 import type { WebFinding } from './modern-web';
 

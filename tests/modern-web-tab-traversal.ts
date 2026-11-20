@@ -1,3 +1,8 @@
+// Rule sources (implementation rationale; see docs/MODERN-WEB.md for remaining gaps):
+// app-menus: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/ui-components/app-menus.md
+// toolbar: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/ui-components/toolbar.md
+// Use actual sequential Tab/inverse reentry, no injected focus stops/tabindex changes.
+// Unknown browser/OS entry policy remains unverified instead of a false store warning.
 import type { ElementHandle, Page } from '@playwright/test';
 import type { WebFinding } from './modern-web';
 

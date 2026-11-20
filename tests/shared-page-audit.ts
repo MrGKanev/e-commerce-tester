@@ -6,8 +6,17 @@ import { auditSpelling } from './spelling';
 import { readSiteSettings } from '../config/site-settings';
 import { inspectModernWeb, attachModernWeb } from './modern-web';
 
-/** Read-only checks consume the current document. They never navigate or mutate cart. */
-export async function auditCurrentPage(page: Page, testInfo: TestInfo, language: string) {
+/** Header provenance: callers pass allHeaders() from their existing final goto response.
+ * https://playwright.dev/docs/api/class-response#response-all-headers
+ * Never refetch: redirects or mutable policies could otherwise change the evidence.
+ * Absent input stays unknown instead of manufacturing missing-header findings.
+ * Read-only checks consume the current document. They never navigate or mutate cart. */
+export async function auditCurrentPage(
+  page: Page,
+  testInfo: TestInfo,
+  language: string,
+  responseHeaders?: Record<string, string>,
+) {
   await waitForContent(page);
   await test.step('Page metadata', async () => {
     await expect.soft(page, 'Page title is empty').not.toHaveTitle('');
@@ -62,7 +71,7 @@ export async function auditCurrentPage(page: Page, testInfo: TestInfo, language:
     await auditSpelling(page, testInfo, language);
   });
   await test.step('Modern web guidance', async () => {
-    const report = await inspectModernWeb(page);
+    const report = await inspectModernWeb(page, responseHeaders);
     await attachModernWeb(report, testInfo);
     expect
       .soft(
