@@ -1,6 +1,7 @@
 import { cartAction, waitForImages, waitForContent, BASE, KNOWN_PRODUCTS, ADD_TO_CART_SEL, PRODUCT_TITLE_SEL, PRICE_SEL, getTopElementAt, findBrokenImages } from './helpers';
 
 import { test, expect } from './fixtures';
+import type { Response } from '@playwright/test';
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -9,18 +10,18 @@ import { test, expect } from './fixtures';
 
 for (const product of KNOWN_PRODUCTS) {
   test.describe(`04 · Product page — ${product.handle}`, { tag: ["@full"] }, () => {
+    let navigationResponse: Response | null = null;
 
     test.beforeEach(async ({ page }) => {
-      await page.goto(product.url, { waitUntil: 'domcontentloaded' });
+      navigationResponse = await page.goto(product.url, { waitUntil: 'domcontentloaded' });
     });
 
     // ── Reachability ─────────────────────────────────────────────────────────
 
-    test('page loads (not 404)', { tag: '@smoke' }, async ({ page }) => {
-      const resp = await page.goto(product.url, { waitUntil: 'domcontentloaded' });
+    test('page loads (not 404)', { tag: '@smoke' }, async () => {
       expect(
-        resp?.status(),
-        `${product.handle} returned ${resp?.status()}`,
+        navigationResponse?.status(),
+        `${product.handle} returned ${navigationResponse?.status()}`,
       ).toBeLessThan(400);
     });
 

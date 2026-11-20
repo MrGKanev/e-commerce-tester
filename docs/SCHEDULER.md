@@ -166,3 +166,9 @@ pnpm test:pacing
 ```
 
 Offline fixtures verify schedule distribution, restart persistence, exclusive ownership, 429 handling, backoff, timezone windows, sequential dispatch and shutdown. They do not contact live stores.
+
+## Diagnostic privacy
+
+Scheduler-captured stdout/stderr passes through the shared privacy filter before display and log persistence. Lines are buffered across chunks, so partial-line progress can be delayed; oversized lines are discarded with a redaction marker. Runtime configuration, request URLs and cooldown behavior are unchanged. Native browser artifacts and historical files remain sensitive; see [the complete scope](ARTIFACT-PRIVACY.md).
+
+Compose mounts security baselines read-only. The scheduler never approves or appends baseline history; use the host-side [review/approval workflow](SECURITY-MONITORING.md). Backups preserve approved references/history and exclude transient approval lock files.

@@ -104,3 +104,9 @@ Use conventional commit prefixes (`feat:`, `fix:`, `test:`, `docs:`, `chore:`) a
 For issues, include the failing scenario, selected project/mode, relevant version information and sanitized report evidence. Include a store URL only if it is public and appropriate to share. Do not commit local store configuration, session state or generated reports.
 
 `pnpm test:woocommerce:local` validates Woo lifecycle hooks, suite isolation, classic/block and cookie/token/nonce carts, custom routes, price precision/taxes and variations through loopback fixtures. It is included in the common acceptance command and CI. `scripts/platform-config.test.js` and mixed-runner tests protect isolation and legacy Shopify configuration.
+
+## Security workflow regression checks
+
+`pnpm test:security:local` exercises security observations against owned desktop/mobile fixtures; `pnpm test:security:entry:local` verifies real Shopify/WooCommerce entry scenarios, including intentional strict failures and immutable baseline/history files. Both are included in local acceptance. Never use live stores to calibrate new rules without authorization.
+
+`pnpm check` includes artifact-redaction and offline baseline review/history unit tests. `pnpm test:reporting` verifies original request execution, filtered diagnostics/encoded attachments and private atomic JSON publication. Security approvals in fixtures must provide an explicit reason; CLI approvals also require the review hash. Preserve exact security fingerprints and document raw artifact exclusions. See [artifact privacy](ARTIFACT-PRIVACY.md) and [baseline workflow](SECURITY-MONITORING.md).

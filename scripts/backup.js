@@ -9,6 +9,7 @@ const ROOTS = [
   'scheduler-state',
   'reports',
   'visual-baselines',
+  'security-baselines',
   'sites.json',
   'scheduler.json',
 ];
@@ -54,6 +55,7 @@ function backup(source, destination) {
         if (
           relative === 'scheduler-state/scheduler.lock' ||
           relative === 'scheduler-state/heartbeat.json' ||
+          (relative.startsWith('security-baselines/') && relative.endsWith('.lock')) ||
           relative.includes('/.trash/') ||
           /\.tmp$/.test(relative)
         )

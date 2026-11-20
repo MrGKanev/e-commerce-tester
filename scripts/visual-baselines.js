@@ -139,10 +139,15 @@ function approve({ reportsDir, root, site, run, revision, ids }) {
     fs.mkdirSync(lock);
   } catch (error) {
     if (error.code !== 'EEXIST') throw error;
-    throw Object.assign(new Error('Another approval is in progress; refresh and try again'), {
-      status: 409,
-      cause: error,
-    });
+    // Source: modern JS Error cause options; keep HTTP 409 enumerable while the
+    // internal cause stays non-enumerable and outside ordinary JSON serialization.
+    // https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/js/js.md
+    throw Object.assign(
+      new Error('Another approval is in progress; refresh and try again', { cause: error }),
+      {
+        status: 409,
+      },
+    );
   }
   let versionDir;
   try {

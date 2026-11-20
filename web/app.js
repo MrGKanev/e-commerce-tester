@@ -634,7 +634,10 @@ function displayReport(url, title) {
 }
 function renderReports() {
   $('#visual-review').hidden = true;
-  $('#monitoring-history').innerHTML = '';
+  // Source: modern-web-guidance js, DOM child replacement; no HTML parser/TT sink
+  // is needed when clearing this ordinary container (not a template).
+  // https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/js/js.md
+  $('#monitoring-history').replaceChildren();
   $('#reports-submenu').innerHTML =
     `<button data-report-store="overview" class="${chipClass}" aria-pressed="${reportStore === 'overview'}">Overview</button>` +
     reportGroups
@@ -871,8 +874,8 @@ async function refreshRuns() {
     );
     updateHTML(
       $('#run-scheduled'),
-      [...status.jobs]
-        .sort((a, b) => (a.nextAt || Infinity) - (b.nextAt || Infinity))
+      status.jobs
+        .toSorted((a, b) => (a.nextAt || Infinity) - (b.nextAt || Infinity))
         .map(
           job =>
             `<p class="border-b border-slate-200 py-2 text-sm text-slate-800 last:border-b-0">${escapeHTML(job.site)} · ${escapeHTML(job.mode)}<small class="block text-xs text-slate-600">Next eligible: ${job.nextAt ? escapeHTML(new Date(job.nextAt).toLocaleString()) : 'Waiting for scheduler'}</small></p>`,

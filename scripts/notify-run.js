@@ -1,5 +1,6 @@
 'use strict';
 const fs = require('node:fs');
+const { stringifyArtifact } = require('./artifact-privacy');
 const path = require('node:path');
 const { summarizeRun } = require('./report-model');
 const { scope, transition, scriptChanges } = require('./monitoring');
@@ -9,7 +10,7 @@ function read(file, fallback) {
 }
 function write(file, data) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file + '.tmp', JSON.stringify(data, null, 2), { mode: 0o600 });
+  fs.writeFileSync(file + '.tmp', stringifyArtifact(data, null, 2), { mode: 0o600 });
   fs.renameSync(file + '.tmp', file);
 }
 async function processRun(runDir, options = {}, env = process.env) {
@@ -76,7 +77,7 @@ async function processRun(runDir, options = {}, env = process.env) {
         redirect: 'error',
         signal: AbortSignal.timeout(10000),
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: stringifyArtifact(payload),
       });
       if (!response.ok) throw new Error(`Webhook HTTP ${response.status}`);
       delivery.status = 'delivered';

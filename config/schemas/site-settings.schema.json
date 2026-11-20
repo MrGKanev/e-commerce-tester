@@ -861,6 +861,166 @@
           "maximum": 100000000000000
         }
       }
+    },
+    "securityMonitoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "enum": [
+            "report",
+            "strict"
+          ]
+        },
+        "observeMs": {
+          "type": "integer",
+          "minimum": 50,
+          "maximum": 10000
+        },
+        "profile": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+        },
+        "baselineFile": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "phases": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "initial",
+              "reject",
+              "accept"
+            ]
+          }
+        },
+        "consent": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "acceptSelector": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "rejectSelector": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            }
+          }
+        },
+        "pages": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "path",
+              "role"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,80}$"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              },
+              "role": {
+                "enum": [
+                  "storefront",
+                  "checkout"
+                ]
+              }
+            }
+          }
+        },
+        "payment": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "checkoutOrigins": {
+              "type": "array",
+              "maxItems": 30,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 1
+              }
+            },
+            "formOrigins": {
+              "type": "array",
+              "maxItems": 30,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 1
+              }
+            },
+            "frameOrigins": {
+              "type": "array",
+              "maxItems": 30,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 1
+              }
+            },
+            "allowTopDocumentCardFields": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "scripts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "requests": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2000
+            },
+            "frames": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "scriptBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4194304
+            },
+            "totalScriptBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16777216
+            }
+          }
+        }
+      }
     }
   }
 }

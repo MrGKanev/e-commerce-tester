@@ -148,3 +148,11 @@ The contact and shipping policies are `required`, `not-applicable` or `unverifie
 The `requiredAddressFields` list is explicit and non-empty. For example, a country without postal codes can use `addressLine1`, `city`, `country`. Additional custom selectors: `checkoutAddressLine1`, `checkoutCity`, `checkoutPostalCode`, `checkoutCountry`. Personal data is never filled in automatically and no order is submitted.
 
 An empty cart is proven by all of these together: an empty public cart in the same session, zero visible cart rows and a visible non-empty empty-state indicator. A cart form alone, hidden empty text or a non-empty API cart is not enough. For a custom UI, configure `cartItems` and `cartEmpty`.
+
+## Security monitoring and artifact privacy
+
+`securityMonitoring` configures opt-in script-content/destination drift and checkout contracts for both Shopify and WooCommerce. It defaults to disabled/report mode, except legacy `monitorScripts: true` enables monitoring unless explicitly overridden. Consent phases need explicit button selectors; checkout pages/origins must be designated. See [the full settings example, limits and baseline workflow](SECURITY-MONITORING.md).
+
+`securityMonitoring.baselineFile` points to a reviewed JSON file under `security-baselines/`. Strict mode requires matching complete evidence; a run never updates approvals. New CLI approvals require a current offline review hash, an explicit reason and `--reviewed`. These security references are separate from visual screenshot baselines.
+
+The [artifact privacy filter](ARTIFACT-PRIVACY.md) applies at selected output boundaries without changing original settings or request URLs. Native browser HTML/trace/image artifacts, external attachment files and historical outputs remain potentially sensitive.

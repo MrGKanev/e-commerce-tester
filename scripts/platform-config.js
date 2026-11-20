@@ -13,6 +13,7 @@ const SHARED = [
   '39-a11y-extras.spec.ts',
   '40-a11y-dynamic.spec.ts',
   '43-modern-web.spec.ts',
+  '44-security-monitoring.spec.ts',
 ];
 function compatibleSpec(file, platform) {
   const name = path.basename(file);

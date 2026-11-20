@@ -9,7 +9,7 @@ for (const entry of configuredPages()) {
     async ({ page }, testInfo) => {
       const response = await page.goto(entry.url, { waitUntil: 'domcontentloaded' });
       expect(response?.status(), 'Page could not load').toBeLessThan(400);
-      await auditCurrentPage(page, testInfo, entry.language);
+      await auditCurrentPage(page, testInfo, entry.language, await response?.allHeaders());
     },
   );
 }
@@ -25,6 +25,6 @@ test('shared pages — extra discovered products', { tag: '@pages' }, async ({ p
     await test.step(entry.url, async () => {
       const response = await page.goto(entry.url, { waitUntil: 'domcontentloaded' });
       expect(response?.status()).toBeLessThan(400);
-      await auditCurrentPage(page, testInfo, entry.language);
+      await auditCurrentPage(page, testInfo, entry.language, await response?.allHeaders());
     });
 });

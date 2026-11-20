@@ -3,6 +3,29 @@ const { validateConfigShape } = require('./config-validation');
 const { commerceSettings } = require('../scripts/platform-config');
 
 const DEFAULTS = {
+  securityMonitoring: {
+    enabled: false,
+    mode: 'report',
+    observeMs: 1000,
+    profile: 'default',
+    baselineFile: '',
+    phases: ['initial'],
+    pages: [],
+    consent: {},
+    payment: {
+      checkoutOrigins: [],
+      formOrigins: [],
+      frameOrigins: [],
+      allowTopDocumentCardFields: null,
+    },
+    limits: {
+      scripts: 100,
+      requests: 500,
+      frames: 20,
+      scriptBytes: 2097152,
+      totalScriptBytes: 8388608,
+    },
+  },
   expectations: { minProducts: 0, currency: '', paymentSelector: '', paymentPath: '/checkout' },
   monitorScripts: false,
   markets: [],
@@ -106,6 +129,78 @@ function resolveSiteSettings(input = {}) {
   }
   Object.assign(result.expectations, input.expectations);
   result.monitorScripts = input.monitorScripts ?? false;
+  const security = input.securityMonitoring || {};
+  Object.assign(result.securityMonitoring, security);
+  result.securityMonitoring.enabled = security.enabled ?? result.monitorScripts;
+  result.securityMonitoring.payment = {
+    ...DEFAULTS.securityMonitoring.payment,
+    ...security.payment,
+  };
+  result.securityMonitoring.limits = { ...DEFAULTS.securityMonitoring.limits, ...security.limits };
+  result.securityMonitoring.consent = { ...security.consent };
+  result.securityMonitoring.phases = [...result.securityMonitoring.phases];
+  result.securityMonitoring.pages = structuredClone(result.securityMonitoring.pages);
+  const normalizedOrigins = list =>
+    list.map(value => {
+      let url;
+      try {
+        url = new URL(value);
+      } catch {
+        throw new Error('Security contract origins must be absolute HTTP(S) origins');
+      }
+      if (
+        !['http:', 'https:'].includes(url.protocol) ||
+        url.username ||
+        url.password ||
+        url.pathname !== '/' ||
+        url.search ||
+        url.hash
+      )
+        throw new Error(
+          'Security contract origins must not contain paths, credentials, queries or fragments',
+        );
+      return url.origin;
+    });
+  for (const key of ['checkoutOrigins', 'formOrigins', 'frameOrigins'])
+    result.securityMonitoring.payment[key] = [
+      ...new Set(normalizedOrigins(result.securityMonitoring.payment[key])),
+    ];
+  if (result.securityMonitoring.baselineFile)
+    require('../scripts/security-model').baselinePath(result.securityMonitoring.baselineFile);
+  const pageNames = new Set();
+  const base = input.url || process.env.STORE_URL || 'https://example.test';
+  for (const page of result.securityMonitoring.pages) {
+    if (pageNames.has(page.name)) throw new Error('Security page names must be unique');
+    pageNames.add(page.name);
+    let url;
+    try {
+      url = new URL(page.path, base);
+    } catch {
+      throw new Error('Invalid security page URL');
+    }
+    if (
+      !['http:', 'https:'].includes(url.protocol) ||
+      url.username ||
+      url.password ||
+      url.hash ||
+      /(?:^|\/)(?:admin|wp-admin)(?:\/|$)/i.test(decodeURIComponent(url.pathname))
+    )
+      throw new Error('Security pages must be public storefront URLs');
+    if (
+      url.origin !== new URL(base).origin &&
+      (page.role !== 'checkout' ||
+        !result.securityMonitoring.payment.checkoutOrigins.includes(url.origin))
+    )
+      throw new Error('External security pages require an explicit checkout origin contract');
+  }
+  for (const phase of result.securityMonitoring.phases)
+    if (phase !== 'initial' && !result.securityMonitoring.consent[phase + 'Selector'])
+      throw new Error('Security consent phases require explicit consent button selectors');
+  if (
+    result.securityMonitoring.limits.totalScriptBytes < result.securityMonitoring.limits.scriptBytes
+  )
+    throw new Error('Security total script budget must cover a single script');
+
   for (const window of input.notifications?.maintenance || []) {
     if (
       !Number.isFinite(Date.parse(window.start)) ||
