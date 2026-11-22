@@ -9,6 +9,7 @@ import { inspectMenuNavigation } from './modern-web-menu-navigation';
 import { inspectComposites } from './modern-web-composites';
 import { inspectCustomAccordions } from './modern-web-accordions';
 import { inspectTableScroll } from './modern-web-table-scroll';
+import { inspectSwitches } from './modern-web-switches';
 import type { Page, ElementHandle } from '@playwright/test';
 import { safeAuditUrl, type WebFinding } from './modern-web';
 
@@ -25,7 +26,6 @@ export async function inspectWidgets(page: Page) {
   const findings: WebFinding[] = [];
   const tabs: Array<Record<string, unknown>> = [];
   const accordions: Array<Record<string, unknown>> = [];
-  const switches: Array<Record<string, unknown>> = [];
   const sliders: Array<Record<string, unknown>> = [];
   const add = (
     rule: string,
@@ -494,70 +494,9 @@ export async function inspectWidgets(page: Page) {
     }
   }
 
-  const switchControls = (await page
-    .locator(
-      'input[type="checkbox"][switch]:not(:disabled), [role="switch"]:not([aria-disabled="true"]):not([aria-readonly="true"])',
-    )
-    .filter({ visible: true })
-    .elementHandles()) as ElementHandle<HTMLElement>[];
-  for (const control of switchControls.slice(0, LIMIT)) {
-    try {
-      const state = () =>
-        control.evaluate(el => ({
-          selector: el.id ? '#' + CSS.escape(el.id) : 'switch',
-          checked:
-            el instanceof HTMLInputElement ? String(el.checked) : el.getAttribute('aria-checked'),
-          named: Boolean(
-            el.getAttribute('aria-label')?.trim() ||
-            (el.getAttribute('aria-labelledby') || '')
-              .split(/\s+/)
-              .some(id => document.getElementById(id)?.textContent?.trim()) ||
-            (el instanceof HTMLInputElement &&
-              [...(el.labels || [])].some(label => label.textContent?.trim())) ||
-            (el.getAttribute('role') === 'switch' &&
-              (() => {
-                const copy = el.cloneNode(true) as HTMLElement;
-                copy
-                  .querySelectorAll('[aria-hidden="true"], [hidden]')
-                  .forEach(node => node.remove());
-                return Boolean(copy.textContent?.trim());
-              })()),
-          ),
-          safe:
-            (!(el instanceof HTMLButtonElement) || el.type === 'button') &&
-            (!(el instanceof HTMLInputElement) || el.type === 'checkbox'),
-        }));
-      const before = await state();
-      if (!before.named || !['true', 'false'].includes(before.checked || ''))
-        add(
-          'widget-switch-semantics',
-          'switch',
-          before.selector,
-          { named: before.named, binaryState: ['true', 'false'].includes(before.checked || '') },
-          'Expose a named binary switch state with a label and checked or aria-checked.',
-        );
-      if (!before.safe) {
-        switches.push({ status: 'not-probed', reason: 'submit-button' });
-        continue;
-      }
-      await control.focus();
-      await control.press('Space', { timeout: 1500 });
-      const toggled = await state();
-      await control.press('Space', { timeout: 1500 });
-      const restored = await state();
-      if (before.checked === toggled.checked || before.checked !== restored.checked)
-        add(
-          'widget-switch-keyboard',
-          'switch',
-          before.selector,
-          { before: before.checked, toggled: toggled.checked, restored: restored.checked },
-          'Support Space toggling and reversal while exposing the checked state.',
-        );
-      switches.push({ before, toggled, restored, status: 'observed' });
-    } catch {
-      switches.push({ status: 'unverified', reason: 'switch-changed' });
-    }
-  }
+  const switchProbe = await inspectSwitches(page);
+  const { observations: switches, findings: switchFindings, ...switchOwnership } = switchProbe;
+  findings.push(...switchFindings);
 
   const ranges = (await page
     .locator(
@@ -566,7 +505,70 @@ export async function inspectWidgets(page: Page) {
     .filter({ visible: true })
     .elementHandles()) as ElementHandle<HTMLElement>[];
   for (const control of ranges.slice(0, LIMIT)) {
+    // https://html.spec.whatwg.org/multipage/interaction.html#focus-management-apis
+    // https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/accessibility/accessibility.md
+    // Retained context and no refocus after theft are local probe safety policy, not
+    // a requirement that stores use a particular slider API. Private signatures never leave the page.
+    const owner = await control
+      .evaluateHandle(el => {
+        // Local safety bounds: 24 ancestors, 128 attributes/node, and 16384
+        // attribute name/value code units per node (before JSON serialization).
+        const signature = (node: Element) => {
+          if (node.attributes.length > 128) return null;
+          let chars = 0;
+          const attributes: string[][] = [];
+          for (const attribute of node.attributes) {
+            if (['aria-valuenow', 'aria-valuetext'].includes(attribute.name)) continue;
+            chars += attribute.name.length + attribute.value.length;
+            if (chars > 16384) return null;
+            attributes.push([attribute.name, attribute.value]);
+          }
+          return JSON.stringify(attributes.sort());
+        };
+        const ancestors: Element[] = [];
+        let node = el.parentElement;
+        for (; node && ancestors.length < 24; node = node.parentElement) ancestors.push(node);
+        const signatures = [el, ...ancestors].map(signature);
+        const eligible = !node && signatures.every(value => value !== null);
+        let focusLost = false;
+        const onFocus = (event: FocusEvent) => {
+          if (event.target !== el) focusLost = true;
+        };
+        document.addEventListener('focusin', onFocus, true);
+        return {
+          el,
+          eligible,
+          dispose: () => document.removeEventListener('focusin', onFocus, true),
+          valid: () => {
+            const current: Element[] = [];
+            let node = el.parentElement;
+            for (; node && current.length < 24; node = node.parentElement) current.push(node);
+            return (
+              eligible &&
+              !focusLost &&
+              !node &&
+              el.isConnected &&
+              document.activeElement === el &&
+              current.length === ancestors.length &&
+              current.every((node, i) => node === ancestors[i]) &&
+              [el, ...current].every((node, i) => signature(node) === signatures[i]) &&
+              !el.closest('[hidden],[inert],[aria-hidden="true"]') &&
+              !el.matches(':disabled,[readonly],[aria-disabled="true"],[aria-readonly="true"]')
+            );
+          },
+        };
+      })
+      .catch(() => null);
+    if (!owner) {
+      sliders.push({ status: 'unverified', reason: 'slider-changed' });
+      break;
+    }
     try {
+      if (!(await owner.evaluate(retained => retained.eligible))) {
+        sliders.push({ status: 'not-probed', reason: 'slider-ownership-budget' });
+        continue;
+      }
+      let keysSent = 0;
       const state = () =>
         control.evaluate(el => {
           const native = el instanceof HTMLInputElement && el.type === 'range';
@@ -639,9 +641,36 @@ export async function inspectWidgets(page: Page) {
           : direction > 0 !== (before.native && before.rtl)
             ? 'ArrowRight'
             : 'ArrowLeft';
-      await control.focus();
-      await control.press(key, { timeout: 1500 });
+      // One DOM focus call: automation focus helpers can refocus after authored theft.
+      await control.evaluate(el => el.focus({ preventScroll: true }));
+      // A focus handler can supply a new value without changing DOM context.
+      // This is authored state, not a keyboard sample that cleanup may reverse.
+      const focused = await state();
+      if (focused.value !== before.value || !(await owner.evaluate(retained => retained.valid()))) {
+        sliders.push({
+          before,
+          status: 'unverified',
+          reason: 'slider-ownership-lost',
+          cleanup: { status: 'not-attempted', applicationResetVerified: false },
+          keysSent,
+        });
+        break;
+      }
+      // keyboard.press does not silently focus a retained node after authored focus movement.
+      keysSent++;
+      await page.keyboard.press(key);
       let changed = await state();
+      if (!(await owner.evaluate(retained => retained.valid()))) {
+        sliders.push({
+          before,
+          changed,
+          status: 'unverified',
+          reason: 'slider-ownership-lost',
+          cleanup: { status: 'not-attempted', applicationResetVerified: false },
+          keysSent,
+        });
+        break;
+      }
       // Engines differ on native RTL arrow direction; sample the opposite arrow at a clamped bound.
       if (changed.value === before.value && before.native) {
         key =
@@ -652,29 +681,51 @@ export async function inspectWidgets(page: Page) {
               : key === 'ArrowRight'
                 ? 'ArrowLeft'
                 : 'ArrowRight';
-        await control.press(key, { timeout: 1500 });
+        keysSent++;
+        await page.keyboard.press(key);
         changed = await state();
       }
-      if (
+      if (!(await owner.evaluate(retained => retained.valid()))) {
+        sliders.push({
+          before,
+          changed,
+          status: 'unverified',
+          reason: 'slider-ownership-lost',
+          cleanup: { status: 'not-attempted', applicationResetVerified: false },
+          keysSent,
+        });
+        break;
+      }
+      const keyboardFailed =
         changed.value === before.value ||
         changed.value === null ||
         changed.value < before.min ||
-        changed.value > before.max
-      )
-        add(
-          'widget-slider-keyboard',
-          'slider',
-          before.selector,
-          { before, changed },
-          'Support arrow-key value changes and keep the exposed value inside the slider bounds.',
+        changed.value > before.max;
+      // Compare-before-restore atomically with retained ownership; do not emit business events.
+      let cleanupAttempted = false;
+      if (before.native) {
+        cleanupAttempted = await owner.evaluate(
+          (retained, values) => {
+            if (
+              !retained.valid() ||
+              Number((retained.el as HTMLInputElement).value) !== values.changed
+            )
+              return false;
+            (retained.el as HTMLInputElement).value = String(values.initial);
+            return true;
+          },
+          { changed: changed.value, initial: before.value },
         );
-      // Restore exact native value without emitting a business action; custom widgets get the inverse key.
-      if (before.native)
-        await control.evaluate((el, value) => {
-          (el as HTMLInputElement).value = String(value);
-        }, before.value);
-      else
-        await control.press(
+      } else if (
+        await owner.evaluate(
+          (retained, value) =>
+            retained.valid() && Number(retained.el.getAttribute('aria-valuenow')) === value,
+          changed.value,
+        )
+      ) {
+        cleanupAttempted = true;
+        keysSent++;
+        await page.keyboard.press(
           key === 'ArrowUp'
             ? 'ArrowDown'
             : key === 'ArrowDown'
@@ -682,11 +733,39 @@ export async function inspectWidgets(page: Page) {
               : key === 'ArrowRight'
                 ? 'ArrowLeft'
                 : 'ArrowRight',
-          { timeout: 1500 },
         );
-      sliders.push({ before, changed, restored: await state(), status: 'observed' });
+      }
+      const restored = await state();
+      const owned = await owner.evaluate(retained => retained.valid());
+      const cleanup = {
+        applicationResetVerified: false,
+        status:
+          cleanupAttempted && owned && restored.value === before.value ? 'restored' : 'unverified',
+      };
+      // Loss during inverse cleanup invalidates provisional keyboard evidence too.
+      if (owned && cleanup.status === 'restored' && keyboardFailed)
+        add(
+          'widget-slider-keyboard',
+          'slider',
+          before.selector,
+          { before, changed },
+          'Support arrow-key value changes and keep the exposed value inside the slider bounds.',
+        );
+      sliders.push({
+        before,
+        changed,
+        restored,
+        cleanup,
+        keysSent,
+        status: owned && cleanup.status === 'restored' ? 'observed' : 'unverified',
+      });
+      if (!owned || cleanup.status !== 'restored') break;
     } catch {
       sliders.push({ status: 'unverified', reason: 'slider-changed' });
+      break;
+    } finally {
+      await owner.evaluate(retained => retained.dispose()).catch(() => {});
+      await owner.dispose();
     }
   }
   const menuNavigation = await inspectMenuNavigation(page);
@@ -708,6 +787,7 @@ export async function inspectWidgets(page: Page) {
       tabs,
       accordions,
       switches,
+      switchOwnership,
       sliders,
       perCategoryLimit: LIMIT,
       tabKeyboardLimit: 20,

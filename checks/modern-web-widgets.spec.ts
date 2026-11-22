@@ -79,7 +79,7 @@ test('broken declared widgets produce guide-specific advisories', async ({ page 
     page,
     `${tabs.replace('aria-label="Details"', '').replace('tabindex="-1"', 'tabindex="0"')}
     <details id="disclosure"><summary><h2>Heading inside summary</h2></summary><p>Details</p></details>
-    <div id="switch" role="switch" tabindex="0"><span aria-hidden="true">Visual switch</span></div>
+    <div id="switch" role="switch" tabindex="0" aria-checked="false"><span aria-hidden="true">Visual switch</span></div>
     <div id="slider" role="slider" tabindex="0" aria-valuemin="0" aria-valuemax="10" aria-valuenow="5">Volume</div>
     <script>document.querySelector('summary').addEventListener('click', event => event.preventDefault());</script>`,
   );
@@ -368,3 +368,209 @@ test('tab network-dependent activation stays unverified and all requests remain 
   });
   expect(guard.counts().blockedRequests).toBe(1);
 });
+
+for (const native of [true, false]) {
+  for (const phase of ['focus', 'arrow']) {
+    test(`slider ownership preserves ${native ? 'native' : 'custom'} focus theft during ${phase}`, async ({
+      page,
+    }) => {
+      await load(
+        page,
+        `<div id="owner">${
+          native
+            ? '<input type="range" id="range" aria-label="Volume" min="0" max="10" value="4">'
+            : '<div id="range" role="slider" tabindex="0" aria-label="Volume" aria-valuemin="0" aria-valuemax="10" aria-valuenow="4">Volume</div>'
+        }</div><button type="button" id="outside">Outside</button><input id="later-range" type="range" aria-label="Later volume" value="40"><script>
+        const slider=document.getElementById('range'),outside=document.getElementById('outside');
+        window.sliderKeys=0;window.sliderFocuses=0;
+        slider.addEventListener('focus',()=>{window.sliderFocuses++;${phase === 'focus' ? 'outside.focus();' : ''}});
+        slider.addEventListener('keydown',event=>{window.sliderKeys++;event.preventDefault();${native ? 'slider.value="8";' : 'slider.setAttribute("aria-valuenow","8");'}${phase === 'arrow' ? 'outside.focus();' : ''}});
+      </script>`,
+      );
+      const report = await inspectWidgets(page);
+      expect(report.findings).toEqual([]);
+      expect(report.coverage.sliders[0]).toMatchObject({
+        status: 'unverified',
+        reason: 'slider-ownership-lost',
+        cleanup: { status: 'not-attempted' },
+      });
+      await expect(page.locator('#outside')).toBeFocused();
+      expect(report.coverage.sliders).toHaveLength(1);
+      await expect(page.locator('#later-range')).toHaveValue('40');
+      expect(
+        await page.evaluate(() => ({
+          keys: (window as unknown as { sliderKeys: number }).sliderKeys,
+          focuses: (window as unknown as { sliderFocuses: number }).sliderFocuses,
+        })),
+      ).toEqual({ keys: phase === 'focus' ? 0 : 1, focuses: 1 });
+      if (native) await expect(page.locator('#range')).toHaveValue(phase === 'focus' ? '4' : '8');
+      else
+        await expect(page.locator('#range')).toHaveAttribute(
+          'aria-valuenow',
+          phase === 'focus' ? '4' : '8',
+        );
+    });
+  }
+}
+
+for (const mutation of ['reparent', 'bounds', 'disabled']) {
+  test(`slider ownership preserves authored ${mutation} without inverse keyboard cleanup`, async ({
+    page,
+  }) => {
+    await load(
+      page,
+      `<div id="owner"><div id="range" role="slider" tabindex="0" aria-label="Volume" aria-valuemin="0" aria-valuemax="10" aria-valuenow="4">Volume</div></div><div id="other"></div><script>
+      const slider=document.getElementById('range');window.sliderKeys=0;
+      slider.addEventListener('keydown',event=>{event.preventDefault();window.sliderKeys++;slider.setAttribute('aria-valuenow','8');${mutation === 'reparent' ? "document.getElementById('other').append(slider);slider.focus();" : mutation === 'bounds' ? "slider.setAttribute('aria-valuemax','20');" : "slider.setAttribute('aria-disabled','true');"}});
+    </script>`,
+    );
+    const report = await inspectWidgets(page);
+    expect(report.findings).toEqual([]);
+    expect(report.coverage.sliders[0]).toMatchObject({
+      status: 'unverified',
+      reason: 'slider-ownership-lost',
+      cleanup: { status: 'not-attempted' },
+    });
+    await expect(page.locator('#range')).toHaveAttribute('aria-valuenow', '8');
+    expect(
+      await page.evaluate(() => (window as unknown as { sliderKeys: number }).sliderKeys),
+    ).toBe(1);
+  });
+}
+
+test('slider ownership restores unchanged native and custom owners with explicit cleanup evidence', async ({
+  page,
+}) => {
+  await load(
+    page,
+    `<label for="range">Volume</label><input id="range" type="range" min="0" max="10" value="4"><div id="custom" role="slider" tabindex="0" aria-label="Volume" aria-valuemin="0" aria-valuemax="10" aria-valuenow="4">Volume</div><script>
+    document.getElementById('custom').addEventListener('keydown',event=>{event.preventDefault();const el=event.currentTarget;el.setAttribute('aria-valuenow',String(Number(el.getAttribute('aria-valuenow'))+(event.key==='ArrowRight'?1:-1)));});
+  </script>`,
+  );
+  const report = await inspectWidgets(page);
+  expect(report.findings).toEqual([]);
+  expect(report.coverage.sliders).toHaveLength(2);
+  expect(report.coverage.sliders.map(sample => sample.keysSent)).toEqual([1, 2]);
+  for (const sample of report.coverage.sliders)
+    expect(sample).toMatchObject({
+      status: 'observed',
+      cleanup: { status: 'restored' },
+      restored: { value: 4 },
+    });
+});
+
+for (const budget of ['ancestry', 'attributes']) {
+  test(`slider ownership excludes excessive ${budget} before focus`, async ({ page }) => {
+    await load(
+      page,
+      `${budget === 'ancestry' ? '<div>'.repeat(25) : ''}<input id="range" type="range" aria-label="Volume" value="40">${budget === 'ancestry' ? '</div>'.repeat(25) : ''}<script>
+      const slider=document.getElementById('range');window.sliderFocuses=0;slider.addEventListener('focus',()=>window.sliderFocuses++);
+      ${budget === 'attributes' ? "slider.setAttribute('data-private','private-sentinel'.repeat(2000));" : ''}
+    </script>`,
+    );
+    const report = await inspectWidgets(page);
+    expect(report.coverage.sliders[0]).toMatchObject({
+      status: 'not-probed',
+      reason: 'slider-ownership-budget',
+    });
+    expect(
+      await page.evaluate(() => (window as unknown as { sliderFocuses: number }).sliderFocuses),
+    ).toBe(0);
+    expect(JSON.stringify(report)).not.toContain('private-sentinel');
+  });
+}
+
+test('slider ownership suppresses provisional warning after inverse cleanup steals focus', async ({
+  page,
+}) => {
+  await load(
+    page,
+    `<div id="range" role="slider" tabindex="0" aria-label="Volume" aria-valuemin="0" aria-valuemax="10" aria-valuenow="4">Volume</div><button type="button" id="outside">Outside</button><script>
+    let keys=0;document.getElementById('range').addEventListener('keydown',event=>{event.preventDefault();if(++keys===2)document.getElementById('outside').focus();});
+  </script>`,
+  );
+  const report = await inspectWidgets(page);
+  expect(report.findings).toEqual([]);
+  expect(report.coverage.sliders[0]).toMatchObject({
+    status: 'unverified',
+    keysSent: 2,
+    cleanup: { status: 'unverified', applicationResetVerified: false },
+  });
+  await expect(page.locator('#outside')).toBeFocused();
+});
+
+test('slider ownership remembers focus theft even when the site immediately returns focus', async ({
+  page,
+}) => {
+  await load(
+    page,
+    `<input type="range" id="range" aria-label="Volume" value="40"><button type="button" id="outside">Outside</button><script>
+    const slider=document.getElementById('range');window.sliderKeys=0;slider.addEventListener('keydown',event=>{event.preventDefault();window.sliderKeys++;slider.value='80';document.getElementById('outside').focus();slider.focus();});
+  </script>`,
+  );
+  const report = await inspectWidgets(page);
+  expect(report.findings).toEqual([]);
+  expect(report.coverage.sliders[0]).toMatchObject({
+    status: 'unverified',
+    reason: 'slider-ownership-lost',
+    keysSent: 1,
+  });
+  await expect(page.locator('#range')).toHaveValue('80');
+  expect(await page.evaluate(() => (window as unknown as { sliderKeys: number }).sliderKeys)).toBe(
+    1,
+  );
+});
+
+test('slider ownership preserves authored inverse value and withholds provisional warning', async ({
+  page,
+}) => {
+  await load(
+    page,
+    `<div id="range" role="slider" tabindex="0" aria-label="Volume" aria-valuemin="0" aria-valuemax="10" aria-valuenow="4">Volume</div><input id="later-range" type="range" aria-label="Later volume" value="40"><script>
+    let keys=0;document.getElementById('range').addEventListener('keydown',event=>{event.preventDefault();if(++keys===2)event.currentTarget.setAttribute('aria-valuenow','8');});
+  </script>`,
+  );
+  const report = await inspectWidgets(page);
+  expect(report.findings).toEqual([]);
+  expect(report.coverage.sliders).toHaveLength(1);
+  expect(report.coverage.sliders[0]).toMatchObject({
+    status: 'unverified',
+    keysSent: 2,
+    cleanup: { status: 'unverified', applicationResetVerified: false },
+  });
+  await expect(page.locator('#range')).toHaveAttribute('aria-valuenow', '8');
+  await expect(page.locator('#later-range')).toHaveValue('40');
+});
+
+for (const native of [true, false])
+  test(`slider ownership preserves ${native ? 'native' : 'custom'} value supplied on focus`, async ({
+    page,
+  }) => {
+    await load(
+      page,
+      `${
+        native
+          ? '<input type="range" id="range" aria-label="Volume" min="0" max="10" value="4">'
+          : '<div id="range" role="slider" tabindex="0" aria-label="Volume" aria-valuemin="0" aria-valuemax="10" aria-valuenow="4">Volume</div>'
+      }<input id="later-range" type="range" aria-label="Later volume" value="40"><script>
+      const slider=document.getElementById('range');window.sliderKeys=0;
+      slider.addEventListener('focus',()=>{${native ? 'slider.value="8";' : 'slider.setAttribute("aria-valuenow","8");'}});
+      slider.addEventListener('keydown',()=>window.sliderKeys++);
+    </script>`,
+    );
+    const report = await inspectWidgets(page);
+    expect(report.findings).toEqual([]);
+    expect(report.coverage.sliders).toHaveLength(1);
+    expect(report.coverage.sliders[0]).toMatchObject({
+      status: 'unverified',
+      reason: 'slider-ownership-lost',
+      keysSent: 0,
+      cleanup: { status: 'not-attempted', applicationResetVerified: false },
+    });
+    if (native) await expect(page.locator('#range')).toHaveValue('8');
+    else await expect(page.locator('#range')).toHaveAttribute('aria-valuenow', '8');
+    await expect(page.locator('#later-range')).toHaveValue('40');
+    expect(
+      await page.evaluate(() => (window as unknown as { sliderKeys: number }).sliderKeys),
+    ).toBe(0);
+  });

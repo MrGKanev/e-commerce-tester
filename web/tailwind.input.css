@@ -54,3 +54,5 @@
 
 @source '../checks/modern-web-field-variants.spec.ts';
 @source '../checks/modern-web-field-sizing.spec.ts';
+
+@source '../checks/modern-web-field-geometry.spec.ts';

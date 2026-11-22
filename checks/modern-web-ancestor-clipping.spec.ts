@@ -1,6 +1,6 @@
 // Source: https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/user-experience/form-factor-adaptation.md
 // Whole-control clipping is actionable; scrollable/positioned/transformed and
-// partial boxes remain outside this geometry subset. Device descriptors exercise
+// complex/glyph clips remain outside this geometry subset. Device descriptors exercise
 // browser layout only: https://playwright.dev/docs/emulation (not OS/AT proof).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -38,11 +38,7 @@ for (const scenario of [
       item => item.rule === 'presentation-control-ancestor-clip',
     );
     expect(findings, JSON.stringify(report.coverage.states)).toHaveLength(
-      ['hidden', 'clip', 'horizontal'].includes(scenario) ||
-        (scenario === 'clip-margin' &&
-          !(await page.evaluate(() => CSS.supports('overflow-clip-margin', '100px'))))
-        ? 2
-        : 0,
+      ['hidden', 'clip', 'horizontal', 'clip-margin'].includes(scenario) ? 2 : 0,
     );
     for (const finding of findings)
       expect(finding).toMatchObject({

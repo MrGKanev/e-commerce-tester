@@ -324,10 +324,18 @@ async function main() {
           widgets.coverage.tableScroll.observations.some(
             item =>
               item.status === 'observed' &&
+              item.scrollRestoration.status === 'restored' &&
+              item.scrollRestoration.applicationResetVerified === false &&
               item.samples.some(sample => sample.canMove && sample.moved),
           ),
           'Actual Full entry must retain table keyboard movement evidence',
         );
+        assert.equal(widgets.coverage.tableScroll.retainedContextRequired, true);
+        assert.equal(widgets.coverage.tableScroll.applicationResetVerified, false);
+        // https://drafts.csswg.org/cssom-view/#scrolling-events
+        // Native scroll-handler work is sampled before restoration succeeds;
+        // the serialized DOM/focus result does not certify application reset.
+        assert.equal(widgets.coverage.tableScroll.focusRestoration.status, 'restored');
         assert.equal(widgets.coverage.accordions.length, 1);
         assert.equal(widgets.coverage.composites.menubars[0].status, 'observed');
         assert.equal(widgets.coverage.composites.toolbars[0].status, 'observed');
@@ -357,7 +365,26 @@ async function main() {
         assert.ok(widgets.coverage.customAccordions.activationAttempts >= 2);
         assert.equal(widgets.coverage.customAccordionActionsAttempted, true);
         assert.equal(widgets.coverage.switches.length, 1);
+        // https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/forms/switch.md
+        // Read native checked state; DOM fallback cleanup must not conceal a
+        // failed Space reversal in actual Full evidence. No persistence claim.
+        assert.equal(widgets.coverage.switches[0].status, 'observed');
+        assert.equal(widgets.coverage.switches[0].before.checked, 'false');
+        assert.equal(widgets.coverage.switches[0].toggled.checked, 'true');
+        assert.equal(widgets.coverage.switches[0].restored.checked, 'false');
+        assert.equal(widgets.coverage.switches[0].keysSent, 2);
+        assert.equal(widgets.coverage.switches[0].restoration.status, 'restored');
+        assert.equal(widgets.coverage.switches[0].restoration.method, 'keyboard');
+        assert.equal(widgets.coverage.switches[0].restoration.applicationResetVerified, false);
+        assert.equal(widgets.coverage.switchOwnership.retainedContextRequired, true);
+        assert.equal(widgets.coverage.switchOwnership.keyLimit, 2);
         assert.equal(widgets.coverage.sliders.length, 1);
+        assert.equal(widgets.coverage.sliders[0].status, 'observed');
+        assert.equal(widgets.coverage.sliders[0].changed.value, 5);
+        assert.equal(widgets.coverage.sliders[0].restored.value, 4);
+        assert.equal(widgets.coverage.sliders[0].cleanup.status, 'restored');
+        assert.equal(widgets.coverage.sliders[0].cleanup.applicationResetVerified, false);
+        assert.equal(widgets.coverage.sliders[0].keysSent, 1);
         const carousel = attachmentJson(
           result.attachments.find(item => item.name === 'modern-web-carousel.json'),
         );

@@ -150,7 +150,13 @@ export async function inspectPresentation(page: Page) {
               'inline-flex',
               'inline-grid',
             ].includes(s.display) ||
-            (s.overflowClipMargin && s.overflowClipMargin !== '0px')
+            // CSS Overflow: clip margins have no effect on hidden/auto/scroll.
+            // https://drafts.csswg.org/css-overflow-3/#overflow-clip-margin
+            // Custom clip edges stay unknown; ordinary hidden padding-box
+            // geometry must not be suppressed by an ignored declaration.
+            ([s.overflowX, s.overflowY].includes('clip') &&
+              s.overflowClipMargin &&
+              s.overflowClipMargin !== '0px')
           )
             continue;
           const box = node.getBoundingClientRect();
