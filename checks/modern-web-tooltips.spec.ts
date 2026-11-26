@@ -20,8 +20,9 @@ async function fixture(page: import('@playwright/test').Page, body: string, scri
   await guard.freeze();
   return { guard, writes: () => writes };
 }
+// Keep a real gap small enough for the fixture's 250ms grace across WebKit mouse steps.
 const markup =
-  '<button id="trigger" type="button" aria-describedby="hint">Help</button><div id="hint" role="tooltip" hidden class="fixed left-8 top-40 w-48 rounded bg-slate-900 p-3 text-white">private-tooltip-text</div>';
+  '<button id="trigger" type="button" aria-describedby="hint">Help</button><div id="hint" role="tooltip" hidden class="fixed left-8 top-24 w-48 rounded bg-slate-900 p-3 text-white">private-tooltip-text</div>';
 const behavior = (delay = 0) =>
   `const trigger=document.getElementById('trigger'),hint=document.getElementById('hint');let timer;const show=()=>{timer=setTimeout(()=>hint.hidden=false,${delay});};const hide=()=>{clearTimeout(timer);hint.hidden=true;};trigger.addEventListener('focus',show);trigger.addEventListener('mouseenter',show);trigger.addEventListener('blur',hide);trigger.addEventListener('mouseleave',()=>{timer=setTimeout(hide,250);});hint.addEventListener('mouseenter',()=>clearTimeout(timer));hint.addEventListener('mouseleave',hide);document.addEventListener('keydown',event=>{if(event.key==='Escape')hide();});`;
 
@@ -82,7 +83,7 @@ test('visible persistent tooltip must dismiss without moving focus and avoid cov
 }) => {
   await fixture(
     page,
-    markup.replace('left-8 top-40', 'left-0 top-0'),
+    markup.replace('left-8 top-24', 'left-0 top-0'),
     `const trigger=document.getElementById('trigger'),hint=document.getElementById('hint');trigger.addEventListener('focus',()=>{hint.hidden=false;const r=trigger.getBoundingClientRect();hint.style.left=r.left+'px';hint.style.top=r.top+'px';});trigger.addEventListener('blur',()=>hint.hidden=true);`,
   );
   const report = await inspectTooltips(page);
@@ -174,7 +175,7 @@ test('occluded tooltip destination remains unverified rather than a hover failur
 }) => {
   await fixture(
     page,
-    markup + '<div class="fixed left-8 top-40 z-50 h-40 w-48 bg-white">Cover</div>',
+    markup + '<div class="fixed left-8 top-24 z-50 h-40 w-48 bg-white">Cover</div>',
     behavior(),
   );
   const report = await inspectTooltips(page);
