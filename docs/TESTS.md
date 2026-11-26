@@ -4,7 +4,7 @@
 
 [Release gates and deferred work](MODERN-WEB-REVIEW.md#stable-release-boundary--2026-11-26). Linux CI run [45792517277](https://github.com/MrGKanev/e-commerce-tester/actions/runs/45792517277) passed 1480 Modern Web cases but failed six native textarea end-reachability assertions. The same six failures were reproduced in the pinned Playwright noble image. The fixture now uses Tailwind `leading-tight` to bound OS-dependent fallback-font line-box differences; all 30 desktop/mobile Chromium field-content cases then passed in that image. Production geometry thresholds, advisory severity, unknown outcomes and rule IDs are unchanged. Desktop/mobile fixture screenshots were inspected. The configured inventory remains 743 definitions / 3715 five-profile executions.
 
-`pnpm check` passed with 128 unit tests, the local CSS build passed, and the current registry audit reported zero known advisories. Whole-chain and five-profile release validation must be recorded independently; these focused results alone do not close the release gates.
+`pnpm check` passed with 128 unit tests, the local CSS build passed, and the current registry audit reported zero known advisories. [PR #29's validation summary and checks](https://github.com/MrGKanev/e-commerce-tester/pull/29) track the subsequent whole-chain and five-profile stabilization results separately; these focused results alone do not close the release gates.
 
 Current follow-up: [native details ownership/widget continuation](#native-details-ownership-and-widget-continuation--2026-11-22) and [current inventory/review](MODERN-WEB-REVIEW.md). Older validation records below retain their historical scope.
 

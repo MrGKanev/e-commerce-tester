@@ -4,7 +4,7 @@
 
 ## Stable release boundary — 2026-11-26
 
-Stabilize the implemented scope before adding more guide coverage. The release gates are:
+Stabilize the implemented scope before adding more guide coverage. [PR #29's validation summary and checks](https://github.com/MrGKanev/e-commerce-tester/pull/29) track completion of these gates; dated focused results below retain their historical scope. The release gates are:
 
 1. Fix the six Linux Chromium textarea fixture failures in [CI run 45792517277](https://github.com/MrGKanev/e-commerce-tester/actions/runs/45792517277). Native caret scrolling can leave part of a line box below the scrollport with OS-dependent fallback fonts; this must not become a storefront failure or a relaxed production threshold.
 2. Pass `pnpm check`, the CSS build, the complete sequential local acceptance chain and the configured five-profile Modern Web matrix. Record actual results separately from inventory counts. Recheck dependency advisories.
