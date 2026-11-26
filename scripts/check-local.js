@@ -19,16 +19,11 @@ function report(state) {
   const rows = state.checks.map(check =>
     `| \`pnpm ${check.command}\` | ${check.status} | ${check.seconds == null ? '—' : `${check.seconds} s`} |`,
   );
-  let body = `${marker}\n## Local quality and browser checks\n\nGenerated automatically by \`scripts/check-local.js\`.\n\n` +
+  let body = `${marker}\n## Local quality and browser checks\n\n` +
     `**Result: ${state.status}**\n\nCommit: \`${state.commit}\`\n\n` +
     `Environment: ${state.environment}\n\nStarted (UTC): ${state.startedAt}\n` +
     (state.finishedAt ? `\nFinished (UTC): ${state.finishedAt}\n` : '') +
-    `\n| Command | Result | Duration |\n| --- | --- | --- |\n${rows.join('\n')}\n\n` +
-    'The maintained CI acceptance chain runs sequentially against local fixtures. ' +
-    'Expected negative reporting/visual/security fixtures are validated by their parent runners; command exit codes determine the result. ' +
-    'Live stores and the additional five-profile Modern Web matrix are outside this run.\n\n' +
-    'Full logs and report files stay in the ignored `reports/local-quality/` directory. ' +
-    'Developer-local reports do not replace hosted GitHub Actions check results.\n';
+    `\n| Command | Result | Duration |\n| --- | --- | --- |\n${rows.join('\n')}\n`;
   const diagnostics = state.checks.filter(check => check.tail).map(check => ({ label: `pnpm ${check.command}`, tail: check.tail }));
   if (state.problem) diagnostics.push({ label: 'Validation/reporting', tail: state.problem });
   for (const diagnostic of diagnostics) {
@@ -108,13 +103,13 @@ async function main() {
     }
   }
   try {
-    publish();
+    save();
     for (const [index, check] of state.checks.entries()) {
       if (interrupted) break;
       if (exec('git', ['rev-parse', 'HEAD']) !== commit || (api && exec('git', ['status', '--porcelain'])))
         throw new Error('The checkout changed during validation; this result is not valid for the PR.');
       check.status = 'running';
-      publish();
+      save();
       console.log(`[${index + 1}/${commands.length}] pnpm ${check.command}`);
       const log = path.join(directory, `${index + 1}.log`);
       const fd = fs.openSync(log, 'w', 0o600);
@@ -137,7 +132,7 @@ async function main() {
         check.tail = fs.readFileSync(log, 'utf8').slice(-6000);
         break;
       }
-      publish();
+      save();
     }
     if (exec('git', ['rev-parse', 'HEAD']) !== commit || (api && exec('git', ['status', '--porcelain'])))
       throw new Error('The checkout changed during validation; this result is not valid for the PR.');

@@ -60,7 +60,7 @@ pnpm check:pr
 pnpm check:pr 29
 ```
 
-The script runs `pnpm check`, `pnpm build:css` and `pnpm test:acceptance:local` sequentially. It prints progress in the terminal and automatically creates/updates its own marked PR comment with the commit, environment, timings and results. A failure stops later checks, publishes a bounded redacted diagnostic tail and returns a nonzero exit code. Cancellation is reported when the process can shut down normally. GitHub publication failures also return nonzero; a green local result must not be inferred from an old comment.
+The script runs `pnpm check`, `pnpm build:css` and `pnpm test:acceptance:local` sequentially. Progress stays in the terminal; after completion it automatically creates/updates its own marked PR comment with the commit, environment, timings and final results. It does not post running-status comments. A failure stops later checks, publishes a bounded redacted diagnostic tail and returns a nonzero exit code. Cancellation is reported when the process can shut down normally. GitHub publication failures also return nonzero; a green local result must not be inferred from an old comment.
 
 The working tree must be clean and the PR must already point to the local commit. Local commit/worktree and remote PR changes during validation invalidate the result. Run one validation per checkout at a time. The command checks and reports; merging remains a separate explicit action.
 

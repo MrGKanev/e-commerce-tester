@@ -46,6 +46,7 @@ function fixture(t) {
     const method=args[args.indexOf('--method')+1];
     if(method==='GET'&&endpoint.endsWith('/pulls/29')){console.log(JSON.stringify({state:'open',head:{sha:process.env.STUB_REMOTE_CHANGED?'b'.repeat(40):'${sha}'}}));process.exit(0);}
     const body=JSON.parse(fs.readFileSync(0,'utf8')).body;
+    fs.appendFileSync('comment-writes.jsonl',JSON.stringify({method,body})+'\\n');
     if(process.env.STUB_UPLOAD_FAIL==='all'||(process.env.STUB_UPLOAD_FAIL&&body.includes('**Result: passed**'))){console.error('GitHub unavailable');process.exit(1);}
     const id=method==='PATCH'?Number(endpoint.split('/').at(-1)):100+comments.length;
     const comment={id,user:{login:'tester'},body,html_url:'https://github.com/example/store/pull/29#issuecomment-'+id};
@@ -87,6 +88,11 @@ test('runs the shared sequence and updates only its own marked PR comment across
   assert.equal(comments(f).find(comment => comment.id === 1).body, marker + '\nOther author');
   assert.equal(comments(f).find(comment => comment.id === 2).body, 'Unrelated review');
   assert.match(comments(f).find(comment => comment.id === 102).body, /Result: passed/);
+  const writes = fs.readFileSync(path.join(f.root, 'comment-writes.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+  assert.equal(writes.length, 2, 'One final publication per execution');
+  for (const { body } of writes) {
+    assert.doesNotMatch(body, /Result: running|Generated automatically|Full logs and report files|Developer-local reports/);
+  }
 });
 
 test('failed checks stop the sequence, return nonzero and publish escaped/redacted diagnostics', t => {
@@ -104,7 +110,7 @@ test('failed checks stop the sequence, return nonzero and publish escaped/redact
 
 test('CI/local mode requires no GitHub calls and writes the same formatted job summary', t => {
   const f = fixture(t);
-  fs.unlinkSync(path.join(f.root, 'bin/gh'));
+  fs.writeFileSync(path.join(f.root, 'bin/gh'), '#!/usr/bin/env node\nprocess.exit(99);\n');
   f.env.GITHUB_STEP_SUMMARY = path.join(f.root, 'summary.md');
   assert.equal(run(f, []).status, 0);
   assert.equal(comments(f).length, 0);
@@ -144,7 +150,7 @@ test('publication failure returns nonzero and persists a failed local report', t
     assert.equal(result(f).status, 'failed');
     assert.match(result(f).problem, /GitHub unavailable/);
     for (const comment of comments(f)) assert.doesNotMatch(comment.body, /Result: passed/);
-    if (mode === 'all') assert.deepEqual(calls(f), []);
+    assert.deepEqual(calls(f), ['check', 'build:css', 'test:acceptance:local']);
   }
 });
 
