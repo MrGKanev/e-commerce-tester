@@ -6,7 +6,7 @@ The suite supports desktop Chromium, Firefox and WebKit, plus selected mobile sc
 
 ## Quick start
 
-Requires Node.js **22.13+** (see `.nvmrc`) and pnpm **11+**. Docker is an alternative to installing browsers locally.
+Requires Node.js **22.13+** (see `.nvmrc`) and pnpm **12+**. Docker is an alternative to installing browsers locally.
 
 ```bash
 git clone https://github.com/MrGKanev/e-commerce-tester.git

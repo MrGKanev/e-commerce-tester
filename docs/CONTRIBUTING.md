@@ -13,7 +13,7 @@ pnpm install --frozen-lockfile
 pnpm run install:browsers
 ```
 
-Use Node.js 22.13+ and pnpm 11+. Keep the pinned Playwright dependency and Docker image version aligned. TypeScript is pinned for compatibility with the installed ESLint parser.
+Use Node.js 22.13+ and pnpm 12+. Keep the pinned Playwright dependency and Docker image version aligned. TypeScript is pinned for compatibility with the installed ESLint parser.
 
 ## Upstream web guidance
 

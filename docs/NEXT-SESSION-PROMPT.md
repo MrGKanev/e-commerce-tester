@@ -2,6 +2,8 @@
 
 Copy the prompt below into the next coding session. The dated snapshot is a starting point; verify current repository and remote state before acting.
 
+Current priority (2026-11-26): finish the [stable release gates](MODERN-WEB-REVIEW.md#stable-release-boundary--2026-11-26) before resuming the expansion prompt below. The older snapshot and suggested batches are historical context, not evidence that current CI passes.
+
 ---
 
 Continue implementing the remaining Modern Web storefront checks in `/Volumes/ROG/git/e-commerce-tester`. Work autonomously in substantial, tested batches and implement as much defensible coverage as possible. Do not stop after proposing a plan or completing one small feature. Communicate with me in Bulgarian; keep project code, comments and documentation in English.

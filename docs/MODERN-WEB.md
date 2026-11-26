@@ -2,6 +2,8 @@
 
 [Back to README](../README.md) · [Test reference](TESTS.md) · [Reports](REPORTS.md)
 
+Stabilization priority (2026-11-26): [release gates](MODERN-WEB-REVIEW.md#stable-release-boundary--2026-11-26) and [Linux textarea fixture calibration](TESTS.md#stable-release-calibration--2026-11-26). This changes fixture line-height only; production rules, thresholds, severities and guide status remain unchanged.
+
 Current follow-up: [native details ownership/widget continuation](#native-details-ownership-and-widget-continuation--2026-11-22), with the [current inventory and review](MODERN-WEB-REVIEW.md).
 
 ## Current handoff — 2026-11-18

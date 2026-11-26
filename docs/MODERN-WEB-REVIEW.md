@@ -2,6 +2,16 @@
 
 [Coverage matrix](MODERN-WEB.md#complete-catalog-mapping) · [Validation record](TESTS.md)
 
+## Stable release boundary — 2026-11-26
+
+Stabilize the implemented scope before adding more guide coverage. The release gates are:
+
+1. Fix the six Linux Chromium textarea fixture failures in [CI run 45792517277](https://github.com/MrGKanev/e-commerce-tester/actions/runs/45792517277). Native caret scrolling can leave part of a line box below the scrollport with OS-dependent fallback fonts; this must not become a storefront failure or a relaxed production threshold.
+2. Pass `pnpm check`, the CSS build, the complete sequential local acceptance chain and the configured five-profile Modern Web matrix. Record actual results separately from inventory counts. Recheck dependency advisories.
+3. Obtain passing CI for the corrected branch before merging/releasing. Local validation alone does not replace Linux CI; do not mark the existing failing commit stable.
+
+After that checkpoint, continue the backlog below in separate tested batches: retained ownership across remaining helpers/inspectors, broader table/text geometry, then explicitly configured sandbox workflows. Device/assistive-technology and private-access security work remain separate obligations. Completing all 110 open guide topics is not a prerequisite for a stable release of the documented bounded checks.
+
 209 guide topics remain **1 Covered / 62 Partial / 48 Pending / 98 outside scope**. These are topics, not test counts. The existing suite already covers forms, disclosures, tabs, sliders, composite/menu/tooltip/carousel keyboard samples, responsive/text/preference stress, table/progress semantics, resource hints, policies and opt-in script/destination/payment monitoring. Do not add a second generic inspector or count axe/fixtures alone as completion.
 
 ## Current scope and remaining counts

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { test, expect } from '../tests/fixtures';
 import { prepareInteractionProbe } from '../tests/modern-web-interactions';
 import { inspectFieldContent } from '../tests/modern-web-field-content';
+// Keep native caret/line-box geometry comparable across OS fallback fonts.
 const css = fs.readFileSync(path.resolve(__dirname, '../web/tailwind.css'), 'utf8');
 for (const scenario of [
   'native',
@@ -29,7 +30,7 @@ for (const scenario of [
       if (route.request().method() !== 'GET') writes++;
       return route.fulfill({
         contentType: 'text/html',
-        body: `<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Local field content</title><style>${css}</style><body class="bg-white text-slate-900"><main class="mx-auto max-w-xl space-y-4 p-4"><h1 class="text-2xl font-bold">Message editing</h1><button id="before" type="button" class="rounded border p-2">Before field</button><label class="block" for="field">Message</label><textarea id="field" rows="2" ${scenario === 'maxlength' ? 'maxlength="10"' : ''} ${scenario === 'readonly' ? 'readonly' : ''} ${scenario === 'inert' ? 'inert' : ''} class="block w-full max-w-full resize-y rounded border p-2 ${scenario === 'field-sizing' ? 'field-sizing-content min-h-16 max-h-64' : ''} ${scenario === 'hidden-overflow' ? 'overflow-hidden' : 'overflow-auto'}">${scenario === 'prefilled' ? 'private-authored-value' : ''}</textarea><button id="after" type="button" class="rounded border p-2">After field</button></main><script>
+        body: `<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Local field content</title><style>${css}</style><body class="bg-white text-slate-900"><main class="mx-auto max-w-xl space-y-4 p-4"><h1 class="text-2xl font-bold">Message editing</h1><button id="before" type="button" class="rounded border p-2">Before field</button><label class="block" for="field">Message</label><textarea id="field" rows="2" ${scenario === 'maxlength' ? 'maxlength="10"' : ''} ${scenario === 'readonly' ? 'readonly' : ''} ${scenario === 'inert' ? 'inert' : ''} class="block w-full max-w-full resize-y rounded border p-2 leading-tight ${scenario === 'field-sizing' ? 'field-sizing-content min-h-16 max-h-64' : ''} ${scenario === 'hidden-overflow' ? 'overflow-hidden' : 'overflow-auto'}">${scenario === 'prefilled' ? 'private-authored-value' : ''}</textarea><button id="after" type="button" class="rounded border p-2">After field</button></main><script>
       const field=document.getElementById('field'), scenario=${JSON.stringify(scenario)};
       field.addEventListener('input',()=>{
         if(scenario==='grow') field.rows=Math.max(2,field.value.split('\\n').length+1);
