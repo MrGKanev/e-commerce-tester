@@ -1,3 +1,4 @@
+import { privateResultsFile } from './scripts/artifact-privacy';
 import { defineConfig, devices } from '@playwright/test';
 import { STORAGE_STATE } from './config/global-setup';
 import { BASE, USER_AGENT, LOCALE, TIMEZONE_ID } from './tests/helpers';
@@ -5,7 +6,7 @@ import { pin, baselineRoot } from './scripts/visual-baselines';
 import { readSiteSettings } from './config/site-settings';
 const platform = readSiteSettings().platform;
 const wooMatch =
-  /(?:12-performance|29-content|30-inventory-visual|32-shared-pages|35-seo-inventory|36-buyer-journey|39-a11y-extras|40-a11y-dynamic|41-markets|42-tracking-consent|43-modern-web|37-store-expectations|38-third-party-scripts|34-woocommerce)\.spec\.ts/;
+  /(?:12-performance|29-content|30-inventory-visual|32-shared-pages|35-seo-inventory|36-buyer-journey|39-a11y-extras|40-a11y-dynamic|41-markets|42-tracking-consent|43-modern-web|44-security-monitoring|37-store-expectations|38-third-party-scripts|34-woocommerce)\.spec\.ts/;
 
 const runDate =
   process.env.TEST_RUN_DATE ||
@@ -16,6 +17,8 @@ const reportDir = siteSlug ? `./reports/${siteSlug}/${runDate}` : `./reports/${r
 
 process.env.PAGE_INVENTORY_FILE ||= `${reportDir}/page-inventory.json`;
 const baseline = pin(baselineRoot(), siteSlug, runDate);
+
+const stagedResults = privateResultsFile(`${reportDir}/results.json`);
 
 export default defineConfig({
   testDir: './tests',
@@ -43,7 +46,11 @@ export default defineConfig({
     ['list'],
     ['./config/run-metadata-reporter.ts', { outputFile: `${reportDir}/run-metadata.json` }],
     ['html', { outputFolder: `${reportDir}/html`, open: 'never' }],
-    ['json', { outputFile: `${reportDir}/results.json` }],
+    ['json', { outputFile: stagedResults }],
+    [
+      './config/artifact-privacy-reporter.ts',
+      { inputFile: stagedResults, outputFile: `${reportDir}/results.json` },
+    ],
   ],
 
   use: {
@@ -91,7 +98,7 @@ export default defineConfig({
       testMatch:
         platform === 'woocommerce'
           ? wooMatch
-          : /(?:07-mobile|10-visual|11-accessibility|24-keyboard|29-content|30-inventory-visual|32-shared-pages|35-seo-inventory|36-buyer-journey|33-commerce-consistency|40-a11y-dynamic|41-markets|42-tracking-consent|43-modern-web)\.spec\.ts/,
+          : /(?:07-mobile|10-visual|11-accessibility|24-keyboard|29-content|30-inventory-visual|32-shared-pages|35-seo-inventory|36-buyer-journey|33-commerce-consistency|40-a11y-dynamic|41-markets|42-tracking-consent|43-modern-web|44-security-monitoring)\.spec\.ts/,
       use: { ...devices['Pixel 7'] },
     },
     {
@@ -99,7 +106,7 @@ export default defineConfig({
       testMatch:
         platform === 'woocommerce'
           ? wooMatch
-          : /(?:07-mobile|10-visual|11-accessibility|24-keyboard|29-content|30-inventory-visual|32-shared-pages|35-seo-inventory|36-buyer-journey|33-commerce-consistency|40-a11y-dynamic|41-markets|42-tracking-consent|43-modern-web)\.spec\.ts/,
+          : /(?:07-mobile|10-visual|11-accessibility|24-keyboard|29-content|30-inventory-visual|32-shared-pages|35-seo-inventory|36-buyer-journey|33-commerce-consistency|40-a11y-dynamic|41-markets|42-tracking-consent|43-modern-web|44-security-monitoring)\.spec\.ts/,
       use: { ...devices['iPhone 13'] },
     },
   ],

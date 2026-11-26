@@ -83,7 +83,7 @@ test.describe('01 · Homepage', { tag: ["@full"] }, () => {
     await goto(page);
     const productLink = page.locator(
       'a[href*="/products/"], a[href*="/collections/"]',
-    ).first();
+    ).filter({ visible: true }).first();
     await expect(productLink).toBeVisible();
   });
 

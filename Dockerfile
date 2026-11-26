@@ -1,5 +1,5 @@
-FROM mcr.microsoft.com/playwright:v1.64.0-noble
-ENV VISUAL_ENVIRONMENT=playwright-1.64.0-noble
+FROM mcr.microsoft.com/playwright:v1.65.1-noble
+ENV VISUAL_ENVIRONMENT=playwright-1.65.1-noble
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ RUN if [ "$INSTALL_OCR" = "1" ]; then \
     fi
 
 # Install pnpm
-RUN npm install -g pnpm@11.3.0
+RUN npm install -g pnpm@12.21.0
 
 # Install dependencies first for layer caching
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./

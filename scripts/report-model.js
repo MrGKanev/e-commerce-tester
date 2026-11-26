@@ -1,5 +1,6 @@
 'use strict';
 const { classification } = require('./monitoring');
+const { sanitizeArtifact } = require('./artifact-privacy');
 
 const percent = (numerator, denominator) => denominator > 0 ? Math.round(numerator / denominator * 100) : null;
 const errorText = error => typeof error === 'string' ? error : error?.message || error?.value || error?.stack || 'Unspecified error';
@@ -75,14 +76,14 @@ function summarizeRun(results = {}, metadata = {}, issue = null) {
   else if (flaky > 0) status = 'flaky';
   else if (executed === 0) status = 'not-applicable';
   else status = 'passed';
-  return {
+  return sanitizeArtifact({
     passed, failed, skipped, flaky, interrupted, notRun, unfinished, total, executed, applicable,
     notApplicable, unclassifiedSkipped, scopeKnown: !!(results.stats || Array.isArray(results.suites) || Object.hasOwn(metadata, 'selectedTests') || selected.length), status, allPassed: status === 'passed',
     // Flaky tests succeeded on retry, but keep a warning status and their failed attempts.
     passRate: percent(passed + flaky, executed), coverage: percent(executed, applicable),
     errors: globalErrors.length, globalErrors, reportIssue: issue, scenarios: selected, metadata,
     durationSec: Math.round((stats.duration ?? metadata.duration ?? 0) / 1000),
-  };
+  });
 }
 
 function compareRuns(current, previous) {

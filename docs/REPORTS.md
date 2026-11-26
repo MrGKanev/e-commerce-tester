@@ -67,3 +67,9 @@ The comparison revision is recorded in run metadata and each visual entry. The r
 ## Price and availability evidence
 
 The `33-commerce-consistency` suite attaches sanitized `commerce-consistency.json` per scenario, and the reporter checkpoints a combined file in the run directory. The dashboard shows public product/variant observations, UI amounts, same-session cart amounts and discounts, including failed and unverified evidence. Unverified checks are ordinary skips that remain in coverage. See [Commerce checks](COMMERCE.md) for selectors, sample limits and supported pricing.
+
+## Filtered diagnostics and raw artifacts
+
+New standard-runner `results.json` is staged privately and published atomically after privacy filtering. Metadata checkpoints, aggregate JSON, control events, managed scheduler logs and derived summaries also use the shared filter. An interrupted or failed publication may leave the final JSON absent; checkpoint coverage remains available and must not be interpreted as a clean run. Execution URLs, evidence hashes and result counts are preserved.
+
+This does not sanitize the native Playwright HTML/ZIP package, traces, screenshots/videos, error-context files, external attachment contents/filenames or historical files. See [exact privacy boundaries and retention limits](ARTIFACT-PRIVACY.md) before sharing reports. The security suite attaches scoped [script/destination/payment/CSP evidence](SECURITY-MONITORING.md); its warning/unverified states are not malware attribution.

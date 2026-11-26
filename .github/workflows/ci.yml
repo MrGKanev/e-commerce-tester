@@ -17,23 +17,21 @@ jobs:
   checks:
     name: Quality and local browser checks
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: TypeScript, lint, unit tests and toolchain
-        run: pnpm check
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
@@ -43,13 +41,11 @@ jobs:
       - name: Install system dependencies only (browser cached)
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright install-deps chromium
-      - name: Build Tailwind CSS
-        run: pnpm build:css
-      - name: Local browser acceptance checks
-        run: pnpm test:acceptance:local
+      - name: Quality and local browser checks
+        run: pnpm check:local
       - name: Upload local failure artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: local-check-reports
           path: reports/local-*/

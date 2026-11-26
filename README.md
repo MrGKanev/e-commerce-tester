@@ -6,7 +6,7 @@ The suite supports desktop Chromium, Firefox and WebKit, plus selected mobile sc
 
 ## Quick start
 
-Requires Node.js **22.13+** (see `.nvmrc`) and pnpm **11+**. Docker is an alternative to installing browsers locally.
+Requires Node.js **22.13+** (see `.nvmrc`) and pnpm **12+**. Docker is an alternative to installing browsers locally.
 
 ```bash
 git clone https://github.com/MrGKanev/e-commerce-tester.git
@@ -57,6 +57,8 @@ pnpm dashboard:preview
 
 Visual checks compare with an explicitly approved version per store. Review and approve candidates in the control panel; runs never update approval automatically. See [Visual baselines](docs/RUNNING.md#visual-baselines).
 
+Opt-in script-content, outbound destination and checkout-interface monitoring supports Shopify/WooCommerce with reviewed baselines. See [Security monitoring](docs/SECURITY-MONITORING.md). Persisted diagnostics use a [shared privacy filter](docs/ARTIFACT-PRIVACY.md); raw browser HTML/trace/image artifacts remain sensitive.
+
 The dashboard preview uses offline sample data. Live runs use request pacing, no automatic retries and one worker. For unattended checks across multiple stores, use the [long-running Docker scheduler](docs/SCHEDULER.md) with configurable intervals and cooldowns. Optional features may be skipped; review coverage and skip reasons alongside pass rate.
 
 ## Coverage
@@ -104,6 +106,8 @@ run.sh                 Entry point for the multi-store runner
 ```
 
 GitHub Actions runs TypeScript, lint, unit tests, toolchain validation and selected local browser acceptance checks on pull requests and pushes to `master`. These checks use local fixtures; live store checks run separately through the CLI or scheduler. Dependabot provides dependency update PRs.
+
+Run the same checks locally with `pnpm check:local`. Use `pnpm check:pr` on a committed/pushed PR branch to run them and automatically publish the results as a PR comment. See [local PR validation](docs/CONTRIBUTING.md#publish-local-results-to-your-pr) for setup, failure reporting and log limits.
 
 ## License
 

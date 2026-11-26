@@ -13,7 +13,7 @@ pnpm install --frozen-lockfile
 pnpm run install:browsers
 ```
 
-Use Node.js 22.13+ and pnpm 11+. Keep the pinned Playwright dependency and Docker image version aligned. TypeScript is pinned for compatibility with the installed ESLint parser.
+Use Node.js 22.13+ and pnpm 12+. Keep the pinned Playwright dependency and Docker image version aligned. TypeScript is pinned for compatibility with the installed ESLint parser.
 
 ## Upstream web guidance
 
@@ -43,13 +43,28 @@ pnpm format:check
 
 The [Project checks workflow](../.github/workflows/ci.yml) runs `pnpm check` and `pnpm test:acceptance:local` on pull requests, pushes to `master` and manual dispatch. It installs the pnpm version from `package.json`, Node from `.nvmrc`, and Chromium with its system dependencies. The acceptance command runs pacing, readiness, reporting, control panel, shared-page, performance-observation, approved-visual lifecycle, Shopify/WooCommerce public commerce consistency, SEO, dynamic accessibility and continuous buyer-journey checks sequentially against local fixtures. Live store checks are scheduled separately. Failed CI runs retain available local report artifacts for seven days.
 
-To run the same checks locally:
+To run the same checks locally (the exact shared runner used by CI):
 
 ```bash
 pnpm exec playwright install chromium
-pnpm check
-pnpm test:acceptance:local
+pnpm check:local
 ```
+
+### Publish local results to your PR
+
+Install the GitHub CLI (`gh`), sign in with `gh auth login`, and commit/push your branch before running:
+
+```bash
+pnpm check:pr
+# Or choose an open PR explicitly:
+pnpm check:pr 29
+```
+
+The script runs `pnpm check`, `pnpm build:css` and `pnpm test:acceptance:local` sequentially. Progress stays in the terminal; after completion it automatically creates/updates its own marked PR comment with the commit, environment, timings and final results. It does not post running-status comments. A failure stops later checks, publishes a bounded redacted diagnostic tail and returns a nonzero exit code. Cancellation is reported when the process can shut down normally. GitHub publication failures also return nonzero; a green local result must not be inferred from an old comment.
+
+The working tree must be clean and the PR must already point to the local commit. Local commit/worktree and remote PR changes during validation invalidate the result. Run one validation per checkout at a time. The command checks and reports; merging remains a separate explicit action.
+
+Raw logs, `result.json` and the exact published `report.md` remain under the ignored `reports/local-quality/<commit>-<timestamp>/` directory. Only the Markdown summary and bounded diagnostic tails are posted; screenshots/traces/full logs stay local. Tails use the shared heuristic privacy filter and HTML escaping, not a guarantee that arbitrary secrets are detectable. Existing GitHub Actions failure artifacts retain their separate access/sensitivity limits. CI also writes the same formatted report to its job summary, without requiring GitHub CLI credentials or posting developer-local comments.
 
 Unit tests also exercise the scheduler with stub runners: interval bounds, cooldowns, restart recovery, process shutdown, exclusive locks and start windows.
 
@@ -104,3 +119,9 @@ Use conventional commit prefixes (`feat:`, `fix:`, `test:`, `docs:`, `chore:`) a
 For issues, include the failing scenario, selected project/mode, relevant version information and sanitized report evidence. Include a store URL only if it is public and appropriate to share. Do not commit local store configuration, session state or generated reports.
 
 `pnpm test:woocommerce:local` validates Woo lifecycle hooks, suite isolation, classic/block and cookie/token/nonce carts, custom routes, price precision/taxes and variations through loopback fixtures. It is included in the common acceptance command and CI. `scripts/platform-config.test.js` and mixed-runner tests protect isolation and legacy Shopify configuration.
+
+## Security workflow regression checks
+
+`pnpm test:security:local` exercises security observations against owned desktop/mobile fixtures; `pnpm test:security:entry:local` verifies real Shopify/WooCommerce entry scenarios, including intentional strict failures and immutable baseline/history files. Both are included in local acceptance. Never use live stores to calibrate new rules without authorization.
+
+`pnpm check` includes artifact-redaction and offline baseline review/history unit tests. `pnpm test:reporting` verifies original request execution, filtered diagnostics/encoded attachments and private atomic JSON publication. Security approvals in fixtures must provide an explicit reason; CLI approvals also require the review hash. Preserve exact security fingerprints and document raw artifact exclusions. See [artifact privacy](ARTIFACT-PRIVACY.md) and [baseline workflow](SECURITY-MONITORING.md).

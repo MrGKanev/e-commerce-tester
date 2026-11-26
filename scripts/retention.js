@@ -44,7 +44,10 @@ function pruneReports(reportsDir, sites, now = Date.now()) {
       .sort((a, b) => b.name.localeCompare(a.name));
     let total = runs.reduce((sum, r) => sum + r.bytes, 0),
       count = runs.length;
-    for (const run of [...runs].reverse()) {
+    // Source: js copying array methods. Prune oldest first without reversing the
+    // newest-first inventory used by protected/latest-run checks below.
+    // https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/js/js.md
+    for (const run of runs.toReversed()) {
       if (run === runs[0] || run.protected) continue;
       if (
         count <= policy.maxRuns &&

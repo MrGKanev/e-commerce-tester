@@ -1,3 +1,4 @@
+import { stringifyArtifact } from '../scripts/artifact-privacy';
 import { controlEvent } from './control-events';
 import type { VitalDocument } from '../tests/web-vitals';
 import { readSiteSettings } from './site-settings';
@@ -92,7 +93,7 @@ export default class RunMetadataReporter implements Reporter {
     const temporary = `${this.file}.tmp`;
     fs.writeFileSync(
       temporary,
-      JSON.stringify(
+      stringifyArtifact(
         { ...this.metadata, scenarios: [...this.scenarios.values()], errors: this.errors },
         null,
         2,
@@ -260,7 +261,7 @@ export default class RunMetadataReporter implements Reporter {
         : { scripts: [] };
       fs.writeFileSync(
         file,
-        JSON.stringify(
+        stringifyArtifact(
           { complete: true, scripts: [...new Set([...prior.scripts, ...report.scripts])].sort() },
           null,
           2,
@@ -275,7 +276,7 @@ export default class RunMetadataReporter implements Reporter {
       const file = path.join(path.dirname(this.file), 'buyer-journeys.json');
       fs.writeFileSync(
         file + '.tmp',
-        JSON.stringify({ schemaVersion: 1, checks: this.buyerJourneys }, null, 2),
+        stringifyArtifact({ schemaVersion: 1, checks: this.buyerJourneys }, null, 2),
       );
       fs.renameSync(file + '.tmp', file);
     }
@@ -289,7 +290,7 @@ export default class RunMetadataReporter implements Reporter {
       const file = path.join(path.dirname(this.file), 'commerce-consistency.json');
       fs.writeFileSync(
         file + '.tmp',
-        JSON.stringify({ schemaVersion: 1, checks: this.commerceChecks }, null, 2),
+        stringifyArtifact({ schemaVersion: 1, checks: this.commerceChecks }, null, 2),
       );
       fs.renameSync(file + '.tmp', file);
     }
@@ -302,7 +303,7 @@ export default class RunMetadataReporter implements Reporter {
       const file = path.join(path.dirname(this.file), 'web-vitals.json');
       fs.writeFileSync(
         file + '.tmp',
-        JSON.stringify(
+        stringifyArtifact(
           {
             schemaVersion: 1,
             synthetic: true,
@@ -340,7 +341,7 @@ export default class RunMetadataReporter implements Reporter {
       const spellingFile = path.join(path.dirname(this.file), 'spelling.json');
       fs.writeFileSync(
         spellingFile + '.tmp',
-        JSON.stringify(
+        stringifyArtifact(
           {
             schemaVersion: 1,
             ocr: { enabled: this.ocrEnabled, ...this.ocrTotals, engines: [...this.ocrEngines] },

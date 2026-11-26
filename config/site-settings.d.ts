@@ -1,3 +1,26 @@
+export interface SecuritySettings {
+  enabled: boolean;
+  mode: 'report' | 'strict';
+  observeMs: number;
+  profile: string;
+  baselineFile: string;
+  phases: Array<'initial' | 'reject' | 'accept'>;
+  pages: Array<{ name: string; path: string; role: 'storefront' | 'checkout' }>;
+  consent: { acceptSelector?: string; rejectSelector?: string };
+  payment: {
+    checkoutOrigins: string[];
+    formOrigins: string[];
+    frameOrigins: string[];
+    allowTopDocumentCardFields: boolean | null;
+  };
+  limits: {
+    scripts: number;
+    requests: number;
+    frames: number;
+    scriptBytes: number;
+    totalScriptBytes: number;
+  };
+}
 export interface CheckoutField {
   selector: string;
   kind: 'fill' | 'select' | 'check';
@@ -54,6 +77,7 @@ export type Capability =
   | 'mobileMenu'
   | 'commerceConsistency';
 export interface SiteSettings {
+  securityMonitoring: SecuritySettings;
   checkoutTotals?: CheckoutTotals;
   analytics?: AnalyticsSettings;
   markets: Market[];

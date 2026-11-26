@@ -6,3 +6,53 @@
 @source '../checks/modern-web.spec.ts';
 @source '../checks/modern-web-probes.spec.ts';
 @source '../checks/a11y.spec.ts';
+@source '../checks/modern-web-forms.spec.ts';
+@source '../checks/modern-web-widgets.spec.ts';
+@source '../checks/modern-web-resilience.spec.ts';
+@source '../checks/modern-web-dialog-scroll.spec.ts';
+@source '../checks/modern-web-components.spec.ts';
+@source '../checks/modern-web-integration.spec.ts';
+@source '../scripts/check-modern-web-entry.js';
+@source '../checks/modern-web-data-widgets.spec.ts';
+@source '../checks/modern-web-tooltips.spec.ts';
+@source '../checks/modern-web-carousel.spec.ts';
+
+@source '../checks/modern-web-composites.spec.ts';
+@source '../checks/modern-web-menu-navigation.spec.ts';
+@source '../checks/modern-web-menubar-switching.spec.ts';
+@source '../checks/security-monitoring.spec.ts';
+
+@source '../checks/modern-web-table-scroll.spec.ts';
+
+@source '../checks/modern-web-field-content.spec.ts';
+
+@source '../checks/modern-web-table-headers.spec.ts';
+
+@source '../checks/modern-web-field-horizontal.spec.ts';
+
+@source '../checks/modern-web-select-ownership.spec.ts';
+
+@source '../checks/modern-web-select-scope.spec.ts';
+
+@source '../checks/modern-web-checkbox-ownership.spec.ts';
+
+@source '../checks/modern-web-table-spans.spec.ts';
+
+@source '../checks/modern-web-ancestor-clipping.spec.ts';
+
+@source '../checks/modern-web-table-grid.spec.ts';
+
+@source '../checks/modern-web-table-columns.spec.ts';
+
+@source '../checks/modern-web-table-implied-rows.spec.ts';
+
+@source '../checks/modern-web-table-group-scopes.spec.ts';
+
+@source '../checks/modern-web-table-header-scan.spec.ts';
+
+@source '../checks/modern-web-table-header-union.spec.ts';
+
+@source '../checks/modern-web-field-variants.spec.ts';
+@source '../checks/modern-web-field-sizing.spec.ts';
+
+@source '../checks/modern-web-field-geometry.spec.ts';
