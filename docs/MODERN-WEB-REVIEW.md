@@ -6,9 +6,11 @@
 
 ## Current scope and remaining counts
 
-The current Modern Web fixture inventory is **685 test definitions in 36 files**, configured in five browser profiles (**3425 executions** when the whole matrix is run). These are configured counts, not a claim that the entire matrix passed in the latest focused batch. The maintained `pnpm test:modern-web:local` acceptance calibration selects the two Chromium profiles; `pnpm test:modern-web:browsers:local` selects all five.
+The current Modern Web fixture inventory is **743 test definitions in 38 files**, configured in five browser profiles (**3715 executions** when the whole matrix is run). These are configured counts, not a claim that the entire matrix passed in the latest focused batch. The maintained `pnpm test:modern-web:local` acceptance calibration selects the two Chromium profiles; `pnpm test:modern-web:browsers:local` selects all five.
 
-Latest verification (2026-11-22): **535 distinct five-profile fixture executions** passed, including **175 new executions / 35 definitions**, plus **24 separate actual Full entry scenarios** and isolated `pnpm check` (**128/128 unit tests**). The final three-file run passed 390/390; unchanged checkbox/probe evidence supplies the other 145 cases. Preliminary/repeated successes are not added again. Initial submitter-reason mismatches and timeout attempts remain recorded below and in TESTS.md; final local validation used command-scoped wake assertions after observed Sleep/DarkWake overlap. The whole acceptance chain and entire configured matrix were not repeated.
+Latest focused verification (2026-11-26): **440 fixture executions** across five profiles passed for native details ownership, widget continuation and composites. The actual Full entry passed **24 scenarios**, and isolated `pnpm check` passed **128/128 unit tests**. A full-matrix attempt was interrupted after 811 passes and concurrent-run failures; affected composite root-focus cases passed in the isolated focused run. The whole acceptance chain and entire configured matrix were not repeated. Earlier validation and limitations are retained below and in TESTS.md.
+
+An additional isolated Desktop Chrome run passed 200 cases in six checkbox, select, switch, widget/slider, table-scroll and field ownership suites. It does not establish a five-profile or full-matrix pass.
 
 Of 209 guide topics, **111 are in scope**: 1 Covered, 62 Partial and 48 Pending; 98 are outside project scope. Therefore **110 topics have remaining obligations** (62 to extend and 48 pending), not 110 known missing test cases. Every Partial topic can already have substantial code and positive/negative regression coverage. Required manual/sandbox/private-access obligations prevent promoting those topics from tests alone.
 
