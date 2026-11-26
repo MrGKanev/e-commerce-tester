@@ -6,6 +6,8 @@
 
 `pnpm check` passed with 128 unit tests, the local CSS build passed, and the current registry audit reported zero known advisories. [PR #29's validation summary and checks](https://github.com/MrGKanev/e-commerce-tester/pull/29) track the subsequent whole-chain and five-profile stabilization results separately; these focused results alone do not close the release gates.
 
+The GitHub job budget is now 40 minutes: the expanded 1486-case Chromium Modern Web batch alone takes about 11 minutes locally, followed by 24 Full-entry scenarios and the security/operations acceptance chain. The former 20-minute whole-job budget no longer accommodates the maintained sequential chain plus installation. Individual test timeouts, zero retries and one-worker execution remain unchanged.
+
 Current follow-up: [native details ownership/widget continuation](#native-details-ownership-and-widget-continuation--2026-11-22) and [current inventory/review](MODERN-WEB-REVIEW.md). Older validation records below retain their historical scope.
 
 Latest handoff: [MODERN-WEB.md](MODERN-WEB.md#current-handoff--2026-11-18). Executable interaction batch `810562a` passed the full local acceptance chain, 500 Modern Web fixtures across five browser projects, 24 production-entry scenarios and 99 unit tests. [PR #29 checks](https://github.com/MrGKanev/e-commerce-tester/pull/29/checks) show current remote status; the prior handoff passed [GitHub CI run 44262956294](https://github.com/MrGKanev/e-commerce-tester/actions/runs/44262956294). Dependency PRs #23, #25, #26 and #27 are superseded and closed. This records a validated batch, not completion of all remaining guides.

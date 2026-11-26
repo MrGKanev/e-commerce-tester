@@ -17,7 +17,7 @@ jobs:
   checks:
     name: Quality and local browser checks
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
         with:
