@@ -1113,3 +1113,7 @@ Existing `widget-accordion-summary`, `widget-accordion-keyboard`, tab/switch/sli
 Local validation on 2026-11-26: `pnpm check`, `pnpm build:css`, 24 production-entry scenarios and 440 focused details/continuation/composites executions across five profiles passed. The full 3715-execution matrix was interrupted after 811 passes and concurrent-run failures; it was not validated in full. The affected composite root-focus cases passed on the subsequent isolated run.
 
 New inventory: 58 definitions / 290 configured five-profile executions (41 details definitions and 17 continuation definitions). One continuation definition is a pure classifier contract, configured five times without needing a browser page; the other 285 new executions use browser fixtures. Current complete inventory: 743 definitions in 38 files / 3715 configured executions. Configured totals are not whole-matrix passes.
+
+## Execution tiers — 2026-11-26
+
+See [Modern Web execution tiers](TESTS.md#modern-web-execution-tiers--2026-11-26) for the quick and focused commands, five-profile CI jobs, retained sequential release checks, updated inventory and measured local results. This changes test execution only; existing rule IDs, evidence, severity, limitations and remaining guide obligations are unchanged. CI timing and a complete five-profile pass remain unverified.

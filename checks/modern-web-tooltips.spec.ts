@@ -37,7 +37,7 @@ test('tooltip probes reject unfrozen pages and absent optional scope stays empty
   expect(report.coverage.observations).toEqual([]);
 });
 
-test('delayed focus and hover tooltips dismiss with Escape, restore focus and block writes', async ({
+test('delayed focus and hover tooltips dismiss with Escape, restore focus and block writes @modern-smoke', async ({
   page,
 }) => {
   const isolation = await fixture(

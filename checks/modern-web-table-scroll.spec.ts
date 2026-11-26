@@ -56,7 +56,7 @@ for (const rtl of [false, true])
     expect(JSON.stringify(report)).not.toMatch(/Private|scroll-region/);
   });
 
-test('blocked arrow behavior produces only an advisory', async ({ page }) => {
+test('blocked arrow behavior produces only an advisory @modern-smoke', async ({ page }) => {
   await fixture(
     page,
     region,

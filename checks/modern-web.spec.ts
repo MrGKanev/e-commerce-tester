@@ -12,7 +12,7 @@ const image =
 const fixtureDocument = (body: string) =>
   `<!doctype html><html lang="en"><head><title>Local modern web fixture</title><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}</style></head><body><main><h1>Local fixture</h1>${body}</main></body></html>`;
 
-test('broken fixtures exercise every rule, retain evidence and never submit a form', async ({
+test('broken fixtures exercise every rule, retain evidence and never submit a form @modern-smoke', async ({
   page,
 }, info) => {
   const submissions: string[] = [];
@@ -74,7 +74,7 @@ test('broken fixtures exercise every rule, retain evidence and never submit a fo
   );
 });
 
-test('correct alternatives, hidden controls and decorative video avoid false positives', async ({
+test('correct alternatives, hidden controls and decorative video avoid false positives @modern-smoke', async ({
   page,
 }) => {
   await page.route('**/*', route =>

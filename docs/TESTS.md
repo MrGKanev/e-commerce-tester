@@ -1,5 +1,15 @@
 # Test Cases
 
+## Modern Web execution tiers — 2026-11-26
+
+For everyday work, run `pnpm test:modern-web:quick` (eight representative Desktop Chrome cases) and `pnpm test:modern-web:focused checks/modern-web-widgets.spec.ts` with the relevant changed spec file or files. The focused command does not infer dependencies: select affected suites explicitly, and use the full matrix when coverage is uncertain. These commands are not release gates and do not establish cross-browser coverage.
+
+CI now runs all five browser profiles in separate matrix jobs, with one worker and zero retries per job. The existing `check:local` acceptance chain, including its two Chromium profiles, remains unchanged; consequently those profiles also run in the matrix. All five matrix jobs and the existing job must succeed for a complete CI result. Durations and stability of the new GitHub jobs are not yet measured. Local full-matrix and acceptance commands remain unchanged and sequential.
+
+Two pairs of independent unfrozen/empty-scope checks now share a fresh test page per pair; all their assertions remain. The pure continuation classifier runs once, without a browser, through `test:unit` instead of once per browser project. Inventory is now 740 browser definitions / 3700 configured executions, plus one separate pure contract; counts are not a matrix pass. No rule IDs, severities, observation windows, production behavior or guide statuses changed.
+
+Local validation: the eight-case quick set passed in 10.2 seconds; the two combined cases passed in all five profiles (10 executions, 7.7 seconds); the pure contract passed once. The previous full-matrix attempt passed 2229 Chromium/Firefox cases and five WebKit cases before being interrupted under heavy system load; 1480 cases did not run and this was not a complete matrix pass. No live store was contacted.
+
 ## Stable release calibration — 2026-11-26
 
 [Release gates and deferred work](MODERN-WEB-REVIEW.md#stable-release-boundary--2026-11-26). Linux CI run [45792517277](https://github.com/MrGKanev/e-commerce-tester/actions/runs/45792517277) passed 1480 Modern Web cases but failed six native textarea end-reachability assertions. The same six failures were reproduced in the pinned Playwright noble image. The fixture now uses Tailwind `leading-tight` to bound OS-dependent fallback-font line-box differences; all 30 desktop/mobile Chromium field-content cases then passed in that image. Production geometry thresholds, advisory severity, unknown outcomes and rule IDs are unchanged. Desktop/mobile fixture screenshots were inspected. The configured inventory remains 743 definitions / 3715 five-profile executions.

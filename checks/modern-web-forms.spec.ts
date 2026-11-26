@@ -74,7 +74,7 @@ test('absent form features do not create compliance claims or findings', async (
   });
 });
 
-test('required select rejects placeholder, clears error, observes delayed announcements and restores selection', async ({
+test('required select rejects placeholder, clears error, observes delayed announcements and restores selection @modern-smoke', async ({
   page,
 }) => {
   let writes = 0;

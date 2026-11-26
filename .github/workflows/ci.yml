@@ -14,6 +14,59 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  modern-web-matrix:
+    name: Modern Web (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { project: 'Desktop Chrome', browser: chromium }
+          - { project: 'Mobile Chrome', browser: chromium }
+          - { project: Firefox, browser: firefox }
+          - { project: WebKit, browser: webkit }
+          - { project: 'Mobile WebKit', browser: webkit }
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Cache Playwright browser
+        id: playwright-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install browser and system dependencies
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      - name: Install system dependencies (browser cached)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps ${{ matrix.browser }}
+      - name: Run browser profile
+        env:
+          STORE_URL: http://127.0.0.1:45996
+          TEST_DELAY_MS: 0
+          TEST_JITTER_MS: 0
+          REQUEST_DELAY_MS: 0
+          REQUEST_JITTER_MS: 0
+          MODERN_WEB_PROJECT: ${{ matrix.project }}
+        run: pnpm exec playwright test --config=checks/modern-web.config.ts --project="$MODERN_WEB_PROJECT"
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: modern-web-${{ strategy.job-index }}
+          path: reports/local-modern-web/
+          if-no-files-found: ignore
+          retention-days: 7
+
   checks:
     name: Quality and local browser checks
     runs-on: ubuntu-latest

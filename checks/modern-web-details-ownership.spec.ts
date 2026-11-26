@@ -36,12 +36,9 @@ const counts = (page: Page) =>
     return { keys: state.keys, focuses: state.focuses, peerFocuses: state.peerFocuses };
   });
 
-test('native details ownership refuses an unfrozen document', async ({ page }) => {
+test('native details ownership refuses an unfrozen document and records absent optional disclosures', async ({ page }) => {
   await page.goto('about:blank');
   await expect(inspectDetails(page)).rejects.toThrow('freeze()');
-});
-
-test('native details ownership records absent optional disclosures', async ({ page }) => {
   await load(page, { markup: '<p>No disclosures.</p>' });
   expect(await inspectDetails(page)).toMatchObject({
     observations: [],

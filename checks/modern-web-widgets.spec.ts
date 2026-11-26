@@ -26,12 +26,9 @@ async function load(page: Parameters<typeof prepareInteractionProbe>[0], body: s
   return guard;
 }
 
-test('widget interactions reject an unfrozen page', async ({ page }) => {
+test('widget interactions reject an unfrozen page and absent optional widgets are explicit empty samples', async ({ page }) => {
   await page.goto('about:blank');
   await expect(inspectWidgets(page)).rejects.toThrow('freeze()');
-});
-
-test('absent optional widgets are explicit empty samples', async ({ page }) => {
   await load(page, '<p>Ordinary page without optional widgets.</p>');
   const report = await inspectWidgets(page);
   expect(report.findings).toEqual([]);
@@ -74,7 +71,7 @@ for (const manual of [false, true]) {
   });
 }
 
-test('broken declared widgets produce guide-specific advisories', async ({ page }) => {
+test('broken declared widgets produce guide-specific advisories @modern-smoke', async ({ page }) => {
   await load(
     page,
     `${tabs.replace('aria-label="Details"', '').replace('tabindex="-1"', 'tabindex="0"')}
@@ -99,7 +96,7 @@ test('broken declared widgets produce guide-specific advisories', async ({ page 
   expect(report.findings.every(finding => finding.severity === 'warning')).toBe(true);
 });
 
-test('custom switch and slider expose keyboard state and restore', async ({ page }) => {
+test('custom switch and slider expose keyboard state and restore @modern-smoke', async ({ page }) => {
   await load(
     page,
     `<button type="button" id="switch" role="switch" aria-checked="false" aria-label="Notifications">Toggle</button>

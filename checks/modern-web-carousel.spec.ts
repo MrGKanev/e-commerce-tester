@@ -29,7 +29,7 @@ test('carousel probes require quarantine and absent optional scope stays empty',
   expect((await inspectCarousels(page)).coverage.observations).toEqual([]);
 });
 
-test('explicit slide controls operate with Enter, restore original slide and focus, and redact text', async ({
+test('explicit slide controls operate with Enter, restore original slide and focus, and redact text @modern-smoke', async ({
   page,
 }) => {
   const isolation = await fixture(
