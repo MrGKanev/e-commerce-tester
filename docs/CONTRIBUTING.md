@@ -43,13 +43,28 @@ pnpm format:check
 
 The [Project checks workflow](../.github/workflows/ci.yml) runs `pnpm check` and `pnpm test:acceptance:local` on pull requests, pushes to `master` and manual dispatch. It installs the pnpm version from `package.json`, Node from `.nvmrc`, and Chromium with its system dependencies. The acceptance command runs pacing, readiness, reporting, control panel, shared-page, performance-observation, approved-visual lifecycle, Shopify/WooCommerce public commerce consistency, SEO, dynamic accessibility and continuous buyer-journey checks sequentially against local fixtures. Live store checks are scheduled separately. Failed CI runs retain available local report artifacts for seven days.
 
-To run the same checks locally:
+To run the same checks locally (the exact shared runner used by CI):
 
 ```bash
 pnpm exec playwright install chromium
-pnpm check
-pnpm test:acceptance:local
+pnpm check:local
 ```
+
+### Publish local results to your PR
+
+Install the GitHub CLI (`gh`), sign in with `gh auth login`, and commit/push your branch before running:
+
+```bash
+pnpm check:pr
+# Or choose an open PR explicitly:
+pnpm check:pr 29
+```
+
+The script runs `pnpm check`, `pnpm build:css` and `pnpm test:acceptance:local` sequentially. It prints progress in the terminal and automatically creates/updates its own marked PR comment with the commit, environment, timings and results. A failure stops later checks, publishes a bounded redacted diagnostic tail and returns a nonzero exit code. Cancellation is reported when the process can shut down normally. GitHub publication failures also return nonzero; a green local result must not be inferred from an old comment.
+
+The working tree must be clean and the PR must already point to the local commit. Local commit/worktree and remote PR changes during validation invalidate the result. Run one validation per checkout at a time. The command checks and reports; merging remains a separate explicit action.
+
+Raw logs, `result.json` and the exact published `report.md` remain under the ignored `reports/local-quality/<commit>-<timestamp>/` directory. Only the Markdown summary and bounded diagnostic tails are posted; screenshots/traces/full logs stay local. Tails use the shared heuristic privacy filter and HTML escaping, not a guarantee that arbitrary secrets are detectable. Existing GitHub Actions failure artifacts retain their separate access/sensitivity limits. CI also writes the same formatted report to its job summary, without requiring GitHub CLI credentials or posting developer-local comments.
 
 Unit tests also exercise the scheduler with stub runners: interval bounds, cooldowns, restart recovery, process shutdown, exclusive locks and start windows.
 

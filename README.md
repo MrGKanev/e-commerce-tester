@@ -107,6 +107,8 @@ run.sh                 Entry point for the multi-store runner
 
 GitHub Actions runs TypeScript, lint, unit tests, toolchain validation and selected local browser acceptance checks on pull requests and pushes to `master`. These checks use local fixtures; live store checks run separately through the CLI or scheduler. Dependabot provides dependency update PRs.
 
+Run the same checks locally with `pnpm check:local`. Use `pnpm check:pr` on a committed/pushed PR branch to run them and automatically publish the results as a PR comment. See [local PR validation](docs/CONTRIBUTING.md#publish-local-results-to-your-pr) for setup, failure reporting and log limits.
+
 ## License
 
 [MIT](LICENSE) © Gabriel Kanev. Bundled dependencies and dictionaries retain their own licenses; see [Content checks](docs/CONTENT.md#licenses).

@@ -29,8 +29,6 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: TypeScript, lint, unit tests and toolchain
-        run: pnpm check
       - name: Cache Playwright browsers
         id: playwright-cache
         uses: actions/cache@v6
@@ -43,10 +41,8 @@ jobs:
       - name: Install system dependencies only (browser cached)
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright install-deps chromium
-      - name: Build Tailwind CSS
-        run: pnpm build:css
-      - name: Local browser acceptance checks
-        run: pnpm test:acceptance:local
+      - name: Quality and local browser checks
+        run: pnpm check:local
       - name: Upload local failure artifacts
         if: failure()
         uses: actions/upload-artifact@v7
