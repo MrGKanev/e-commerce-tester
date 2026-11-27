@@ -1,5 +1,13 @@
 # Test Cases
 
+## Quick CI and full local browser reporting — 2026-11-27
+
+At the user's request, this supersedes the hosted browser matrix described below. The `bf61061` hosted run [45988133297](https://github.com/MrGKanev/e-commerce-tester/actions/runs/45988133297) passed CSS/dependency preparation for all three extra profiles and reached browser execution; it was deliberately cancelled before completion to avoid continuing four long jobs. It is not a browser pass.
+
+CI now has one job for `pnpm check` and CSS build, a ten-minute safety timeout, no browser installation and no full acceptance/matrix runs. It publishes per-stage outcomes as a Markdown job summary and a seven-day text artifact even on failure. These outcomes do not certify browser regressions. Full local validation adds `test:modern-web:cross-browser:local` after acceptance: the latter already covers 1634 Chromium executions, while the additional Firefox/WebKit/Mobile WebKit stage covers 2451, retaining all 4085 without duplicate Chromium. `check:pr` publishes the existing bounded redacted final report including that fourth stage; full logs/screenshots remain local. A regression verifies that failure in the new final stage cannot produce a passing published report.
+
+Local validation: all eight report-runner tests passed, including the new final-stage failure contract. The final standalone Node 24 `pnpm check` passed all 137 Node tests, one pure continuation contract, types/lint/toolchain/catalog; CSS build, actionlint 1.7.12, matrix discovery (2451 cases) and whitespace checks passed. A preceding concurrent attempt hit the existing queue cleanup EPERM/timeout even on Node 24, so runtime causality is unproven and the intermittent queue risk remains. No browser assertions changed in this CI/reporting revision; the full 4085 local pass above remains the latest browser evidence, not a new full run for this revision.
+
 ## CI setup correction — 2026-11-27
 
 Pre-push verification also passed the complete `pnpm check` under the project Node 24 (24.22.3), including all 136 Node tests and the pure browser contract. A preceding check under local Node 26.13.1 hit the previously observed queue cleanup `kill EPERM`; all four queue tests then passed in isolation. This does not prove the runtime version caused the intermittent failure; scheduler behavior and test timeouts were not changed.

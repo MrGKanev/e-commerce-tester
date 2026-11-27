@@ -80,6 +80,7 @@
     "security:baseline": "node scripts/security-model.js",
     "test:security:entry:local": "node scripts/check-security-monitoring.js",
     "test:security:reporting:local": "playwright test --config=checks/security-reporting-upload.config.ts",
+    "test:modern-web:cross-browser:local": "STORE_URL=http://127.0.0.1:45996 TEST_DELAY_MS=0 TEST_JITTER_MS=0 REQUEST_DELAY_MS=0 REQUEST_JITTER_MS=0 playwright test --config=checks/modern-web.config.ts --project=Firefox --project=WebKit --project='Mobile WebKit'",
     "test:modern-web:browsers:local": "STORE_URL=http://127.0.0.1:45996 TEST_DELAY_MS=0 TEST_JITTER_MS=0 REQUEST_DELAY_MS=0 REQUEST_JITTER_MS=0 playwright test --config=checks/modern-web.config.ts"
   },
   "devDependencies": {

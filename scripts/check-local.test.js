@@ -84,7 +84,7 @@ test('runs the shared sequence and updates only its own marked PR comment across
     assert.equal(result(f).status, 'passed');
     assert.equal(comments(f).length, 3);
   }
-  assert.deepEqual(calls(f), ['check', 'build:css', 'test:acceptance:local', 'check', 'build:css', 'test:acceptance:local']);
+  assert.deepEqual(calls(f), ['check', 'build:css', 'test:acceptance:local', 'test:modern-web:cross-browser:local', 'check', 'build:css', 'test:acceptance:local', 'test:modern-web:cross-browser:local']);
   assert.equal(comments(f).find(comment => comment.id === 1).body, marker + '\nOther author');
   assert.equal(comments(f).find(comment => comment.id === 2).body, 'Unrelated review');
   assert.match(comments(f).find(comment => comment.id === 102).body, /Result: passed/);
@@ -114,7 +114,7 @@ test('CI/local mode requires no GitHub calls and writes the same formatted job s
   f.env.GITHUB_STEP_SUMMARY = path.join(f.root, 'summary.md');
   assert.equal(run(f, []).status, 0);
   assert.equal(comments(f).length, 0);
-  assert.deepEqual(calls(f), ['check', 'build:css', 'test:acceptance:local']);
+  assert.deepEqual(calls(f), ['check', 'build:css', 'test:acceptance:local', 'test:modern-web:cross-browser:local']);
   assert.match(fs.readFileSync(f.env.GITHUB_STEP_SUMMARY, 'utf8'), /Result: passed/);
 });
 
@@ -150,7 +150,7 @@ test('publication failure returns nonzero and persists a failed local report', t
     assert.equal(result(f).status, 'failed');
     assert.match(result(f).problem, /GitHub unavailable/);
     for (const comment of comments(f)) assert.doesNotMatch(comment.body, /Result: passed/);
-    assert.deepEqual(calls(f), ['check', 'build:css', 'test:acceptance:local']);
+    assert.deepEqual(calls(f), ['check', 'build:css', 'test:acceptance:local', 'test:modern-web:cross-browser:local']);
   }
 });
 
@@ -172,4 +172,14 @@ test('SIGTERM stops the child process and reports cancellation without running l
   assert.match(comments(f)[0].body, /Result: cancelled/);
   const pid = Number(fs.readFileSync(path.join(f.root, 'child-pid'), 'utf8'));
   assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' });
+});
+
+test('cross-browser failures remain failed in the published local report', t => {
+  const f = fixture(t);
+  f.env.STUB_FAIL_STEP = 'test:modern-web:cross-browser:local';
+  assert.equal(run(f).status, 1);
+  assert.equal(result(f).checks[3].status, 'failed');
+  assert.equal(result(f).status, 'failed');
+  assert.match(comments(f)[0].body, /test:modern-web:cross-browser:local/);
+  assert.match(comments(f)[0].body, /Result: failed/);
 });

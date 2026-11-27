@@ -41,13 +41,15 @@ pnpm format:check
 
 `pnpm check` runs TypeScript, ESLint, offline unit tests and the Docker/Playwright toolchain check. ESLint covers storefront tests, local checks, configuration, Node scripts and browser JavaScript with the appropriate runtime globals. Formatting is a separate command.
 
-The [Project checks workflow](../.github/workflows/ci.yml) runs `pnpm check` and `pnpm test:acceptance:local` on pull requests, pushes to `master` and manual dispatch. It installs the pnpm version from `package.json`, Node from `.nvmrc`, and Chromium with its system dependencies. The acceptance command runs pacing, readiness, reporting, control panel, shared-page, performance-observation, approved-visual lifecycle, Shopify/WooCommerce public commerce consistency, SEO, dynamic accessibility and continuous buyer-journey checks sequentially against local fixtures. Live store checks are scheduled separately. Failed CI runs retain available local report artifacts for seven days.
+The [Project checks workflow](../.github/workflows/ci.yml) uses one job for `pnpm check` and `pnpm build:css` on pull requests, pushes to `master` and manual dispatch. It installs pnpm from `package.json` and Node from `.nvmrc`, with no browser downloads or browser acceptance runs. A Markdown job summary and downloadable text artifact record passed, failed or skipped stages. A green CI result covers only these quick checks.
 
-To run the same checks locally (the exact shared runner used by CI):
+Full browser validation stays local. Acceptance covers both Chromium profiles; the additional cross-browser command covers Firefox, WebKit and Mobile WebKit without repeating Chromium. All runs use owned fixtures; live-store scans remain separate.
 
 ```bash
-pnpm exec playwright install chromium
+pnpm install:browsers
 pnpm check:local
+# Only the additional non-Chromium profiles:
+pnpm test:modern-web:cross-browser:local
 ```
 
 ### Publish local results to your PR
@@ -60,11 +62,11 @@ pnpm check:pr
 pnpm check:pr 29
 ```
 
-The script runs `pnpm check`, `pnpm build:css` and `pnpm test:acceptance:local` sequentially. Progress stays in the terminal; after completion it automatically creates/updates its own marked PR comment with the commit, environment, timings and final results. It does not post running-status comments. A failure stops later checks, publishes a bounded redacted diagnostic tail and returns a nonzero exit code. Cancellation is reported when the process can shut down normally. GitHub publication failures also return nonzero; a green local result must not be inferred from an old comment.
+The script runs `pnpm check`, `pnpm build:css`, `pnpm test:acceptance:local` and `pnpm test:modern-web:cross-browser:local` sequentially. Progress stays in the terminal; after completion it automatically creates/updates its own marked PR comment with the commit, environment, timings and final results. It does not post running-status comments. A failure stops later checks, publishes a bounded redacted diagnostic tail and returns a nonzero exit code. Cancellation is reported when the process can shut down normally. GitHub publication failures also return nonzero; a green local result must not be inferred from an old comment.
 
 The working tree must be clean and the PR must already point to the local commit. Local commit/worktree and remote PR changes during validation invalidate the result. Run one validation per checkout at a time. The command checks and reports; merging remains a separate explicit action.
 
-Raw logs, `result.json` and the exact published `report.md` remain under the ignored `reports/local-quality/<commit>-<timestamp>/` directory. Only the Markdown summary and bounded diagnostic tails are posted; screenshots/traces/full logs stay local. Tails use the shared heuristic privacy filter and HTML escaping, not a guarantee that arbitrary secrets are detectable. Existing GitHub Actions failure artifacts retain their separate access/sensitivity limits. CI also writes the same formatted report to its job summary, without requiring GitHub CLI credentials or posting developer-local comments.
+Raw logs, `result.json` and the exact published `report.md` remain under the ignored `reports/local-quality/<commit>-<timestamp>/` directory. Only the Markdown summary and bounded diagnostic tails are posted; screenshots/traces/full logs stay local. Tails use the shared heuristic privacy filter and HTML escaping, not a guarantee that arbitrary secrets are detectable. GitHub Actions publishes its separate quick-check summary, without requiring GitHub CLI credentials or claiming a developer-local browser pass.
 
 Unit tests also exercise the scheduler with stub runners: interval bounds, cooldowns, restart recovery, process shutdown, exclusive locks and start windows.
 
@@ -118,7 +120,7 @@ Use conventional commit prefixes (`feat:`, `fix:`, `test:`, `docs:`, `chore:`) a
 
 For issues, include the failing scenario, selected project/mode, relevant version information and sanitized report evidence. Include a store URL only if it is public and appropriate to share. Do not commit local store configuration, session state or generated reports.
 
-`pnpm test:woocommerce:local` validates Woo lifecycle hooks, suite isolation, classic/block and cookie/token/nonce carts, custom routes, price precision/taxes and variations through loopback fixtures. It is included in the common acceptance command and CI. `scripts/platform-config.test.js` and mixed-runner tests protect isolation and legacy Shopify configuration.
+`pnpm test:woocommerce:local` validates Woo lifecycle hooks, suite isolation, classic/block and cookie/token/nonce carts, custom routes, price precision/taxes and variations through loopback fixtures. It is included in the common local acceptance command. `scripts/platform-config.test.js` and mixed-runner tests protect isolation and legacy Shopify configuration.
 
 ## Security workflow regression checks
 

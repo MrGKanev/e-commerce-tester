@@ -2,6 +2,8 @@
 
 [Coverage matrix](MODERN-WEB.md#complete-catalog-mapping) · [Validation record](TESTS.md)
 
+The current [quick-CI/local-browser policy](TESTS.md#quick-ci-and-full-local-browser-reporting--2026-11-27) supersedes the hosted matrix below: only quick quality/CSS checks run on GitHub; full acceptance and all five profiles run locally and can publish a separate PR report. The cancelled `bf61061` run is setup evidence only. A green quick job does not close Linux/browser/device release obligations.
+
 ## Stable release boundary — 2026-11-26
 
 Later verification and CI diagnosis are recorded in [TESTS.md](TESTS.md#complete-local-rerun-and-ci-diagnosis--2026-11-27). Published `fc4afe2` passed its main Linux quality/acceptance job, while four matrix jobs could not load missing generated CSS and Firefox could not install dependencies after an external APT 403. Those setup failures are not passing browser coverage or failed storefront assertions. The subsequent unpublished [CI correction](TESTS.md#ci-setup-correction--2026-11-27) adds per-matrix CSS builds, pins Ubuntu 24.04 and removes duplicate Chromium matrix jobs; its workflow lint and discovery passed, while hosted verification remains open. The unpublished local optimization batch separately passed static checks, CSS, the full acceptance chain and all 4085 five-profile browser executions on local macOS fixtures; it has not been published or exercised by a new hosted run.

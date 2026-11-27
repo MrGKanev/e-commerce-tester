@@ -9,7 +9,7 @@ const { redactText } = require('./artifact-privacy');
 
 const root = path.resolve(__dirname, '..');
 const marker = '<!-- e-commerce-tester:local-quality -->';
-const commands = ['check', 'build:css', 'test:acceptance:local'];
+const commands = ['check', 'build:css', 'test:acceptance:local', 'test:modern-web:cross-browser:local'];
 const exec = (file, args, input) => execFileSync(file, args, {
   cwd: root, encoding: 'utf8', input, maxBuffer: 16 * 1024 * 1024,
   env: { ...process.env, GH_PROMPT_DISABLED: '1' },
