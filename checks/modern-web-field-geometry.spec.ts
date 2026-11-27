@@ -61,6 +61,29 @@ const cases = [
     partial: true,
   },
   {
+    name: 'textarea-partial-y',
+    html: '<div class="flow-root h-8 overflow-hidden"><textarea aria-label="Message" class="mt-4 block h-11 w-48 border p-2"></textarea></div>',
+    partial: true,
+  },
+  {
+    name: 'select-partial-x',
+    html: '<div class="flow-root w-32 overflow-hidden"><select aria-label="Choice" class="block h-11 w-48 border p-2"><option>First</option></select></div>',
+    partial: true,
+  },
+  {
+    name: 'input-fully-clipped',
+    html: '<div class="flow-root h-8 overflow-hidden"><input aria-label="Message" class="mt-16 block h-11 w-48 border p-2"></div>',
+    full: true,
+  },
+  {
+    name: 'input-exact-width',
+    html: '<div class="flow-root w-48 overflow-hidden"><input aria-label="Message" class="block h-11 w-48 border p-2"></div>',
+  },
+  {
+    name: 'input-fit-inside-padded-clip',
+    html: '<div class="flow-root w-64 overflow-hidden border-4 p-2"><input aria-label="Message" class="block h-11 w-48 border p-2"></div>',
+  },
+  {
     name: 'padded-border-clip',
     html:
       '<div class="flow-root h-16 w-40 overflow-hidden border-4 p-2">' + clippedInput + '</div>',
@@ -134,12 +157,16 @@ for (const scenario of cases) {
         'presentation-control-partial-ancestor-clip',
       ].includes(f.rule),
     );
-    expect(relevant).toHaveLength(partial ? 2 : 0);
+    expect(relevant).toHaveLength(partial || scenario.full ? 2 : 0);
     for (const finding of relevant)
       expect(finding).toMatchObject({
-        rule: 'presentation-control-partial-ancestor-clip',
+        rule: scenario.full
+          ? 'presentation-control-ancestor-clip'
+          : 'presentation-control-partial-ancestor-clip',
         severity: 'warning',
-        evidence: { glyphVisibilityVerified: false },
+        evidence: scenario.full
+          ? { wholeBorderBoxOutsideClip: true }
+          : { glyphVisibilityVerified: false },
       });
     for (const state of states) {
       const fields = state.fieldSizing as Array<Record<string, number | boolean>>;
@@ -168,9 +195,21 @@ for (const scenario of cases) {
           expect(clips[0].visibleHeight).toBeLessThan(clips[0].height);
         }
       }
+      if (scenario.full) {
+        expect(state.ancestorClipped).toHaveLength(1);
+        expect(state.ancestorPartiallyClipped).toEqual([]);
+      }
     }
     if (
-      ['progressive-bounded', 'padded-border-clip', 'nested-two-axis'].includes(scenario.name) &&
+      [
+        'progressive-bounded',
+        'padded-border-clip',
+        'nested-two-axis',
+        'textarea-partial-y',
+        'select-partial-x',
+        'input-fully-clipped',
+        'input-fit-inside-padded-clip',
+      ].includes(scenario.name) &&
       ['Desktop Chrome', 'Mobile Chrome'].includes(info.project.name)
     )
       await page.screenshot({ path: info.outputPath('field-geometry.png'), fullPage: true });

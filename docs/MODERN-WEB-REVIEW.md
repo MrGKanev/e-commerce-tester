@@ -4,6 +4,10 @@
 
 ## Stable release boundary — 2026-11-26
 
+Local continuation on November 27: the complete acceptance chain and all 3700 configured five-profile Modern Web executions passed in separate sequential runs on `af992db`, with command-scoped wake protection. Earlier timeout attempts, focused reruns, dependency audit and limitations are recorded in [TESTS.md](TESTS.md#release-validation-continuation--2026-11-27). The Linux CI gate and new parallel CI matrix remain unverified.
+
+The earlier published merge commit `5d5ab50` did pass [Linux CI](https://github.com/MrGKanev/e-commerce-tester/actions/runs/45838626842); that run does not cover the later execution-tier changes. The new workflow passes actionlint and all five profile names discover 740 cases each locally. Docker and Linux CI for `af992db` remain unavailable or unverified respectively.
+
 Stabilize the implemented scope before adding more guide coverage. [PR #29's validation summary and checks](https://github.com/MrGKanev/e-commerce-tester/pull/29) track completion of these gates; dated focused results below retain their historical scope. The release gates are:
 
 1. Fix the six Linux Chromium textarea fixture failures in [CI run 45792517277](https://github.com/MrGKanev/e-commerce-tester/actions/runs/45792517277). Native caret scrolling can leave part of a line box below the scrollport with OS-dependent fallback fonts; this must not become a storefront failure or a relaxed production threshold.
@@ -16,7 +20,7 @@ After that checkpoint, continue the backlog below in separate tested batches: re
 
 ## Current scope and remaining counts
 
-The current Modern Web fixture inventory is **743 test definitions in 38 files**, configured in five browser profiles (**3715 executions** when the whole matrix is run). These are configured counts, not a claim that the entire matrix passed in the latest focused batch. The maintained `pnpm test:modern-web:local` acceptance calibration selects the two Chromium profiles; `pnpm test:modern-web:browsers:local` selects all five.
+The current Modern Web fixture inventory is **801 browser test definitions in 39 files**, configured in five browser profiles (**4005 executions**); a separate pure continuation contract runs once under `test:unit`. The maintained `pnpm test:modern-web:local` acceptance calibration selects the two Chromium profiles; `pnpm test:modern-web:browsers:local` selects all five. The earlier November 27 full-matrix result covers the previous 740 definitions; the later clipping fixtures were separately validated across all profiles as recorded in [TESTS.md](TESTS.md#control-clipping-combinations--2026-11-27).
 
 Latest focused verification (2026-11-26): **440 fixture executions** across five profiles passed for native details ownership, widget continuation and composites. The actual Full entry passed **24 scenarios**, and isolated `pnpm check` passed **128/128 unit tests**. A full-matrix attempt was interrupted after 811 passes and concurrent-run failures; affected composite root-focus cases passed in the isolated focused run. The whole acceptance chain and entire configured matrix were not repeated. Earlier validation and limitations are retained below and in TESTS.md.
 

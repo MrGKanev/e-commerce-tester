@@ -1,5 +1,25 @@
 # Test Cases
 
+## Control clipping combinations — 2026-11-27
+
+`checks/modern-web-control-clipping-matrix.spec.ts` adds 56 browser definitions: input, textarea, select and button under 14 bounded clipping/containment layouts. Positive cases include exact fit, visible overflow and padded containment; partial/full cases cover horizontal and vertical edges, nested axes, flex, grid, `overflow: clip` and an ignored clip-margin on `overflow: hidden`. Both existing `presentation-control-ancestor-clip` and `presentation-control-partial-ancestor-clip` findings remain advisory warnings under `form-factor-adaptation`; assertions distinguish full/partial/clear, inspect each viewport, preserve DOM/viewport and require no additional requests. These are controlled fixtures, not a new detection rule. Transforms, complex clip paths, actual glyph/OS picker visibility, real devices and AT remain unverified.
+
+All **280 executions across five profiles passed** in one run (3.5 minutes); desktop and mobile fixture screenshots were inspected and the local CSS build passed. Inventory now lists 801 browser definitions / 4005 configured executions plus one pure contract. This focused run is not a new full-matrix pass. Sources: [form-factor-adaptation](https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/user-experience/form-factor-adaptation.md) and [overflow-clipping-control](https://github.com/GoogleChrome/modern-web-guidance/blob/main/skills/modern-web-guidance/guides/css/overflow-clipping-control.md).
+
+## Form-control clipping fixtures — 2026-11-27
+
+Five additional passive fixtures exercise partially clipped textarea and select controls, a fully clipped input, an input exactly fitting the clipping width, and an input inside a padded and bordered clip. `presentation-control-ancestor-clip` and `presentation-control-partial-ancestor-clip` remain `form-factor-adaptation` warnings: tests verify whole-box versus partial evidence and clean fitting controls, both sampled viewports, unchanged DOM/viewport and no additional requests. The inspector, thresholds and guide status are unchanged. Existing exclusions for transforms, positioning, clip paths and complex clipping remain; border-box geometry does not establish glyph visibility, picker usability, AT or real-device behavior.
+
+Local validation: the complete field-geometry suite passed **125 executions across five profiles**, including 25 new executions; desktop and mobile fixture screenshots were inspected, and `pnpm build:css` passed. Current inventory is 745 browser definitions / 3725 five-profile executions plus one pure contract. This focused result is not a new full-matrix or acceptance-chain pass.
+
+## Release validation continuation — 2026-11-27
+
+The published merge commit `5d5ab50` passed its [Linux Project checks run 45838626842](https://github.com/MrGKanev/e-commerce-tester/actions/runs/45838626842), including the sequential local acceptance chain. This run predates `af992db` and does not exercise the new parallel matrix. For that local commit, actionlint 1.7.12 reported no workflow diagnostics, and Playwright `--list` selected 740 cases for each of the five CI project names. These are static and discovery checks, not a Linux execution of the new jobs. Docker was unavailable locally; no GitHub workflow was triggered for the unpublished commit.
+
+On commit `af992db`, the complete `pnpm test:acceptance:local` chain passed sequentially, including 1480 Modern Web Chromium cases and 24 actual production-entry scenarios. The separate `pnpm test:modern-web:browsers:local` run passed all **3700 cases across five profiles in 30.7 minutes**. Both final runs used a command-scoped macOS `caffeinate -dims` assertion, one worker and zero retries; neither changes test windows or establishes the cause of earlier stalls. `pnpm check` and the CSS build passed in the preceding optimization batch; `pnpm audit` reported zero known advisories on November 27.
+
+Earlier attempts are not passes: the WebKit run had 1477 passes and three Mobile WebKit timeouts after unusually long pauses; all three passed an isolated unchanged rerun. An acceptance attempt had 1473 Modern Web passes and seven Desktop Chrome timeouts; those seven passed separately. A separate entry run passed 22/24 and timed out twice; the subsequent awake run passed all 24. These timeout causes are unproven and are not erased by the successful final runs. Linux CI for this commit and the new parallel matrix remains unverified; local passes do not close the CI release gate. No live stores were used.
+
 ## Modern Web execution tiers — 2026-11-26
 
 For everyday work, run `pnpm test:modern-web:quick` (eight representative Desktop Chrome cases) and `pnpm test:modern-web:focused checks/modern-web-widgets.spec.ts` with the relevant changed spec file or files. The focused command does not infer dependencies: select affected suites explicitly, and use the full matrix when coverage is uncertain. These commands are not release gates and do not establish cross-browser coverage.

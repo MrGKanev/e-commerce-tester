@@ -1116,4 +1116,10 @@ New inventory: 58 definitions / 290 configured five-profile executions (41 detai
 
 ## Execution tiers — 2026-11-26
 
-See [Modern Web execution tiers](TESTS.md#modern-web-execution-tiers--2026-11-26) for the quick and focused commands, five-profile CI jobs, retained sequential release checks, updated inventory and measured local results. This changes test execution only; existing rule IDs, evidence, severity, limitations and remaining guide obligations are unchanged. CI timing and a complete five-profile pass remain unverified.
+See [Modern Web execution tiers](TESTS.md#modern-web-execution-tiers--2026-11-26) for the quick and focused commands, five-profile CI jobs, retained sequential release checks, updated inventory and measured local results. This changes test execution only; existing rule IDs, evidence, severity, limitations and remaining guide obligations are unchanged. The [November 27 validation](TESTS.md#release-validation-continuation--2026-11-27) passed the full local five-profile matrix and acceptance chain; CI timing and Linux CI remain unverified.
+
+## Form-control clipping fixtures — 2026-11-27
+
+Five new fixtures verify partial textarea/select clipping, full input clipping, exact-width containment and a padded/bordered positive case. The existing `presentation-control-ancestor-clip` and `presentation-control-partial-ancestor-clip` advisories, geometry limits and `form-factor-adaptation` Partial status remain unchanged. [Validation and remaining limits](TESTS.md#form-control-clipping-fixtures--2026-11-27).
+
+The later [control clipping combinations](TESTS.md#control-clipping-combinations--2026-11-27) add 56 test definitions across four controls and 14 distinct layout conditions; all 280 configured five-profile executions passed. Existing warnings, evidence, inspector behavior and Partial guide status remain unchanged.
