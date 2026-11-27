@@ -818,6 +818,47 @@ $('#run-projects').innerHTML = projects
       `<label class="${checkLabelClass}"><input class="${checkboxClass}" type="checkbox" name="run-project" value="${escapeHTML(project)}" ${index === 0 ? 'checked' : ''}>${escapeHTML(project)}</label>`,
   )
   .join('');
+const runProfiles = {
+  quick: {
+    title: 'Quick',
+    description: 'Key journeys · Desktop Chrome',
+    mode: 'smoke',
+    projects: ['Desktop Chrome'],
+  },
+  standard: {
+    title: 'Standard',
+    description: 'All regular checks · Desktop Chrome',
+    mode: 'full',
+    projects: ['Desktop Chrome'],
+  },
+  full: {
+    title: 'Full',
+    description: 'All regular checks · all five browsers',
+    mode: 'full',
+    projects,
+  },
+};
+$('#run-profiles').innerHTML = Object.entries(runProfiles)
+  .map(
+    ([id, profile]) =>
+      `<label for="run-profile-${id}" class="flex min-h-12 cursor-pointer items-start gap-2 rounded-lg border border-slate-500 p-3 text-sm text-slate-900 has-checked:border-blue-600 has-checked:bg-blue-50"><input id="run-profile-${id}" name="run-profile" type="radio" value="${id}" ${id === 'quick' ? 'checked' : ''} class="mt-1 size-4 shrink-0 accent-blue-600 ${focusRing}"><span><strong class="block">${profile.title}</strong><span class="block text-slate-600">${profile.description}</span></span></label>`,
+  )
+  .join('');
+$('#run-profiles').addEventListener('change', event => {
+  const profile = runProfiles[event.target.value];
+  if (!profile) return;
+  $('#run-mode').value = profile.mode;
+  document.querySelectorAll('[name="run-project"]').forEach(input => {
+    input.checked = profile.projects.includes(input.value);
+  });
+});
+function clearRunProfile() {
+  document.querySelectorAll('[name="run-profile"]').forEach(input => {
+    input.checked = false;
+  });
+}
+$('#run-mode').addEventListener('change', clearRunProfile);
+$('#run-projects').addEventListener('change', clearRunProfile);
 function runsMessage(text, error = false) {
   setNotice($('#runs-message'), text, error);
 }
@@ -923,6 +964,15 @@ function renderRunDetails({ run, events, log }) {
       ? `<p>${progress.completed} / ${progress.total} checks completed</p><progress class="mt-2 h-2 w-full overflow-hidden rounded-full [&::-moz-progress-bar]:bg-blue-600 [&::-webkit-progress-bar]:bg-slate-200 [&::-webkit-progress-value]:bg-blue-600" max="${Math.max(progress.total, 1)}" value="${progress.completed}" aria-label="Checks completed"></progress>`
       : emptyNote('Waiting for test progress…'),
   );
+  const efficiency = last('efficiency');
+  updateHTML(
+    $('#run-efficiency'),
+    efficiency?.stages?.length
+      ? `<p class="text-xs text-slate-600">Slowest first. Test time includes hooks and pacing; concurrent times can overlap. Request attempts include redirects and intercepted requests; setup/cleanup outside tests is excluded. Counts are not transferred bytes.</p><ol role="list" class="mt-2 space-y-2">${efficiency.stages.map(stage => `<li class="rounded-lg border border-slate-200 p-2 break-words"><strong>${escapeHTML(stage.name)}</strong><span class="block">${(stage.durationMs / 1000).toFixed(1)} s · ${stage.attempts} attempts</span><span class="block text-slate-600">${stage.measuredAttempts ? `Main-document requests: ${stage.documentRequests} · Browser requests: ${stage.browserRequests} (including documents) · API calls: ${stage.apiRequests}` : 'Request counts unavailable'} · ${stage.measuredAttempts}/${stage.attempts} attempts measured</span></li>`).join('')}</ol>`
+      : emptyNote(
+          'Measurements appear after the first completed check. Older runs may not have measurements.',
+        ),
+  );
   const test = last('test'),
     step = events.findLast(event => event.type === 'step' && (!test || event.time >= test.time)),
     url = events.findLast(event => event.type === 'url' && (!test || event.time >= test.time));
@@ -934,6 +984,12 @@ function renderRunDetails({ run, events, log }) {
       ['Step', step?.title],
       ['URL / API', url?.url],
       ['Last result', last('result')?.status],
+      [
+        'Elapsed',
+        run.startedAt
+          ? `${(((run.finishedAt || Date.now()) - run.startedAt) / 1000).toFixed(1)} s`
+          : '',
+      ],
       ['Started', run.startedAt ? new Date(run.startedAt).toLocaleString() : ''],
       ['Finished', run.finishedAt ? new Date(run.finishedAt).toLocaleString() : ''],
     ]

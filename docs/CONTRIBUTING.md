@@ -6,6 +6,10 @@ Contributions that improve coverage, portability and reliability are welcome. Se
 
 ## Development setup
 
+Use `./start.sh` from the checkout to start Docker Desktop and open the managed panel (`--no-open` for a headless host). The launcher reuses active services; it does not run validation.
+
+Start Docker Desktop/Engine before any test. For Docker Desktop, use `docker desktop start`, then verify `docker info`. Keep Docker running throughout validation. If it cannot start, report the blocked validation without a host retry.
+
 ```bash
 git clone https://github.com/MrGKanev/e-commerce-tester.git
 cd e-commerce-tester
@@ -89,9 +93,11 @@ All package commands below are container commands: prefix focused runs with `doc
 
 The historical `test:p2:local` script name is retained as a command, not a documentation phase. Its OCR pipeline uses a fixture executable; a native OCR check additionally runs when Tesseract and its English model are installed.
 
+These editing commands mount the checkout writable and keep Linux dependencies in a separate container volume, so changes persist without using host dependencies.
+
 ```bash
-pnpm lint:fix
-pnpm format
+docker compose run --build --rm -T -v "$PWD:/app" -v /app/node_modules checks pnpm lint:fix
+docker compose run --build --rm -T -v "$PWD:/app" -v /app/node_modules checks pnpm format
 ```
 
 These commands modify files. Keep formatting changes scoped to your contribution.

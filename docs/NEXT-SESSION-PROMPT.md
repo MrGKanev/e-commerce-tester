@@ -10,6 +10,8 @@ Continue implementing the remaining Modern Web storefront checks in `/Volumes/RO
 
 ## Start by recovering the actual state
 
+0. Before any tests, run `docker info`; if needed start Docker Desktop with `docker desktop start` and wait for readiness. All validation, isolated retries and runtime probes use the project Docker containers (`linux/amd64`). Use `docker compose run --build --rm -T checks pnpm <command>` for owned fixtures; there is no host Node/browser fallback. Keep the hosted CI quick; do not restore a full hosted browser matrix. Historical snapshots below do not establish Docker validation.
+
 1. Read `AGENTS.md`, `docs/MODERN-WEB.md` (especially Current handoff, the complete matrix and Suggested implementation order) and `docs/TESTS.md`.
 2. Inspect Git status, branch, recent commits, PR #29 and its current CI. Preserve unrelated changes. Do not repeat completed actions or assume the PR is still open/unmerged.
 3. If PR #29 remains open, continue its branch unless isolation is needed. If it has merged, start a new branch from current master. You may commit, push and create/update a PR; do not merge it automatically.
@@ -71,7 +73,7 @@ Choose productive alternatives when a topic requires unavailable human/device/bu
 
 ## Verification and maintenance
 
-- Run checks appropriate to the change: `pnpm check`, `pnpm test:modern-web:local`, `pnpm test:modern-web:entry:local`, relevant Pages/a11y/vitals checks, and installed Firefox/WebKit projects when applicable. Run full local acceptance for broad changes or dependency upgrades.
+- Run checks appropriate to the change through `docker compose run --build --rm -T checks` (the following are container command names): `pnpm check`, `pnpm test:modern-web:local`, `pnpm test:modern-web:entry:local`, relevant Pages/a11y/vitals checks, and Firefox/WebKit projects supplied by the Docker image when applicable. Run full local acceptance for broad changes or dependency upgrades.
 - Run `pnpm build:css` after changing template/fixture classes; keep `web/tailwind.input.css` source declarations current. Generated `web/tailwind.css` is build output.
 - Run `pnpm check:modern-web:coverage`. Optional `--catalog <already-downloaded-CLI-list.json>` verifies exact catalog equality offline. The validator also checks exact Partial membership in the TESTS index.
 - Claims acceptance now uses parent-owned dynamic loopback servers before workers import settings. Preserve this isolation; a regression reserves legacy port 45994 and verifies independent fixtures. Do not reintroduce fixed-port ownership in claims workers.

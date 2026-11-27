@@ -7,10 +7,12 @@ Manage stores and schedules through forms, without editing JSON. The control ser
 ## Start with Docker
 
 ```bash
-docker compose --profile managed up -d --build control
+./start.sh
 ```
 
-Open **http://localhost:8080**. Add a store, enter its address and two product handles, choose checks and intervals, enable it, then save. New stores are paused until enabled explicitly. The UI uses hours for intervals and seconds for request pauses; the underlying scheduler continues using minutes/milliseconds.
+The launcher starts Docker Desktop when needed, waits for Docker and the panel healthcheck, and opens the published URL. `./start.sh --no-open` prints it without opening a browser. A running panel is reused without a restart or rebuild; apply source updates with `docker compose --profile managed up -d --build control` after active runs finish. If the file-based scheduler is running, the launcher reports the conflict without stopping it.
+
+Open the displayed URL. Add a store, enter its address and two product handles, choose checks and intervals, enable it, then save. New stores are paused until enabled explicitly. The UI uses hours for intervals and seconds for request pauses; the underlying scheduler continues using minutes/milliseconds.
 
 The page includes:
 
@@ -50,6 +52,10 @@ Settings, Reports and Runs have direct links at `/settings`, `/reports` and `/ru
 
 Open **Runs** to select a saved store, check mode and browsers, then **Add to queue**. Manual runs work even when the store's automatic schedule is paused. Save edits in Settings before enqueueing; each queued run retains the saved store settings from that moment.
 
+Choose a **Quick** (Smoke, Desktop Chrome), **Standard** (all regular checks, Desktop Chrome) or **Full** (all regular checks, all five browsers) profile. Standard keeps regular cart/checkout coverage while using one browser. Profiles only fill the existing controls: changing checks or browsers clears the profile selection, and nothing is queued until you submit. Full can take substantially longer.
+
+Run details show **Time & requests by stage**, grouped by browser/spec and sorted by test time. Counts include repeated main-document request attempts (including reloads/redirects), all HTTP browser requests and separately wrapped API calls. Hash-only navigation is not a document request. Measurements are passive and add no store requests. Test durations include hooks/pacing and retries; overlapping durations are not wall-clock time. Setup/teardown outside tests, uninstrumented clients, transferred bytes and cache savings are not measured. Unmeasured attempts are reported explicitly. Full measurements persist in `run-metadata.json`; the live panel uses recent activity and may not show older measurements after they leave the bounded event log.
+
 The scheduler executes one run at a time. Manual requests use FIFO order and take priority over upcoming scheduled checks after the current run ends. Request pacing, the gap between runs and store cooldowns still apply; the queue shows the eligibility time and reason when waiting. **Remove** cancels a waiting request. **Stop run** interrupts an active manual or scheduled run and closes its runner/browser process group; stopping does not pause future scheduled checks. Deliberate cancellation does not add a failure cooldown.
 
 The **Activity** panel remains visible in Settings, Reports and Runs. It updates every second with the current test, browser, page/API URL and recent steps/results. The Runs detail panel also shows completed/total checks and runner output. Activity is retained after completion, and the latest 50 runs are available in the local control history. Full generated reports remain in Reports. Queued runs survive worker restarts; an active run interrupted by a restart is marked interrupted rather than rerun automatically.
@@ -80,17 +86,13 @@ Configuration saves are validated before writing. Invalid edits leave the previo
 
 The healthcheck verifies the HTTP service and scheduler heartbeat. The service restarts an exited scheduler after five seconds. Run one control service per state directory; do not run the file-based scheduler concurrently.
 
-## Run locally
+## Development checks
+
+Run owned loopback fixtures in the isolated Docker validation service:
 
 ```bash
-pnpm control
-```
-
-Defaults: host `127.0.0.1`, port `8080`, configuration `managed-config/configuration.json`, state `scheduler-state/`. Override with `CONTROL_HOST`, `CONTROL_PORT`, `CONTROL_CONFIG_FILE` and `SCHEDULER_STATE_DIR`. Docker's `CONTROL_BIND_ADDRESS` is the host publish address; `CONTROL_HOST` is the address listened on inside the process.
-
-```bash
-pnpm test:control:local
-pnpm check
+docker compose run --build --rm -T checks pnpm test:control:local
+docker compose run --build --rm -T checks pnpm check
 ```
 
 Loopback tests cover setup, editing, save/reload, pause, advanced setting preservation, mobile layout and axe checks. API tests cover validation, revision conflicts, cross-origin writes and report path confinement. Scheduler tests verify live reload without store traffic.

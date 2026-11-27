@@ -6,11 +6,27 @@ The suite supports desktop Chromium, Firefox and WebKit, plus selected mobile sc
 
 ## Quick start
 
-Docker Engine/Desktop with Docker Compose is required for all project execution and validation. Containers use the project Playwright image on `linux/amd64`; do not install or run browsers/tests directly on the host. Host Node/pnpm and GitHub CLI are optional report-controller tools only.
+Install Docker Desktop/Engine with Docker Compose, then run:
 
 ```bash
 git clone https://github.com/MrGKanev/e-commerce-tester.git
 cd e-commerce-tester
+./start.sh
+```
+
+The launcher starts Docker Desktop if needed, waits for Docker and the panel healthcheck, and opens its published address (normally **http://localhost:8080**). On an Engine-only Linux installation, start its Docker service first. If Docker is unavailable, execution stops; there is no host Node/browser fallback.
+
+Use the panel to add stores, choose checks and schedules, pause stores and view reports. No configuration files need editing. Choose **Quick** for key journeys, **Standard** for all regular checks with Desktop Chrome, or **Full** for all five browsers. The service starts empty and has no password/login; see [Browser control panel](docs/CONTROL-PANEL.md) for local hosting and domains.
+
+For later starts, run `./start.sh` from the checkout. It reuses a running panel without rebuilding or restarting it; `./start.sh --no-open` prints the address only. Apply code updates by rebuilding the service after active runs finish.
+
+All project execution and validation uses the pinned Playwright Docker environment on `linux/amd64`. Host Node/pnpm and GitHub CLI are optional report-controller tools only.
+
+## Run from the CLI
+
+Start Docker Desktop/Engine and verify `docker info` before running a container. Copy the store configuration:
+
+```bash
 cp examples/sites.example.json sites.json
 ```
 
@@ -22,17 +38,9 @@ docker compose run --build --rm -v "$PWD/sites.json:/app/sites.json:ro" e2e pnpm
 
 `sites.json`, `.env`, browser storage and generated reports are local files excluded from version control. Configure your own store before running: the code retains legacy store defaults when configuration is omitted.
 
-## Browser management
-
-For unattended checks managed through forms, run:
-
-```bash
-docker compose --profile managed up -d --build control
-```
-
-Open **http://localhost:8080** to add stores, choose checks and schedules, pause stores and view reports. No configuration files need editing. The service starts empty and has no password/login; see [Browser control panel](docs/CONTROL-PANEL.md) for local hosting and domains.
-
 ## Run modes
+
+Package command names below are container entrypoints: use the Docker `e2e` service for authorized stores and `checks` for owned fixtures. Only `check:local`/`check:pr` report controllers and guidance tooling run on the host.
 
 | Command                        | Scope                                                                                   |
 | ------------------------------ | --------------------------------------------------------------------------------------- |
@@ -45,11 +53,12 @@ Open **http://localhost:8080** to add stores, choose checks and schedules, pause
 | `pnpm test:audit`              | Opt-in Lighthouse and throttled network checks                                          |
 
 ```bash
-pnpm test:full --project="Desktop Firefox" --project="Desktop Safari"
-pnpm test:pages --project="Mobile Chrome"
-pnpm test:headed
-pnpm test:debug
-pnpm dashboard:preview
+# Authorized store runs only; the store file stays read-only in Docker.
+docker compose run --build --rm -T -v "$PWD/sites.json:/app/sites.json:ro" e2e pnpm test:full --project="Desktop Firefox" --project="Desktop Safari"
+docker compose run --build --rm -T -v "$PWD/sites.json:/app/sites.json:ro" e2e pnpm test:pages --project="Mobile Chrome"
+docker compose run --build --rm -T -v "$PWD/sites.json:/app/sites.json:ro" e2e xvfb-run -a pnpm test:headed
+# Interactive debugging needs a configured display/VNC session inside Docker.
+# See docs/REPORTS.md for Docker report viewing and offline preview export.
 ```
 
 Visual checks compare with an explicitly approved version per store. Review and approve candidates in the control panel; runs never update approval automatically. See [Visual baselines](docs/RUNNING.md#visual-baselines).

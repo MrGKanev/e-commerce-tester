@@ -53,7 +53,11 @@ export function recordRateLimit(status: number, url: string, retryAfter: string 
   );
 }
 
+// Worker-local attempt counts; no URLs, extra requests or response bodies are retained.
+export const runTraffic = { browserRequests: 0, documentRequests: 0, apiRequests: 0 };
+
 const wrapped = new WeakSet<APIRequestContext>();
+const observedContexts = new WeakSet<BrowserContext>();
 export function paceAPI(request: APIRequestContext): void {
   if (wrapped.has(request)) return;
   wrapped.add(request);
@@ -62,6 +66,7 @@ export function paceAPI(request: APIRequestContext): void {
   request.fetch = async (...args: Parameters<APIRequestContext['fetch']>) => {
     await paceRequest();
     controlEvent({ type: 'url', url: typeof args[0] === 'string' ? args[0] : args[0].url() });
+    runTraffic.apiRequests++;
     const response = await original(...args);
     recordRateLimit(response.status(), response.url(), response.headers()['retry-after'] ?? null);
     return response;
@@ -70,6 +75,15 @@ export function paceAPI(request: APIRequestContext): void {
 
 export async function paceContext(context: BrowserContext): Promise<void> {
   paceAPI(context.request);
+  if (!observedContexts.has(context)) {
+    observedContexts.add(context);
+    context.on('request', request => {
+      if (!/^https?:/.test(request.url())) return;
+      runTraffic.browserRequests++;
+      if (request.isNavigationRequest() && request.frame().parentFrame() === null)
+        runTraffic.documentRequests++;
+    });
+  }
   context.on('response', response => {
     recordRateLimit(response.status(), response.url(), response.headers()['retry-after'] ?? null);
   });

@@ -2,7 +2,7 @@ import { expect } from '@playwright/test';
 import { test } from '../tests/fixtures';
 import { createServer, type Server } from 'node:http';
 import fs from 'node:fs';
-import { RATE_LIMIT_FILE, paceAPI, paceContext, isLimited } from '../tests/pacing';
+import { RATE_LIMIT_FILE, paceAPI, paceContext, isLimited, runTraffic } from '../tests/pacing';
 
 let server: Server;
 const requests: number[] = [];
@@ -19,7 +19,9 @@ test.beforeAll(async () => {
     }
     res.end('<html><title>Local pacing test</title></html>');
   });
-  await new Promise<void>(resolve => server.listen(Number(new URL(origin).port), '127.0.0.1', resolve));
+  await new Promise<void>(resolve =>
+    server.listen(Number(new URL(origin).port), '127.0.0.1', resolve),
+  );
 });
 
 test.afterAll(async () => {
@@ -34,20 +36,28 @@ test('paces direct browser navigations and API get/post calls', async ({ browser
     const page = await context.newPage();
     await page.goto(origin);
     await page.goto(`${origin}/second`);
+    await page.reload();
+    await page.goto(`${origin}/second#same-document`);
     paceAPI(request);
     await request.get(origin);
     await context.request.post(origin);
+    expect(runTraffic.documentRequests).toBe(3);
+    expect(runTraffic.apiRequests).toBe(2);
     expect(requests.length).toBeGreaterThanOrEqual(4);
     for (let i = 1; i < requests.length; i++) {
       expect(requests[i] - requests[i - 1]).toBeGreaterThanOrEqual(50);
     }
-  } finally { await context.close(); }
+  } finally {
+    await context.close();
+  }
 });
 
 test('shared fixture also paces pages created by Playwright', async ({ page }) => {
   const count = requests.length;
   await page.goto(origin);
   expect(requests.length).toBeGreaterThan(count);
+  expect(runTraffic.documentRequests).toBe(1);
+  expect(runTraffic.apiRequests).toBe(0);
 });
 
 test('records Retry-After and blocks requests after HTTP 429', async ({ browser, request }) => {
@@ -64,9 +74,10 @@ test('records Retry-After and blocks requests after HTTP 429', async ({ browser,
     const page = await context.newPage();
     await expect(page.goto(origin)).rejects.toThrow();
     expect(requests.length).toBe(count);
-  } finally { await context.close(); }
+  } finally {
+    await context.close();
+  }
 });
-
 
 test('shared fixture skips further tests after 429', async ({ page }) => {
   await page.goto(origin);

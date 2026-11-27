@@ -2,7 +2,6 @@
 
 All project execution and manual reproductions use Docker with this repository's Dockerfile and `linux/amd64` platform. Package commands in this document run inside the container, never directly in host Node/pnpm. Use the isolated `checks` service for owned fixture validation (`docker compose run --build --rm -T checks pnpm check`) and `e2e`/managed services for authorized store runs. Rebuild after source changes. If Docker is unavailable, validation is blocked; host execution is not a fallback. The host may run `pnpm check:local`/`check:pr` only as Docker/report controllers.
 
-
 [Back to README](../README.md) · [Configuration](CONFIGURATION.md)
 
 ## Modes and browser selection
@@ -20,12 +19,12 @@ The runner defaults to `full` mode and `Desktop Chrome`. Suites are selected by 
 | `pnpm test:audit`   | `@audit`   | Lighthouse and network throttling                                     |
 
 ```bash
-pnpm test:full --project="Desktop Chrome" --project="Desktop Firefox" --project="Desktop Safari"
-pnpm test:full --project="Mobile Chrome" --project="Mobile Safari"
-pnpm test:full --grep="@content"
-pnpm test:smoke --site=my-store
-pnpm test:headed
-pnpm test:debug
+docker compose run --build --rm -T -v "$PWD/sites.json:/app/sites.json:ro" e2e pnpm test:full --project="Desktop Chrome" --project="Desktop Firefox" --project="Desktop Safari"
+docker compose run --build --rm -T -v "$PWD/sites.json:/app/sites.json:ro" e2e pnpm test:full --project="Mobile Chrome" --project="Mobile Safari"
+docker compose run --build --rm -T -v "$PWD/sites.json:/app/sites.json:ro" e2e pnpm test:full --grep="@content"
+docker compose run --build --rm -T -v "$PWD/sites.json:/app/sites.json:ro" e2e pnpm test:smoke --site=my-store
+docker compose run --build --rm -T -v "$PWD/sites.json:/app/sites.json:ro" e2e xvfb-run -a pnpm test:headed
+# Interactive debugging requires a configured display/VNC session inside Docker; never use a host browser.
 ```
 
 `--site=<slug>` selects one configured store. `--sites-file=<path>` selects a different store file; both options are consumed by the runner.
@@ -76,16 +75,16 @@ reports/<store>/<run>/visual/
   <screenshot-id>-diff.png
 ```
 
-A new approval copies unselected existing images and replaces only selected images. Old versions remain available and a run pins its approved revision at startup. Deleting old reports does not delete approved images. Back up `visual-baselines/` alongside configuration; it is gitignored, excluded from Docker builds and mounted in all Compose services. `VISUAL_BASELINES_DIR` can override its location for CLI and control services.
+A new approval copies unselected existing images and replaces only selected images. Old versions remain available and a run pins its approved revision at startup. Deleting old reports does not delete approved images. Back up `visual-baselines/` alongside configuration; it is gitignored, excluded from Docker builds and mounted in store runtime services; isolated `checks` containers require the explicit mount shown below. `VISUAL_BASELINES_DIR` can override its location for CLI and control services.
 
 Use the same pinned Docker image and CPU architecture to capture and compare. The image sets `VISUAL_ENVIRONMENT`; compatibility also includes platform, architecture, browser/Playwright versions, locale, timezone, device properties, viewport and capture policy. A mismatch produces candidates with an **incompatible** status rather than a misleading pixel regression. Re-run in the approved environment, or review and explicitly approve the new environment. Updating the browser or image therefore requires a reviewed migration. Native and Docker baselines are not interchangeable.
 
-For file-based use, review the images in the report before invoking explicit approval:
+For file-based use, review the images in the report before invoking explicit approval. Replace `RUN_TIMESTAMP` and `SNAPSHOT_ID` with values from the report:
 
 ```bash
-pnpm visual:review --site=my-store --run=<run-timestamp>
+docker compose run --build --rm -T -v "$PWD/visual-baselines:/app/visual-baselines:ro" checks pnpm visual:review --site=my-store --run=RUN_TIMESTAMP
 # Use the revision and IDs returned by review; use none only for the first approval.
-pnpm visual:approve --site=my-store --run=<run-timestamp> --revision=none --ids=<id>,<id>
+docker compose run --build --rm -T -v "$PWD/visual-baselines:/app/visual-baselines:rw" checks pnpm visual:approve --site=my-store --run=RUN_TIMESTAMP --revision=none --ids=SNAPSHOT_ID,SNAPSHOT_ID
 ```
 
 Automatic `--update-snapshots`, `-u` and ignored-snapshot comparisons are rejected. Playwright receives disposable run-local copies, never writable approved images.
@@ -94,13 +93,13 @@ The six old store screenshots and saved image artifacts from that store were del
 
 The default difference ratio is 0.03. Per-store `thresholds.visual.components` overrides it by screenshot name without `.png`, for example `{ "header": 0.005, "product-hero": 0.01 }`. Viewport screenshots use the actual configured viewport, including mobile projects. Dynamic elements are masked by the spec. Spelling evidence remains separate from baseline images.
 
-Local lifecycle checks: `pnpm test:visual:local` checks desktop/mobile Chromium; `VISUAL_CHECK_ALL_BROWSERS=1 pnpm test:visual:local` checks all five projects after installing Firefox and WebKit too. These commands use intercepted local pages and temporary approval stores.
+Local lifecycle checks: `pnpm test:visual:local` checks desktop/mobile Chromium; `docker compose run --build --rm -T -e VISUAL_CHECK_ALL_BROWSERS=1 checks pnpm test:visual:local` checks all five projects using the browsers already supplied by the pinned Docker image. These commands use intercepted local pages and temporary approval stores.
 
 ## Security monitoring and approval
 
 Configure [security monitoring](SECURITY-MONITORING.md) before running `pnpm test:security --site=my-store`; this visits the authorized store. Monitoring is opt-in and supports report/strict modes, scoped consent scenarios and checkout contracts. Run `pnpm test:security:local` and `pnpm test:security:entry:local` for owned offline fixtures instead.
 
-Approve security baselines offline through the documented `review` → `approve` workflow. CLI approval requires the current review hash, a reason and `--reviewed`; `history` displays previous approvals. Test runs never promote references. These files are independent of visual baselines. Docker Compose exposes `security-baselines/` read-only; perform approvals on the host.
+Approve security baselines offline through the documented `review` → `approve` workflow. CLI approval requires the current review hash, a reason and `--reviewed`; `history` displays previous approvals. Test runs never promote references. These files are independent of visual baselines. Docker Compose exposes `security-baselines/` read-only; perform approvals in a disposable Docker container with an explicit writable security-baseline mount, following the documented review/approval workflow.
 
 ## Docker
 

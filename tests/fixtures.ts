@@ -8,7 +8,14 @@ const settings = readSiteSettings();
 import { compatibleSpec } from '../scripts/platform-config';
 let visitedUrls = new Set<string>();
 import { test as base, chromium as originalChromium, type Browser } from '@playwright/test';
-import { assertNotLimited, isLimited, paceAPI, paceContext, pauseBetweenTests } from './pacing';
+import {
+  assertNotLimited,
+  isLimited,
+  paceAPI,
+  paceContext,
+  pauseBetweenTests,
+  runTraffic,
+} from './pacing';
 
 export { expect } from '@playwright/test';
 export type { Page, BrowserContext } from '@playwright/test';
@@ -65,6 +72,7 @@ export const test = base.extend<{ politeRun: void }>({
   politeRun: [
     async ({}, use, testInfo) => {
       visitedUrls = new Set();
+      Object.assign(runTraffic, { browserRequests: 0, documentRequests: 0, apiRequests: 0 });
       vitalSessions = [];
       const file = path.basename(testInfo.file);
       automateConsent = ![
@@ -116,6 +124,10 @@ export const test = base.extend<{ politeRun: void }>({
         await use();
       } finally {
         await attachWebVitals(vitalSessions, testInfo);
+        await testInfo.attach('run-efficiency.json', {
+          body: JSON.stringify(runTraffic),
+          contentType: 'application/json',
+        });
         for (const url of visitedUrls) testInfo.annotations.push({ type: 'url', description: url });
         if (actualBrowserVersion)
           testInfo.annotations.push({ type: 'browser-version', description: actualBrowserVersion });

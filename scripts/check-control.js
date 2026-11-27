@@ -421,6 +421,19 @@ const { digest, approved } = require('./visual-baselines');
     fs.mkdirSync(stateDirectory, { recursive: true });
     await page.getByRole('link', { name: 'Runs', exact: true }).click();
     await page.getByLabel('Saved store', { exact: true }).selectOption(storeId);
+    await expect(page.getByRole('radio', { name: /Quick/ })).toBeChecked();
+    await page.getByRole('radio', { name: /Full/ }).check();
+    await expect(page.locator('#run-mode')).toHaveValue('full');
+    assert.equal(await page.locator('[name="run-project"]:checked').count(), 5);
+    await page.getByRole('radio', { name: /Standard/ }).check();
+    await expect(page.locator('#run-mode')).toHaveValue('full');
+    assert.equal(await page.locator('[name="run-project"]:checked').count(), 1);
+    await page.locator('#run-mode').selectOption('visual');
+    assert.equal(await page.locator('[name="run-profile"]:checked').count(), 0);
+    await page.getByRole('radio', { name: /Quick/ }).focus();
+    await page.keyboard.press('Space');
+    await expect(page.locator('#run-mode')).toHaveValue('smoke');
+
     await page.getByRole('button', { name: 'Add to queue', exact: true }).click();
     await expect(page.locator('#runs-message')).toContainText('Run submitted');
     const commandDirectory = path.join(stateDirectory, 'commands');
@@ -450,6 +463,21 @@ const { digest, approved } = require('./visual-baselines');
         },
         { type: 'url', url: 'https://example.test/products/one' },
         { type: 'step', title: 'Compare displayed price' },
+        {
+          type: 'efficiency',
+          title: 'Time and request counts updated',
+          stages: [
+            {
+              name: 'Desktop Chrome / product.spec.ts',
+              durationMs: 2500,
+              attempts: 2,
+              measuredAttempts: 2,
+              documentRequests: 1,
+              browserRequests: 4,
+              apiRequests: 1,
+            },
+          ],
+        },
       ]
         .map(event => JSON.stringify({ ...event, time: Date.now() }))
         .join('\n') + '\n',
@@ -457,6 +485,9 @@ const { digest, approved } = require('./visual-baselines');
     await expect(page.locator('#run-active')).toContainText('running');
     await expect(page.locator('#run-events')).toContainText('Compare displayed price');
     await expect(page.locator('#run-progress')).toContainText('2 / 9');
+    await expect(page.locator('#run-efficiency')).toContainText('2.5 s');
+    await expect(page.locator('#run-efficiency')).toContainText('Main-document requests: 1');
+    await expect(page.locator('#run-events')).toContainText('Time and request counts updated');
     await expect(page.locator('#activity-test')).toContainText('Checking product price');
     await expect(page.locator('#activity-url')).toContainText('/products/one');
     const removeRun = page
@@ -541,7 +572,10 @@ const { digest, approved } = require('./visual-baselines');
       [],
     );
     await page.screenshot({
-      path: path.join(os.tmpdir(), 'store-control-runs-desktop.png'),
+      path: path.join(
+        process.env.CONTROL_SCREENSHOTS_DIR || os.tmpdir(),
+        'store-control-runs-desktop.png',
+      ),
       fullPage: true,
     });
     await page.setViewportSize({ width: 390, height: 844 });
@@ -550,7 +584,10 @@ const { digest, approved } = require('./visual-baselines');
       false,
     );
     await page.screenshot({
-      path: path.join(os.tmpdir(), 'store-control-runs-mobile.png'),
+      path: path.join(
+        process.env.CONTROL_SCREENSHOTS_DIR || os.tmpdir(),
+        'store-control-runs-mobile.png',
+      ),
       fullPage: true,
     });
     atomicWrite(queueFile, {

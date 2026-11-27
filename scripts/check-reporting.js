@@ -67,6 +67,27 @@ try {
     /redacted-[a-f0-9]{64}/,
   );
   const run = summarizeRun(results, metadata);
+  const efficiency = metadata.efficiency.stages[0];
+  assert.ok(efficiency.durationMs > 0);
+  assert.equal(efficiency.attempts, 5, 'Retries and skipped results retain their durations');
+  assert.equal(efficiency.documentRequests, 1);
+  assert.equal(efficiency.browserRequests, 1);
+  assert.equal(efficiency.apiRequests, 0);
+  assert.equal(
+    efficiency.measuredAttempts,
+    5,
+    'Entered fixtures measure traffic even when their test skips at runtime',
+  );
+  assert.deepEqual(
+    JSON.parse(
+      rawEvents
+        .trim()
+        .split('\n')
+        .filter(line => JSON.parse(line).type === 'efficiency')
+        .at(-1),
+    ).stages,
+    metadata.efficiency.stages,
+  );
   assert.equal(metadata.phase, 'finished');
   assert.equal(metadata.selectedTests, 4);
   assert.ok(metadata.versions.playwright);

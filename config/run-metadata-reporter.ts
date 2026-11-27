@@ -35,6 +35,16 @@ function sourceRevision() {
   }
 }
 
+type EfficiencyStage = {
+  name: string;
+  durationMs: number;
+  attempts: number;
+  measuredAttempts: number;
+  browserRequests: number;
+  documentRequests: number;
+  apiRequests: number;
+};
+
 type Scenario = {
   id: string;
   name: string;
@@ -49,7 +59,13 @@ type Scenario = {
   urls?: string[];
   artifacts?: Array<{ name: string; path: string; contentType: string }>;
   activeRetry?: number;
-  attempts: Array<{ retry: number; status: string; errors: string[] }>;
+  attempts: Array<{
+    retry: number;
+    status: string;
+    errors: string[];
+    durationMs: number;
+    traffic?: { browserRequests: number; documentRequests: number; apiRequests: number };
+  }>;
 };
 
 export default class RunMetadataReporter implements Reporter {
@@ -148,6 +164,7 @@ export default class RunMetadataReporter implements Reporter {
         tags: [...new Set(suite.allTests().flatMap(t => t.tags))],
       },
       selectedTests: suite.allTests().length,
+      efficiency: { stages: [] },
     };
     for (const test of suite.allTests()) {
       this.scenarios.set(test.id, {
@@ -188,6 +205,34 @@ export default class RunMetadataReporter implements Reporter {
     scenario.activeRetry = result.retry;
     this.write();
   }
+  private efficiency() {
+    const stages = [...this.scenarios.values()].reduce((groups, scenario) => {
+      if (!scenario.attempts.length) return groups;
+      const key = `${scenario.project} / ${scenario.file}`;
+      const stage = groups.get(key) || {
+        name: key,
+        durationMs: 0,
+        attempts: 0,
+        measuredAttempts: 0,
+        browserRequests: 0,
+        documentRequests: 0,
+        apiRequests: 0,
+      };
+      for (const attempt of scenario.attempts) {
+        stage.durationMs += attempt.durationMs;
+        stage.attempts++;
+        if (attempt.traffic) {
+          stage.measuredAttempts++;
+          stage.browserRequests += attempt.traffic.browserRequests;
+          stage.documentRequests += attempt.traffic.documentRequests;
+          stage.apiRequests += attempt.traffic.apiRequests;
+        }
+      }
+      groups.set(key, stage);
+      return groups;
+    }, new Map<string, EfficiencyStage>());
+    return { stages: [...stages.values()].sort((a, b) => b.durationMs - a.durationMs) };
+  }
   onTestEnd(test: TestCase, result: TestResult) {
     this.completed++;
     controlEvent({
@@ -222,11 +267,24 @@ export default class RunMetadataReporter implements Reporter {
           .filter((text): text is string => !!text),
       ),
     ];
+    const trafficAttachment = result.attachments.find(a => a.name === 'run-efficiency.json');
+    const traffic = trafficAttachment
+      ? JSON.parse(
+          trafficAttachment.body
+            ? trafficAttachment.body.toString()
+            : fs.readFileSync(trafficAttachment.path!, 'utf8'),
+        )
+      : undefined;
     scenario.attempts.push({
       retry: result.retry,
       status: result.status,
+      durationMs: result.duration,
+      traffic,
       errors: result.errors.map(e => e.message || e.value || 'Unspecified error'),
     });
+    const efficiency = this.efficiency();
+    this.metadata.efficiency = efficiency;
+    controlEvent({ type: 'efficiency', title: 'Time and request counts updated', ...efficiency });
     scenario.urls = [
       ...new Set(
         annotations

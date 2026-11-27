@@ -2,6 +2,7 @@
 
 ## Docker-only execution (required)
 
+- Before any validation or runtime reproduction, check `docker info`. If unavailable, start Docker Desktop with `docker desktop start` on this macOS workspace (or start Docker Engine on Linux), wait until `docker info` succeeds, and only then run checks. Do not restart a healthy Docker daemon or an active user service.
 - Run every project test, validation command and manual runtime reproduction inside Docker, using the pinned Playwright environment declared in this repository's `Dockerfile` and the locked project dependencies. This includes unit tests, TypeScript/lint checks, browser fixtures, the control panel and scheduler. Never run them directly with host Node.js, pnpm or host browsers, including for an isolated retry or debugging an intermittent failure.
 - Use `docker compose run --build --rm -T checks pnpm check` for quick verification. For focused suites, replace `check` with the relevant package command and arguments; for a direct Node test, use `docker compose run --build --rm -T checks node --test scripts/<name>.test.js`. The isolated `checks` service has no merchant settings, credentials or baseline mounts.
 - Use `pnpm check:local` or `pnpm check:pr [number]` on the host only as report controllers: they launch every validation stage through Docker Compose. Host execution is allowed for editing, Git/GitHub operations, Docker management and guidance tooling, not for running project checks or reproducing runtime behavior.
