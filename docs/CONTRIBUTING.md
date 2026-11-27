@@ -9,11 +9,10 @@ Contributions that improve coverage, portability and reliability are welcome. Se
 ```bash
 git clone https://github.com/MrGKanev/e-commerce-tester.git
 cd e-commerce-tester
-pnpm install --frozen-lockfile
-pnpm run install:browsers
+docker compose --profile validation build checks
 ```
 
-Use Node.js 22.13+ and pnpm 12+. Keep the pinned Playwright dependency and Docker image version aligned. TypeScript is pinned for compatibility with the installed ESLint parser.
+Use Docker for every runtime check and reproduction, including unit tests and isolated retries. Runtime/validation services use `linux/amd64` and the pinned project Dockerfile. Its Playwright base image supplies the runtime Node version; `.nvmrc` is only for optional host report tooling, not an alternate test runtime. Host editing, Git/GitHub, guidance and report orchestration are allowed; host test/browser execution is not. If Docker is unavailable, start it or report validation as blocked without falling back to macOS/Windows. Do not restart an active user service to test changes.
 
 ## Upstream web guidance
 
@@ -35,21 +34,22 @@ Apply relevant recommendations to our existing Tailwind helpers and test fixture
 Executable Modern Web rules and their maintenance contract are tracked in [MODERN-WEB.md](MODERN-WEB.md). Their local desktop/mobile fixtures are part of `pnpm test:acceptance:local`; run them separately with `pnpm test:modern-web:local` after `pnpm build:css`.
 
 ```bash
-pnpm check
-pnpm format:check
+docker compose run --build --rm -T checks pnpm check
+docker compose run --build --rm -T checks pnpm format:check
 ```
 
 `pnpm check` runs TypeScript, ESLint, offline unit tests and the Docker/Playwright toolchain check. ESLint covers storefront tests, local checks, configuration, Node scripts and browser JavaScript with the appropriate runtime globals. Formatting is a separate command.
 
-The [Project checks workflow](../.github/workflows/ci.yml) uses one job for `pnpm check` and `pnpm build:css` on pull requests, pushes to `master` and manual dispatch. It installs pnpm from `package.json` and Node from `.nvmrc`, with no browser downloads or browser acceptance runs. A Markdown job summary and downloadable text artifact record passed, failed or skipped stages. A green CI result covers only these quick checks.
+The [Project checks workflow](../.github/workflows/ci.yml) uses one job for `pnpm check` and `pnpm build:css` on pull requests, pushes to `master` and manual dispatch. It runs in the same pinned Playwright base image as `Dockerfile`, using its Node runtime and the package pnpm version; there is no separate Node/browser installation or full browser acceptance run. The toolchain check rejects a mismatched CI image. A Markdown job summary and downloadable text artifact record passed, failed or skipped stages. A green CI result covers only these quick checks.
 
-Full browser validation stays local. Acceptance covers both Chromium profiles; the additional cross-browser command covers Firefox, WebKit and Mobile WebKit without repeating Chromium. All runs use owned fixtures; live-store scans remain separate.
+Full browser validation stays in local Docker. Acceptance covers both Chromium profiles; the additional cross-browser command covers Firefox, WebKit and Mobile WebKit without repeating Chromium. All runs use owned fixtures; live-store scans remain separate.
 
 ```bash
-pnpm install:browsers
 pnpm check:local
-# Only the additional non-Chromium profiles:
-pnpm test:modern-web:cross-browser:local
+# Only the additional non-Chromium profiles, still inside Docker:
+docker compose run --build --rm -T checks pnpm test:modern-web:cross-browser:local
+# Focused Node regression:
+docker compose run --build --rm -T checks node --test scripts/run-queue.test.js
 ```
 
 ### Publish local results to your PR
@@ -62,15 +62,15 @@ pnpm check:pr
 pnpm check:pr 29
 ```
 
-The script runs `pnpm check`, `pnpm build:css`, `pnpm test:acceptance:local` and `pnpm test:modern-web:cross-browser:local` sequentially. Progress stays in the terminal; after completion it automatically creates/updates its own marked PR comment with the commit, environment, timings and final results. It does not post running-status comments. A failure stops later checks, publishes a bounded redacted diagnostic tail and returns a nonzero exit code. Cancellation is reported when the process can shut down normally. GitHub publication failures also return nonzero; a green local result must not be inferred from an old comment.
+The host script launches `pnpm check`, `pnpm build:css`, `pnpm test:acceptance:local` and `pnpm test:modern-web:cross-browser:local` sequentially through `docker compose run --build --rm -T checks`. It rebuilds the validation image from the current checkout and never falls back to host pnpm when Docker fails. Git metadata and GitHub authentication remain on the host; they are not mounted into the container. The report distinguishes the Docker runtime from its host controller. Progress stays in the terminal; after completion it automatically creates/updates its own marked PR comment with the commit, environment, timings and final results. It does not post running-status comments. A failure stops later checks, publishes a bounded redacted diagnostic tail and returns a nonzero exit code. Cancellation is reported when the process can shut down normally. GitHub publication failures also return nonzero; a green local result must not be inferred from an old comment.
 
 The working tree must be clean and the PR must already point to the local commit. Local commit/worktree and remote PR changes during validation invalidate the result. Run one validation per checkout at a time. The command checks and reports; merging remains a separate explicit action.
 
 Raw logs, `result.json` and the exact published `report.md` remain under the ignored `reports/local-quality/<commit>-<timestamp>/` directory. Only the Markdown summary and bounded diagnostic tails are posted; screenshots/traces/full logs stay local. Tails use the shared heuristic privacy filter and HTML escaping, not a guarantee that arbitrary secrets are detectable. GitHub Actions publishes its separate quick-check summary, without requiring GitHub CLI credentials or claiming a developer-local browser pass.
 
-Unit tests also exercise the scheduler with stub runners: interval bounds, cooldowns, restart recovery, process shutdown, exclusive locks and start windows.
+Node unit test files run sequentially in the canonical container so process/CLI fixtures do not starve each other during amd64 emulation; test deadlines and browser observation windows are unchanged. Unit tests also exercise the scheduler with stub runners: interval bounds, cooldowns, restart recovery, process shutdown, exclusive locks and start windows.
 
-Additional loopback acceptance checks:
+All package commands below are container commands: prefix focused runs with `docker compose run --build --rm -T checks`. Additional loopback acceptance checks:
 
 `pnpm test:commerce:local` covers public product/JSON-LD/cart consistency and unavailable variants, with localized routes and shared cookie sessions. It is part of `pnpm test:acceptance:local`.
 

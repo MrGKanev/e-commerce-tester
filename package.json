@@ -18,7 +18,7 @@
     "lint:fix": "eslint tests/ config/ checks/ scripts/ web/ *.ts --fix",
     "format": "prettier --write \"tests/**/*.ts\" \"*.ts\"",
     "format:check": "prettier --check \"tests/**/*.ts\" \"*.ts\"",
-    "test:unit": "node --test scripts/*.test.js && playwright test --config=checks/modern-web-unit.config.ts",
+    "test:unit": "node --test --test-concurrency=1 scripts/*.test.js && playwright test --config=checks/modern-web-unit.config.ts",
     "test:acceptance:local": "pnpm test:pacing && pnpm test:readiness && pnpm test:smoke:local && pnpm test:shared-visits:local && pnpm test:visit-groups:local && pnpm test:reporting && pnpm test:control:local && pnpm test:pages:local && pnpm test:vitals:local && pnpm test:visual:local && pnpm test:commerce:local && pnpm test:woocommerce:local && pnpm test:seo:local && pnpm test:journey:local && pnpm test:claims:local && pnpm test:a11y:local && pnpm test:modern-web:local && pnpm test:modern-web:entry:local && pnpm test:security:local && pnpm test:security:entry:local && pnpm test:security:reporting:local && pnpm test:monitoring:local && pnpm test:operations:local",
     "check": "pnpm run type-check && pnpm run lint && pnpm run test:unit && pnpm run check:toolchain && pnpm run check:modern-web:coverage",
     "check:local": "node scripts/check-local.js",

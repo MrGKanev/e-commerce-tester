@@ -1,5 +1,8 @@
 services:
   e2e:
+    platform: linux/amd64
+    init: true
+    shm_size: '1gb'
     build:
       context: .
       dockerfile: Dockerfile
@@ -17,6 +20,7 @@ services:
 
   scheduler:
     profiles: [scheduled]
+    platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile
@@ -46,6 +50,7 @@ services:
 
   control:
     profiles: [managed]
+    platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile
@@ -73,3 +78,18 @@ services:
       timeout: 5s
       start_period: 30s
       retries: 3
+
+  checks:
+    profiles: [validation]
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: [pnpm, check]
+    init: true
+    environment:
+      CI: 'true'
+    volumes:
+      - ./reports:/app/reports
+    shm_size: '1gb'
+    restart: 'no'

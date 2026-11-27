@@ -8,4 +8,9 @@ const dockerfile = fs.readFileSync(require('node:path').join(__dirname, '../Dock
 const image = /^FROM\s+mcr\.microsoft\.com\/playwright:v([^\s]+)/mi.exec(dockerfile)?.[1];
 const environment = /^ENV\s+VISUAL_ENVIRONMENT=(\S+)/mi.exec(dockerfile)?.[1];
 if (environment !== `playwright-${image}`) throw new Error('Docker VISUAL_ENVIRONMENT must identify the pinned rendering image');
+const ci = fs.readFileSync(require('node:path').join(__dirname, '../.github/workflows/ci.yml'), 'utf8');
+const ciImage = /^\s+image:\s+mcr\.microsoft\.com\/playwright:v([^\s]+)/m.exec(ci)?.[1];
+if (ciImage !== image) throw new Error('CI container must match the project Dockerfile image');
+const ciEnvironment = /^\s+VISUAL_ENVIRONMENT:\s+(\S+)/m.exec(ci)?.[1];
+if (ciEnvironment !== environment) throw new Error('CI rendering environment must match the project Dockerfile');
 console.log(`Docker/Playwright versions match: ${version}`);

@@ -18,15 +18,27 @@ jobs:
     name: Quick quality checks
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.1-noble
+      options: --init --shm-size=1g --platform linux/amd64
+    env:
+      VISUAL_ENVIRONMENT: playwright-1.65.1-noble
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - name: Locate pnpm store
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
         with:
-          node-version-file: .nvmrc
-          cache: pnpm
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-playwright-1.65.1-noble-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Verify canonical Docker runtime
+        id: runtime
+        run: |
+          node -e "if (!require('node:fs').existsSync('/.dockerenv') || process.platform !== 'linux' || process.arch !== 'x64') throw new Error('Checks require Docker linux/amd64'); console.log(process.version, process.platform, process.arch)"
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Types, lint, unit tests and metadata
@@ -38,6 +50,7 @@ jobs:
       - name: Publish summary
         if: always()
         env:
+          RUNTIME_RESULT: ${{ steps.runtime.outcome }}
           QUALITY_RESULT: ${{ steps.quality.outcome }}
           CSS_RESULT: ${{ steps.css.outcome }}
         run: |
@@ -47,9 +60,10 @@ jobs:
             echo
             printf 'Commit: %s\n\n' "$GITHUB_SHA"
             printf '| Check | Result |\n| --- | --- |\n'
+            printf '| Docker linux/amd64 | %s |\n' "$RUNTIME_RESULT"
             printf '| Types, lint, unit tests, metadata | %s |\n' "$QUALITY_RESULT"
             printf '| CSS build | %s |\n\n' "$CSS_RESULT"
-            echo 'Full browser acceptance and cross-browser suites run locally with pnpm check:local.'
+            echo 'Full browser acceptance and cross-browser suites run in local Docker with pnpm check:local.'
             echo 'Use pnpm check:pr to publish their separate results to an open PR; this CI result does not certify browser coverage.'
           } > reports/ci/summary.md
           cat reports/ci/summary.md >> "$GITHUB_STEP_SUMMARY"

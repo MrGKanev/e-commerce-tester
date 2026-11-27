@@ -35,6 +35,14 @@ function fixture(t) {
     else if(command===process.env.STUB_FAIL_STEP){console.error('Authorization: Bearer sensitive-value\\nemail=person@example.test\\n</pre><script>unsafe</script>');process.exit(7);}
     else console.log('fixture passed');
   `);
+  binary('docker', `
+    const args=process.argv.slice(2);
+    fs.appendFileSync('docker-calls.jsonl',JSON.stringify(args)+'\\n');
+    if(process.env.STUB_DOCKER_FAIL){console.error('Docker daemon unavailable');process.exit(1);}
+    if(JSON.stringify(args.slice(0,7))!==JSON.stringify(['compose','run','--build','--rm','-T','checks','pnpm'])||args.length!==8)process.exit(9);
+    process.argv=[process.execPath,'pnpm',args[7]];
+    require(require('node:path').resolve('bin/pnpm'));
+  `);
   binary('gh', `
     const args=process.argv.slice(2);
     if(args[0]==='pr'){console.log(JSON.stringify({number:29,url:'https://github.com/example/store/pull/29',state:'OPEN',headRefOid:process.env.STUB_REMOTE_HEAD||'${sha}'}));process.exit(0);}
@@ -88,6 +96,9 @@ test('runs the shared sequence and updates only its own marked PR comment across
   assert.equal(comments(f).find(comment => comment.id === 1).body, marker + '\nOther author');
   assert.equal(comments(f).find(comment => comment.id === 2).body, 'Unrelated review');
   assert.match(comments(f).find(comment => comment.id === 102).body, /Result: passed/);
+  const dockerCalls=fs.readFileSync(path.join(f.root,'docker-calls.jsonl'),'utf8').trim().split('\n').map(JSON.parse);
+  assert.deepEqual(dockerCalls.map(args=>args[7]), calls(f));
+  assert.match(result(f).environment, /Docker Compose checks/);
   const writes = fs.readFileSync(path.join(f.root, 'comment-writes.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
   assert.equal(writes.length, 2, 'One final publication per execution');
   for (const { body } of writes) {
@@ -182,4 +193,16 @@ test('cross-browser failures remain failed in the published local report', t => 
   assert.equal(result(f).status, 'failed');
   assert.match(comments(f)[0].body, /test:modern-web:cross-browser:local/);
   assert.match(comments(f)[0].body, /Result: failed/);
+});
+
+
+test('Docker unavailable fails the report without executing checks on the host', t => {
+  const f = fixture(t);
+  f.env.STUB_DOCKER_FAIL = '1';
+  assert.equal(run(f).status, 1);
+  assert.deepEqual(calls(f), []);
+  assert.equal(result(f).status, 'failed');
+  assert.equal(result(f).checks[0].status, 'failed');
+  assert.ok(result(f).checks.slice(1).every(check => check.status === 'not run'));
+  assert.match(comments(f)[0].body, /Docker daemon unavailable/);
 });

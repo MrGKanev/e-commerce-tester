@@ -1,5 +1,16 @@
 # Project instructions
 
+## Docker-only execution (required)
+
+- Run every project test, validation command and manual runtime reproduction inside Docker, using the pinned Playwright environment declared in this repository's `Dockerfile` and the locked project dependencies. This includes unit tests, TypeScript/lint checks, browser fixtures, the control panel and scheduler. Never run them directly with host Node.js, pnpm or host browsers, including for an isolated retry or debugging an intermittent failure.
+- Use `docker compose run --build --rm -T checks pnpm check` for quick verification. For focused suites, replace `check` with the relevant package command and arguments; for a direct Node test, use `docker compose run --build --rm -T checks node --test scripts/<name>.test.js`. The isolated `checks` service has no merchant settings, credentials or baseline mounts.
+- Use `pnpm check:local` or `pnpm check:pr [number]` on the host only as report controllers: they launch every validation stage through Docker Compose. Host execution is allowed for editing, Git/GitHub operations, Docker management and guidance tooling, not for running project checks or reproducing runtime behavior.
+- For raw Docker commands, use `docker build --platform linux/amd64` and `docker run --platform linux/amd64 --init --shm-size=1g`. Prefer the configured Compose services.
+- Keep runtime and validation services on `linux/amd64`, and keep the CI container image identical to the base image in `Dockerfile`. Do not install a different Node/browser runtime in CI. Rebuild after source changes; never validate a stale image.
+- If Docker is unavailable, start it if possible or report validation as blocked. Do not fall back to host execution and do not present earlier macOS results as Docker validation.
+- Full browser suites stay in local Docker; GitHub runs only the quick quality/CSS job in the matching container and publishes text results. Never move the full suite back to hosted workers without user authorization.
+- Do not stop/rebuild an active user service to validate a change. Disposable `checks` containers are separate from `control` and `scheduler`.
+
 ## Modern Web Guidance
 
 - At the start of every task that changes HTML, Tailwind classes, report templates or client-side JavaScript, run `pnpm guidance:sync`. This installs or refreshes the complete official GoogleChrome/modern-web-guidance skill from upstream; do not pin, vendor or hand-edit its generated files.
@@ -21,6 +32,6 @@
 
 ## Verification
 
-- Run checks appropriate to the change. For control-panel behavior, use `pnpm test:control:local`; for backend changes, run the relevant Node tests and `pnpm check`.
+- Run checks appropriate to the change through the Docker `checks` service. Package commands below are container commands: for control-panel behavior use `pnpm test:control:local`; for backend changes run the relevant Node tests and `pnpm check`.
 - Inspect desktop and mobile screenshots for UI changes. Use local fixtures for verification rather than contacting live stores without task authorization.
 - Do not interrupt an active user run to restart the development server. Wait for it to finish before applying server changes.

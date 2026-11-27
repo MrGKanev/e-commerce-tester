@@ -67,7 +67,7 @@ async function main() {
   fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
   const state = {
     commit, status: 'running', startedAt: new Date().toISOString(),
-    environment: `${os.platform()} ${os.arch()}, Node.js ${process.version}, pnpm ${exec('pnpm', ['--version'])}`,
+    environment: `Docker Compose checks (project Dockerfile, linux/amd64); report controller: ${os.platform()} ${os.arch()}, Node.js ${process.version}`,
     checks: commands.map(command => ({ command, status: 'pending' })),
   };
   let commentUrl, child, interrupted;
@@ -115,7 +115,7 @@ async function main() {
       const fd = fs.openSync(log, 'w', 0o600);
       const started = performance.now();
       const outcome = await new Promise(resolve => {
-        child = spawn('pnpm', [check.command], { cwd: root, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'] });
+        child = spawn('docker', ['compose', 'run', '--build', '--rm', '-T', 'checks', 'pnpm', check.command], { cwd: root, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'] });
         for (const [stream, output] of [[child.stdout, process.stdout], [child.stderr, process.stderr]])
           stream.on('data', data => { fs.writeSync(fd, data); output.write(data); });
         child.on('error', error => fs.writeSync(fd, error.message));

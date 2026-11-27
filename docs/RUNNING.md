@@ -1,5 +1,8 @@
 # Running tests
 
+All project execution and manual reproductions use Docker with this repository's Dockerfile and `linux/amd64` platform. Package commands in this document run inside the container, never directly in host Node/pnpm. Use the isolated `checks` service for owned fixture validation (`docker compose run --build --rm -T checks pnpm check`) and `e2e`/managed services for authorized store runs. Rebuild after source changes. If Docker is unavailable, validation is blocked; host execution is not a fallback. The host may run `pnpm check:local`/`check:pr` only as Docker/report controllers.
+
+
 [Back to README](../README.md) · [Configuration](CONFIGURATION.md)
 
 ## Modes and browser selection
@@ -112,8 +115,8 @@ docker compose run --build --rm e2e
 Compose loads `.env` and mounts `./reports`. To pass a multi-store configuration, mount `sites.json` explicitly:
 
 ```bash
-docker build -t e2e .
-docker run --rm --env-file .env \
+docker build --platform linux/amd64 -t e2e .
+docker run --platform linux/amd64 --init --shm-size=1g --rm --env-file .env \
   -v "$PWD/reports:/app/reports" \
   -v "$PWD/visual-baselines:/app/visual-baselines" \
   -v "$PWD/security-baselines:/app/security-baselines:ro" \

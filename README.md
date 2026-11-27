@@ -6,21 +6,18 @@ The suite supports desktop Chromium, Firefox and WebKit, plus selected mobile sc
 
 ## Quick start
 
-Requires Node.js **22.13+** (see `.nvmrc`) and pnpm **12+**. Docker is an alternative to installing browsers locally.
+Docker Engine/Desktop with Docker Compose is required for all project execution and validation. Containers use the project Playwright image on `linux/amd64`; do not install or run browsers/tests directly on the host. Host Node/pnpm and GitHub CLI are optional report-controller tools only.
 
 ```bash
 git clone https://github.com/MrGKanev/e-commerce-tester.git
 cd e-commerce-tester
-pnpm install --frozen-lockfile
-pnpm run install:browsers
 cp examples/sites.example.json sites.json
 ```
 
 For Shopify, edit `sites.json` with your store URL, two product handles and a search term that returns products. For WooCommerce, use [the Woo example](examples/woocommerce-sites.example.json) and [setup guide](docs/WOOCOMMERCE.md). Remove unused example stores, then run:
 
 ```bash
-pnpm test:smoke
-pnpm dashboard
+docker compose run --build --rm -v "$PWD/sites.json:/app/sites.json:ro" e2e pnpm test:smoke
 ```
 
 `sites.json`, `.env`, browser storage and generated reports are local files excluded from version control. Configure your own store before running: the code retains legacy store defaults when configuration is omitted.
@@ -105,9 +102,9 @@ playwright.config.ts   Projects, artifacts and snapshot paths
 run.sh                 Entry point for the multi-store runner
 ```
 
-GitHub Actions runs one quick job for TypeScript, lint, unit tests, toolchain/metadata validation and CSS build on pull requests and pushes to `master`. It publishes a text summary and does not install browsers. Full fixture browser tests run locally; live store checks run separately through the CLI or scheduler. Dependabot provides dependency update PRs.
+GitHub Actions runs one quick job inside the same pinned Playwright base image for TypeScript, lint, unit tests, toolchain/metadata validation and CSS build. It publishes a text summary and runs no browser suites. Full fixture browser tests run in local Docker; live store checks run separately through the CLI or scheduler. Dependabot provides dependency update PRs.
 
-Run the full validation locally with `pnpm check:local`, including acceptance and all five Modern Web profiles without repeating Chromium. Use `pnpm check:pr` on a committed/pushed PR branch to run them and automatically publish the results as a PR comment. See [local PR validation](docs/CONTRIBUTING.md#publish-local-results-to-your-pr) for setup, failure reporting and log limits.
+Run quick checks with `docker compose run --build --rm -T checks pnpm check`. Run full local Docker validation with the host report controller `pnpm check:local`, including acceptance and all five Modern Web profiles without repeating Chromium. Use `pnpm check:pr` on a committed/pushed PR branch to run them and automatically publish the results as a PR comment. See [local PR validation](docs/CONTRIBUTING.md#publish-local-results-to-your-pr) for setup, failure reporting and log limits.
 
 ## License
 
