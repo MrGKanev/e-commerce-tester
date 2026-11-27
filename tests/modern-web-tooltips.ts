@@ -5,6 +5,7 @@
 // An absent hint within the window stays unverified; no Anchor/Interest API mandate.
 import type { Page, ElementHandle } from '@playwright/test';
 import { safeAuditUrl, type WebFinding } from './modern-web';
+import { retainProbeFocus } from './modern-web-probe-focus';
 
 type Point = { x: number; y: number };
 
@@ -18,7 +19,9 @@ export async function inspectTooltips(page: Page, restorePointer?: Point) {
     throw new Error('Tooltip probes require prepareInteractionProbe(...).freeze() first');
   const findings: WebFinding[] = [];
   const observations: Array<Record<string, unknown>> = [];
-  const originalFocus = await page.evaluateHandle(() => document.activeElement);
+  let continuationSafe = true;
+  let attempted = false;
+  const focus = await retainProbeFocus(page);
   const originalScroll = await page.evaluate(() => ({ x: scrollX, y: scrollY }));
   const add = (
     rule: string,
@@ -30,7 +33,12 @@ export async function inspectTooltips(page: Page, restorePointer?: Point) {
   const settle = (ms: number) =>
     page.evaluate(delay => new Promise<void>(resolve => setTimeout(resolve, delay)), ms);
   const candidates = await page.evaluateHandle(() => {
-    const result: Array<{ trigger: HTMLElement; target: HTMLElement; relationship: string }> = [];
+    const result: Array<{
+      trigger: HTMLElement;
+      target: HTMLElement;
+      relationship: string;
+      retained: () => boolean;
+    }> = [];
     for (const trigger of [
       ...document.querySelectorAll<HTMLElement>('button,a[href],input,select,textarea,[tabindex]'),
     ].slice(0, 2000)) {
@@ -56,7 +64,39 @@ export async function inspectTooltips(page: Page, restorePointer?: Point) {
           trigger.closest('[hidden],[inert]')
         )
           continue;
+        const nodes = [trigger, target];
+        const parents = nodes.map(el => el.parentElement);
+        const signature = (el: Element) =>
+          JSON.stringify(
+            [
+              'id',
+              'role',
+              'type',
+              'href',
+              'aria-label',
+              'aria-labelledby',
+              'aria-describedby',
+              'interestfor',
+              'popover',
+              'disabled',
+              'aria-disabled',
+              'inert',
+              'aria-hidden',
+            ].map(name => el.getAttribute(name)),
+          );
+        const signatures = nodes.map(signature);
         result.push({
+          retained: () =>
+            document.getElementById(id) === target &&
+            !trigger.matches(
+              ':disabled,[aria-disabled="true"],[inert],[inert] *,[hidden],[hidden] *',
+            ) &&
+            nodes.every(
+              (el, i) =>
+                el.isConnected &&
+                el.parentElement === parents[i] &&
+                signature(el) === signatures[i],
+            ),
           trigger,
           target,
           relationship: interest === id ? 'interestfor' : 'aria-describedby',
@@ -80,7 +120,7 @@ export async function inspectTooltips(page: Page, restorePointer?: Point) {
         await candidate.getProperty('relationship')
       ).jsonValue()) as string;
       const state = () =>
-        target.evaluate((el, triggerElement) => {
+        candidate.evaluate(({ trigger, target: el, retained }) => {
           const rect = el.getBoundingClientRect(),
             style = getComputedStyle(el);
           const visible =
@@ -98,7 +138,6 @@ export async function inspectTooltips(page: Page, restorePointer?: Point) {
             const peers = [...parent.children].filter(peer => peer.localName === element.localName);
             return `${selector(parent)} > ${element.localName}:nth-of-type(${peers.indexOf(element) + 1})`;
           };
-          const trigger = triggerElement as HTMLElement;
           const tr = trigger.getBoundingClientRect();
           const hit = document.elementFromPoint(tr.left + tr.width / 2, tr.top + tr.height / 2);
           const popoverOpen =
@@ -106,7 +145,7 @@ export async function inspectTooltips(page: Page, restorePointer?: Point) {
               ? el.matches(':popover-open')
               : false;
           return {
-            connected: el.isConnected && trigger.isConnected,
+            connected: retained(),
             visible,
             popoverOpen,
             clippedByViewport:
@@ -134,7 +173,17 @@ export async function inspectTooltips(page: Page, restorePointer?: Point) {
                     other.matches(':popover-open'))),
             ),
           };
-        }, trigger);
+        });
+      const findingStart = findings.length;
+      let probed = false;
+      const assertOwned = async (current: Awaited<ReturnType<typeof state>>) => {
+        if (
+          !current.connected ||
+          current.otherOpenOverlay ||
+          !(await focus.evaluate(owner => owner.owned()))
+        )
+          throw new Error('Tooltip ownership changed');
+      };
       try {
         const initial = await state();
         if (initial.visible || initial.otherOpenOverlay) {
@@ -146,13 +195,17 @@ export async function inspectTooltips(page: Page, restorePointer?: Point) {
           });
           continue;
         }
+        await assertOwned(initial);
+        probed = true;
+        attempted = true;
         await page.mouse.move(0, 0);
-        await trigger.focus();
+        await assertOwned(await state());
+        await focus.evaluate((owner, el) => owner.focus(el), trigger);
         // Authors may use a delay. Bounded absence is explicitly unverified, not proof of failure.
         await settle(700);
         const focused = await state();
         if (!focused.connected) throw new Error('Tooltip nodes changed');
-        if (focused.visible && focused.focusInsideTooltip)
+        if (focused.visible && focused.focusInsideTooltip && !focused.otherOpenOverlay) {
           add(
             'tooltip-focus-moved',
             'interest-triggered-tooltips',
@@ -160,6 +213,16 @@ export async function inspectTooltips(page: Page, restorePointer?: Point) {
             { relationship, focusMovedIntoHint: true },
             'Do not move focus into supplemental tooltip content on focus/hover alone; preserve the trigger focus.',
           );
+          continuationSafe = false;
+          observations.push({
+            relationship,
+            focused,
+            status: 'unverified',
+            reason: 'tooltip-took-focus',
+          });
+          break;
+        }
+        await assertOwned(focused);
         let escape: Record<string, unknown> = { status: 'not-observed' };
         if (focused.visible && !focused.otherOpenOverlay) {
           await page.keyboard.press('Escape');
@@ -184,6 +247,7 @@ export async function inspectTooltips(page: Page, restorePointer?: Point) {
             )
             .catch(() => {});
           const dismissed = await state();
+          await assertOwned(dismissed);
           escape = { status: 'observed', remainsVisible: dismissed.visible };
           if (dismissed.visible)
             add(
@@ -194,13 +258,17 @@ export async function inspectTooltips(page: Page, restorePointer?: Point) {
               'Make supplemental hover/focus content dismissible without moving focus, for example with Escape; verify delayed transitions and essential-content alternatives.',
             );
         }
+        await assertOwned(await state());
+        await focus.evaluate(owner => owner.expectFocus(document.body));
         await trigger.evaluate(el => el.blur());
+        await assertOwned(await state());
         await page.mouse.move(0, 0);
         await settle(150);
+        await assertOwned(await state());
         await trigger.hover({ timeout: 1500 });
         await settle(700);
         const hovered = await state();
-        if (!hovered.connected) throw new Error('Tooltip nodes changed');
+        await assertOwned(hovered);
         if (hovered.visible && !focused.visible && focused.triggerFocused)
           add(
             'tooltip-focus-discovery',
@@ -256,7 +324,7 @@ export async function inspectTooltips(page: Page, restorePointer?: Point) {
             await page.mouse.move(destination.x, destination.y, { steps: 12 });
             await settle(700);
             const entered = await state();
-            if (!entered.connected) throw new Error('Tooltip nodes changed');
+            await assertOwned(entered);
             const pointerOverTarget = await target.evaluate((el, point) => {
               const hit = document.elementFromPoint(point.x, point.y);
               return Boolean(hit && (hit === el || el.contains(hit)));
@@ -304,80 +372,109 @@ export async function inspectTooltips(page: Page, restorePointer?: Point) {
           arrowDirectionVerified: false,
         });
       } catch {
+        continuationSafe = false;
+        findings.length = findingStart;
         observations.push({
           relationship,
           status: 'unverified',
           reason: 'nodes-changed-or-dependent-work-blocked',
         });
       } finally {
-        await trigger
-          .evaluate(el => {
-            if (el.isConnected) el.blur();
-          })
-          .catch(() => {});
-        await page.mouse.move(0, 0).catch(() => {});
-        // Allow authored loss-of-interest delays before the next probe inherits this page.
-        await page
-          .waitForFunction(
-            el => {
-              const r = el.getBoundingClientRect(),
-                style = getComputedStyle(el);
-              return (
-                !el.isConnected ||
-                r.width <= 0 ||
-                r.height <= 0 ||
-                style.visibility !== 'visible' ||
-                style.display === 'none' ||
-                Number(style.opacity) === 0 ||
-                Boolean(el.closest('[hidden],[inert]'))
-              );
-            },
-            target,
-            { timeout: 700 },
-          )
-          .catch(() => {});
-        const observation = observations.at(-1);
-        if (observation?.status === 'observed' || observation?.status === 'unverified') {
-          const cleaned = await state().catch(() => null);
-          observation.cleanup = {
-            status: cleaned?.connected && !cleaned.visible ? 'restored' : 'unverified',
-            tooltipRemainsVisible: cleaned?.visible ?? null,
-            sampleWindowMs: 700,
-          };
+        if (probed) {
+          let cleaned: Awaited<ReturnType<typeof state>> | null = null;
+          if (continuationSafe) {
+            try {
+              await assertOwned(await state());
+              await focus.evaluate(owner => owner.expectFocus(document.body));
+              await trigger.evaluate(el => el.blur());
+              await assertOwned(await state());
+              await page.mouse.move(0, 0);
+              // Retain the existing authored loss-of-interest/fade window.
+              await page
+                .waitForFunction(
+                  el => {
+                    const r = el.getBoundingClientRect(),
+                      style = getComputedStyle(el);
+                    return (
+                      !el.isConnected ||
+                      r.width <= 0 ||
+                      r.height <= 0 ||
+                      style.visibility !== 'visible' ||
+                      style.display === 'none' ||
+                      Number(style.opacity) === 0 ||
+                      Boolean(el.closest('[hidden],[inert]'))
+                    );
+                  },
+                  target,
+                  { timeout: 700 },
+                )
+                .catch(() => {});
+              cleaned = await state();
+              await assertOwned(cleaned);
+              if (cleaned.visible) continuationSafe = false;
+            } catch {
+              continuationSafe = false;
+              findings.length = findingStart;
+              const observation = observations.at(-1);
+              if (observation) observation.status = 'unverified';
+            }
+          }
+          const observation = observations.at(-1);
+          if (observation)
+            observation.cleanup = {
+              status:
+                continuationSafe && cleaned?.connected && !cleaned.visible
+                  ? 'restored'
+                  : 'unverified',
+              tooltipRemainsVisible: cleaned?.visible ?? null,
+              sampleWindowMs: cleaned ? 700 : 0,
+              applicationResetVerified: false,
+            };
         }
       }
+      if (!continuationSafe) break;
     }
   } finally {
-    await originalFocus
-      .evaluate(el => {
-        if (el instanceof HTMLElement && el.isConnected) {
-          const active = document.activeElement;
-          if (active instanceof HTMLElement && active !== el) active.blur();
-          el.focus({ preventScroll: true });
-        }
-      })
-      .catch(() => {});
-    await originalFocus.dispose();
-    await candidates.dispose();
-    await page
-      .evaluate(
-        position => scrollTo({ left: position.x, top: position.y, behavior: 'instant' }),
-        originalScroll,
-      )
-      .catch(() => {});
-    await page.mouse.move(restorePointer?.x ?? 0, restorePointer?.y ?? 0).catch(() => {});
+    try {
+      if (attempted && continuationSafe)
+        continuationSafe = await focus.evaluate(owner => owner.restore()).catch(() => false);
+      if (attempted && continuationSafe)
+        await page
+          .evaluate(
+            position => scrollTo({ left: position.x, top: position.y, behavior: 'instant' }),
+            originalScroll,
+          )
+          .catch(() => {
+            continuationSafe = false;
+          });
+      if (attempted && continuationSafe)
+        await page.mouse.move(restorePointer?.x ?? 0, restorePointer?.y ?? 0).catch(() => {
+          continuationSafe = false;
+        });
+    } finally {
+      await focus.evaluate(owner => owner.dispose()).catch(() => {});
+      await focus.dispose();
+      await candidates.dispose();
+    }
   }
+
   return {
     schemaVersion: 1,
     url: safeAuditUrl(page.url()),
     coverage: {
       observations,
       sampleLimit: 5,
+      continuationSafe,
+      applicationResetVerified: false,
       triggerScanLimit: 2000,
       successfulActivationAttempted: false,
-      pointerRestoration: restorePointer
-        ? 'caller-supplied-origin'
-        : 'origin-unavailable-parked-at-viewport-origin',
+      pointerRestoration: !continuationSafe
+        ? 'withheld-after-ownership-loss'
+        : !attempted
+          ? 'not-needed-no-probe'
+          : restorePointer
+            ? 'caller-supplied-origin'
+            : 'origin-unavailable-parked-at-viewport-origin',
       touchLongPressVerified: false,
     },
     findings,

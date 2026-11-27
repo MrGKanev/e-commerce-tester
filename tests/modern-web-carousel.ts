@@ -4,6 +4,7 @@
 // No slide labels, autoplay semantics, gestures or asynchronous completion are guessed.
 import type { Page, ElementHandle } from '@playwright/test';
 import { safeAuditUrl, type WebFinding } from './modern-web';
+import { retainProbeFocus } from './modern-web-probe-focus';
 
 /** Optional, explicit slide controls only; fresh quarantined pages own these bounded changes. */
 export async function inspectCarousels(page: Page) {
@@ -16,72 +17,7 @@ export async function inspectCarousels(page: Page) {
   const findings: WebFinding[] = [];
   const observations: Array<Record<string, unknown>> = [];
   let canRestore = true;
-  const focus = await page.evaluateHandle(() => {
-    const original = document.activeElement;
-    const chain = (el: Element | null) => {
-      const nodes: Element[] = [];
-      for (; el; el = el.parentElement) nodes.push(el);
-      return nodes;
-    };
-    const signature = (el: Element) =>
-      [
-        'id',
-        'role',
-        'tabindex',
-        'type',
-        'disabled',
-        'hidden',
-        'inert',
-        'aria-hidden',
-        'aria-label',
-        'aria-labelledby',
-      ].map(name => el.getAttribute(name));
-    const ancestors = chain(original);
-    const signatures = ancestors.map(signature);
-    let expected: Element | null = null;
-    let lost = false;
-    const onFocus = (event: FocusEvent) => {
-      if (expected && event.target !== expected) lost = true;
-    };
-    const onBlur = (event: FocusEvent) => {
-      if (expected && event.target === expected) lost = true;
-    };
-    document.addEventListener('focusin', onFocus, true);
-    document.addEventListener('focusout', onBlur, true);
-    const owned = () => !lost && (!expected || document.activeElement === expected);
-    return {
-      expectFocus: (el: Element) => {
-        expected = el;
-      },
-      owned,
-      restore: () => {
-        const current = chain(original);
-        if (
-          !owned() ||
-          !original?.isConnected ||
-          current.length !== ancestors.length ||
-          !current.every(
-            (el, i) =>
-              el === ancestors[i] &&
-              JSON.stringify(signature(el)) === JSON.stringify(signatures[i]),
-          )
-        )
-          return false;
-        if (!expected) return true;
-        expected = original;
-        if (original instanceof HTMLElement) {
-          if (original === document.body && document.activeElement instanceof HTMLElement)
-            document.activeElement.blur();
-          original.focus({ preventScroll: true });
-        }
-        return owned();
-      },
-      dispose: () => {
-        document.removeEventListener('focusin', onFocus, true);
-        document.removeEventListener('focusout', onBlur, true);
-      },
-    };
-  });
+  const focus = await retainProbeFocus(page);
   const originalScroll = await page.evaluate(() => ({ x: scrollX, y: scrollY }));
   const roots = (await page
     .locator('[aria-roledescription="carousel"]')
@@ -251,8 +187,7 @@ export async function inspectCarousels(page: Page) {
         const inverse = (
           await (await bundle.getProperty(forward ? 'previous' : 'next')).getProperty('0')
         ).asElement() as ElementHandle<HTMLButtonElement> | null;
-        await focus.evaluate((state, el) => state.expectFocus(el), handle);
-        await handle.focus();
+        await focus.evaluate((state, el) => state.focus(el), handle);
         const beforeActivation = await snapshot();
         if (
           !beforeActivation.connected ||
@@ -291,8 +226,7 @@ export async function inspectCarousels(page: Page) {
           !changed.overlayOpen &&
           (forward ? changed.previousSafe : changed.nextSafe)
         ) {
-          await focus.evaluate((state, el) => state.expectFocus(el), inverse);
-          await inverse.focus();
+          await focus.evaluate((state, el) => state.focus(el), inverse);
           const beforeRestore = await snapshot();
           if (
             !beforeRestore.connected ||

@@ -123,6 +123,12 @@ test('focus theft into tooltip content is advisory and unrelated active modal pr
   );
   const report = await inspectTooltips(page);
   expect(report.findings.map(finding => finding.rule)).toContain('tooltip-focus-moved');
+  expect(report.coverage.observations[0]).toMatchObject({
+    status: 'unverified',
+    reason: 'tooltip-took-focus',
+  });
+  await expect(page.locator('#hint')).toBeFocused();
+  await expect(page.locator('#hint')).toBeVisible();
   await page.evaluate(() => {
     const modal = document.createElement('dialog');
     modal.textContent = 'Active dialog';
@@ -198,4 +204,194 @@ test('tooltip moving away from the sampled destination does not claim hoverabili
   expect(report.coverage.observations[0]).toMatchObject({
     hoverability: { status: 'unverified', reason: 'tooltip-moved-away-from-sampled-pointer' },
   });
+});
+
+for (const scenario of [
+  {
+    name: 'focus changes description',
+    event: 'focus',
+    change: "trigger.setAttribute('aria-describedby','authored-hint');",
+    escapes: 0,
+    hovers: 0,
+  },
+  {
+    name: 'focus changes target role',
+    event: 'focus',
+    change: "hint.setAttribute('role','alert');",
+    escapes: 0,
+    hovers: 0,
+  },
+  {
+    name: 'focus reparents trigger',
+    event: 'focus',
+    change:
+      "const wrapper=document.createElement('div');document.querySelector('main').append(wrapper);wrapper.append(trigger);",
+    escapes: 0,
+    hovers: 0,
+  },
+  {
+    name: 'focus reparents target',
+    event: 'focus',
+    change:
+      "const wrapper=document.createElement('div');document.querySelector('main').append(wrapper);wrapper.append(hint);",
+    escapes: 0,
+    hovers: 0,
+  },
+  {
+    name: 'focus reassigns target id',
+    event: 'focus',
+    change:
+      "hint.id='private-authored-hint';const replacement=document.createElement('div');replacement.id='hint';replacement.setAttribute('role','tooltip');replacement.hidden=true;document.querySelector('main').append(replacement);",
+    escapes: 0,
+    hovers: 0,
+  },
+  {
+    name: 'Escape changes description',
+    event: 'keydown',
+    change: "trigger.setAttribute('aria-describedby','authored-hint');",
+    escapes: 1,
+    hovers: 0,
+  },
+  {
+    name: 'hover changes description',
+    event: 'mouseenter',
+    change: "trigger.setAttribute('aria-describedby','authored-hint');",
+    escapes: 1,
+    hovers: 1,
+  },
+  {
+    name: 'focus moves to authored control',
+    event: 'focus',
+    change: "document.getElementById('authored').focus();",
+    escapes: 0,
+    hovers: 0,
+  },
+  {
+    name: 'focus blurs and immediately returns',
+    event: 'focus',
+    change: 'trigger.blur();trigger.focus();',
+    escapes: 0,
+    hovers: 0,
+  },
+]) {
+  test(`tooltip ownership: ${scenario.name}`, async ({ page }, info) => {
+    await fixture(
+      page,
+      '<button id="prior" type="button">Prior</button><button id="authored" type="button">Authored focus</button>' +
+        markup +
+        '<div id="authored-hint" role="tooltip" hidden>New authored description</div>' +
+        markup.replaceAll('trigger', 'later-trigger').replaceAll('hint', 'later-hint'),
+      behavior() +
+        `
+        window.escapes=0;window.hovers=0;window.laterFocus=0;
+        document.addEventListener('keydown',event=>{if(event.key==='Escape')window.escapes++;});
+        trigger.addEventListener('mouseenter',()=>window.hovers++);
+        document.getElementById('later-trigger').addEventListener('focus',()=>window.laterFocus++);
+        ${scenario.event === 'keydown' ? 'document' : 'trigger'}.addEventListener('${scenario.event}',event=>{${scenario.event === 'keydown' ? "if(event.key!=='Escape')return;" : ''}${scenario.change}},{once:true});
+      `,
+    );
+    await page.locator('#prior').focus();
+    const report = await inspectTooltips(page, { x: 300, y: 300 });
+    expect(report.coverage.observations).toHaveLength(1);
+    expect(report.coverage.observations[0]).toMatchObject({
+      status: 'unverified',
+      cleanup: { status: 'unverified' },
+    });
+    expect(report.coverage.pointerRestoration).toBe('withheld-after-ownership-loss');
+    await expect(page.locator('#prior')).not.toBeFocused();
+    expect(
+      await page.evaluate(() => ({
+        escapes: (window as unknown as { escapes: number }).escapes,
+        hovers: (window as unknown as { hovers: number }).hovers,
+        later: (window as unknown as { laterFocus: number }).laterFocus,
+      })),
+    ).toEqual({ escapes: scenario.escapes, hovers: scenario.hovers, later: 0 });
+    expect(report.findings).toEqual([]);
+    expect(JSON.stringify(report)).not.toContain('private-authored-hint');
+    if (scenario.name === 'focus moves to authored control') {
+      await expect(page.locator('#authored')).toBeFocused();
+      if (['Desktop Chrome', 'Mobile Chrome'].includes(info.project.name))
+        await page.screenshot({
+          path: info.outputPath('tooltip-authored-focus.png'),
+          fullPage: true,
+        });
+    }
+  });
+}
+
+test('tooltip ownership: already visible hint and trigger focus remain untouched', async ({
+  page,
+}) => {
+  await fixture(page, markup, behavior());
+  await page.locator('#trigger').focus();
+  await expect(page.locator('#hint')).toBeVisible();
+  await page.evaluate(() => {
+    (window as unknown as { blurCount: number }).blurCount = 0;
+    document.getElementById('trigger')!.addEventListener('blur', () => {
+      (window as unknown as { blurCount: number }).blurCount++;
+    });
+  });
+  const report = await inspectTooltips(page);
+  expect(await page.evaluate(() => (window as unknown as { blurCount: number }).blurCount)).toBe(0);
+  expect(report.coverage.observations[0]).toMatchObject({
+    status: 'not-probed',
+    reason: 'tooltip-already-visible',
+  });
+  await expect(page.locator('#hint')).toBeVisible();
+  await expect(page.locator('#trigger')).toBeFocused();
+});
+
+test('tooltip ownership: changed original focus semantics are not overwritten', async ({
+  page,
+}) => {
+  await fixture(
+    page,
+    '<button id="prior" type="button">Prior</button>' + markup,
+    behavior() +
+      "trigger.addEventListener('focus',()=>document.getElementById('prior').setAttribute('aria-label','private-authored-purpose'));",
+  );
+  await page.locator('#prior').focus();
+  const report = await inspectTooltips(page);
+  await expect(page.locator('#prior')).not.toBeFocused();
+  await expect(page.locator('#prior')).toHaveAttribute('aria-label', 'private-authored-purpose');
+  expect(report.coverage.pointerRestoration).toBe('withheld-after-ownership-loss');
+  expect(JSON.stringify(report)).not.toContain('private-authored-purpose');
+});
+
+test('tooltip ownership: retained pairs continue and restore original focus', async ({ page }) => {
+  await fixture(
+    page,
+    '<button id="prior" type="button">Prior</button>' +
+      markup +
+      markup.replaceAll('trigger', 'later-trigger').replaceAll('hint', 'later-hint'),
+    behavior() +
+      `{${behavior().replaceAll("getElementById('trigger')", "getElementById('later-trigger')").replaceAll("getElementById('hint')", "getElementById('later-hint')")}}`,
+  );
+  await page.locator('#prior').focus();
+  const report = await inspectTooltips(page);
+  expect(report.findings).toEqual([]);
+  expect(report.coverage.observations).toHaveLength(2);
+  for (const observation of report.coverage.observations)
+    expect(observation).toMatchObject({ status: 'observed', cleanup: { status: 'restored' } });
+  await expect(page.locator('#prior')).toBeFocused();
+});
+
+test('tooltip ownership: a modal opened on focus is left open without tooltip warnings', async ({
+  page,
+}) => {
+  await fixture(
+    page,
+    '<button id="prior" type="button">Prior</button><button id="trigger" type="button" aria-describedby="hint">Help</button><dialog id="modal"><div id="hint" role="tooltip" tabindex="-1" hidden>Authored modal content</div></dialog>',
+    "window.escapes=0;document.addEventListener('keydown',event=>{if(event.key==='Escape')window.escapes++;});document.getElementById('trigger').addEventListener('focus',()=>{document.getElementById('hint').hidden=false;document.getElementById('modal').showModal();document.getElementById('hint').focus();});",
+  );
+  await page.locator('#prior').focus();
+  const report = await inspectTooltips(page);
+  expect(report.findings).toEqual([]);
+  expect(report.coverage.observations[0]).toMatchObject({
+    status: 'unverified',
+    cleanup: { status: 'unverified' },
+  });
+  await expect(page.locator('#modal:modal')).toHaveCount(1);
+  await expect(page.locator('#hint')).toBeFocused();
+  expect(await page.evaluate(() => (window as unknown as { escapes: number }).escapes)).toBe(0);
 });

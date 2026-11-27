@@ -227,6 +227,14 @@ for (const scenario of [
     clicks: [],
   },
   {
+    name: 'focus moves to authored control',
+    event: 'focus',
+    target: 'next',
+    change: "document.getElementById('authored').focus();",
+    active: 'one',
+    clicks: [],
+  },
+  {
     name: 'activation moves focus',
     event: 'click',
     target: 'next',
@@ -307,6 +315,8 @@ for (const scenario of [
     ).toBe(0);
     expect(JSON.stringify(report)).not.toContain('private-new-owner');
     expect(report.findings).toEqual([]);
+    if (scenario.name === 'focus moves to authored control')
+      await expect(page.locator('#authored')).toBeFocused();
   });
 }
 
