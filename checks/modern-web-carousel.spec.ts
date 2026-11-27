@@ -200,3 +200,149 @@ test('content-visibility hidden ancestors do not establish an active slide', asy
   });
   expect(await page.locator('#one').getAttribute('hidden')).toBeNull();
 });
+
+for (const scenario of [
+  {
+    name: 'focus changes slide',
+    event: 'focus',
+    target: 'next',
+    change: 'one.hidden=true;two.hidden=false;',
+    active: 'two',
+    clicks: [],
+  },
+  {
+    name: 'focus leaves and immediately returns',
+    event: 'focus',
+    target: 'next',
+    change: "document.getElementById('authored').focus();document.getElementById('next').focus();",
+    active: 'one',
+    clicks: [],
+  },
+  {
+    name: 'focus blurs and immediately returns',
+    event: 'focus',
+    target: 'next',
+    change: "document.getElementById('next').blur();document.getElementById('next').focus();",
+    active: 'one',
+    clicks: [],
+  },
+  {
+    name: 'activation moves focus',
+    event: 'click',
+    target: 'next',
+    change: "document.getElementById('authored').focus();",
+    active: 'two',
+    clicks: ['next'],
+  },
+  {
+    name: 'inverse focus changes slide',
+    event: 'focus',
+    target: 'previous',
+    change: 'one.hidden=false;two.hidden=true;',
+    active: 'one',
+    clicks: ['next'],
+  },
+  {
+    name: 'inverse activation moves focus',
+    event: 'click',
+    target: 'previous',
+    change: "document.getElementById('authored').focus();",
+    active: 'one',
+    clicks: ['next', 'previous'],
+  },
+  {
+    name: 'focus reparents root',
+    event: 'focus',
+    target: 'next',
+    change:
+      "const wrapper=document.createElement('div');document.querySelector('main').append(wrapper);wrapper.append(document.querySelector('section'));",
+    active: 'one',
+    clicks: [],
+  },
+  {
+    name: 'focus reparents slide',
+    event: 'focus',
+    target: 'next',
+    change:
+      "const wrapper=document.createElement('div');document.querySelector('section').append(wrapper);wrapper.append(one);",
+    active: 'one',
+    clicks: [],
+  },
+  {
+    name: 'focus changes carousel identity',
+    event: 'focus',
+    target: 'next',
+    change: "document.querySelector('section').setAttribute('aria-label','private-new-owner');",
+    active: 'one',
+    clicks: [],
+  },
+]) {
+  test(`carousel retains authored state and stops later roots: ${scenario.name}`, async ({
+    page,
+  }) => {
+    await fixture(
+      page,
+      markup +
+        '<button id="authored" type="button">Authored focus</button>' +
+        markup.replaceAll('id="', 'id="later-'),
+      behavior +
+        `
+        window.activations=[];window.laterFocus=0;
+        document.getElementById('later-next').addEventListener('focus',()=>window.laterFocus++);
+        document.addEventListener('click',event=>{if(['next','previous'].includes(event.target.id))window.activations.push(event.target.id);});
+        document.getElementById('${scenario.target}').addEventListener('${scenario.event}',()=>{${scenario.change}},{once:true});
+      `,
+    );
+    await page.locator('#prior').focus();
+    const report = await inspectCarousels(page);
+    expect(report.coverage.observations).toHaveLength(1);
+    expect(report.coverage.observations[0]).toMatchObject({ status: 'unverified' });
+    await expect(page.locator('#' + scenario.active)).toBeVisible();
+    await expect(page.locator('#prior')).not.toBeFocused();
+    expect(
+      await page.evaluate(() => (window as unknown as { activations: string[] }).activations),
+    ).toEqual(scenario.clicks);
+    expect(
+      await page.evaluate(() => (window as unknown as { laterFocus: number }).laterFocus),
+    ).toBe(0);
+    expect(JSON.stringify(report)).not.toContain('private-new-owner');
+    expect(report.findings).toEqual([]);
+  });
+}
+
+test('carousel continues to later retained roots and restores the original focus', async ({
+  page,
+}) => {
+  await fixture(
+    page,
+    markup + markup.replaceAll('id="', 'id="later-'),
+    behavior + `{${behavior.replaceAll("getElementById('", "getElementById('later-")}}`,
+  );
+  await page.locator('#prior').focus();
+  const report = await inspectCarousels(page);
+  expect(report.coverage.observations).toHaveLength(2);
+  for (const observation of report.coverage.observations)
+    expect(observation).toMatchObject({ status: 'observed', restoration: { status: 'restored' } });
+  expect(report.coverage.stoppedAfterLoss).toBe(false);
+  await expect(page.locator('#one')).toBeVisible();
+  await expect(page.locator('#later-one')).toBeVisible();
+  await expect(page.locator('#prior')).toBeFocused();
+});
+
+test('carousel cleanup does not refocus an original target with changed semantics', async ({
+  page,
+}) => {
+  await fixture(
+    page,
+    markup,
+    behavior +
+      "document.getElementById('next').addEventListener('click',()=>document.getElementById('prior').setAttribute('aria-label','private-authored-purpose'));",
+  );
+  await page.locator('#prior').focus();
+  const report = await inspectCarousels(page);
+  expect(report.coverage.observations[0]).toMatchObject({ restoration: { status: 'restored' } });
+  expect(report.coverage.stoppedAfterLoss).toBe(true);
+  await expect(page.locator('#prior')).not.toBeFocused();
+  await expect(page.locator('#prior')).toHaveAttribute('aria-label', 'private-authored-purpose');
+  expect(JSON.stringify(report)).not.toContain('private-authored-purpose');
+});

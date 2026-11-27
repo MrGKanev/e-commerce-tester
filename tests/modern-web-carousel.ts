@@ -15,7 +15,73 @@ export async function inspectCarousels(page: Page) {
     throw new Error('Carousel probes require prepareInteractionProbe(...).freeze() first');
   const findings: WebFinding[] = [];
   const observations: Array<Record<string, unknown>> = [];
-  const originalFocus = await page.evaluateHandle(() => document.activeElement);
+  let canRestore = true;
+  const focus = await page.evaluateHandle(() => {
+    const original = document.activeElement;
+    const chain = (el: Element | null) => {
+      const nodes: Element[] = [];
+      for (; el; el = el.parentElement) nodes.push(el);
+      return nodes;
+    };
+    const signature = (el: Element) =>
+      [
+        'id',
+        'role',
+        'tabindex',
+        'type',
+        'disabled',
+        'hidden',
+        'inert',
+        'aria-hidden',
+        'aria-label',
+        'aria-labelledby',
+      ].map(name => el.getAttribute(name));
+    const ancestors = chain(original);
+    const signatures = ancestors.map(signature);
+    let expected: Element | null = null;
+    let lost = false;
+    const onFocus = (event: FocusEvent) => {
+      if (expected && event.target !== expected) lost = true;
+    };
+    const onBlur = (event: FocusEvent) => {
+      if (expected && event.target === expected) lost = true;
+    };
+    document.addEventListener('focusin', onFocus, true);
+    document.addEventListener('focusout', onBlur, true);
+    const owned = () => !lost && (!expected || document.activeElement === expected);
+    return {
+      expectFocus: (el: Element) => {
+        expected = el;
+      },
+      owned,
+      restore: () => {
+        const current = chain(original);
+        if (
+          !owned() ||
+          !original?.isConnected ||
+          current.length !== ancestors.length ||
+          !current.every(
+            (el, i) =>
+              el === ancestors[i] &&
+              JSON.stringify(signature(el)) === JSON.stringify(signatures[i]),
+          )
+        )
+          return false;
+        if (!expected) return true;
+        expected = original;
+        if (original instanceof HTMLElement) {
+          if (original === document.body && document.activeElement instanceof HTMLElement)
+            document.activeElement.blur();
+          original.focus({ preventScroll: true });
+        }
+        return owned();
+      },
+      dispose: () => {
+        document.removeEventListener('focusin', onFocus, true);
+        document.removeEventListener('focusout', onBlur, true);
+      },
+    };
+  });
   const originalScroll = await page.evaluate(() => ({ x: scrollX, y: scrollY }));
   const roots = (await page
     .locator('[aria-roledescription="carousel"]')
@@ -31,7 +97,23 @@ export async function inspectCarousels(page: Page) {
         const buttons = [
           ...root.querySelectorAll<HTMLButtonElement>('button[type="button"][aria-label]'),
         ].filter(el => owned(el) && !el.closest('[aria-roledescription="slide"]'));
+        const nodes = [root, ...slides, ...buttons];
+        const parents = nodes.map(el => el.parentElement);
+        const signature = (el: Element) =>
+          JSON.stringify(
+            ['id', 'role', 'aria-roledescription', 'aria-label', 'aria-labelledby'].map(name =>
+              el.getAttribute(name),
+            ),
+          );
+        const signatures = nodes.map(signature);
         return {
+          contextRetained: () =>
+            nodes.every(
+              (el, i) =>
+                el.isConnected &&
+                el.parentElement === parents[i] &&
+                signature(el) === signatures[i],
+            ),
           root,
           slides,
           next: buttons.filter(el =>
@@ -43,7 +125,7 @@ export async function inspectCarousels(page: Page) {
         };
       });
       const snapshot = () =>
-        bundle.evaluate(({ root, slides, next, previous }) => {
+        bundle.evaluate(({ root, slides, next, previous, contextRetained }) => {
           const visible = (el: Element) => {
             const r = el.getBoundingClientRect(),
               s = getComputedStyle(el);
@@ -93,6 +175,7 @@ export async function inspectCarousels(page: Page) {
             visible(buttons[0]);
           return {
             connected:
+              contextRetained() &&
               root.isConnected &&
               visible(root) &&
               retained(next, 'next') &&
@@ -168,10 +251,13 @@ export async function inspectCarousels(page: Page) {
         const inverse = (
           await (await bundle.getProperty(forward ? 'previous' : 'next')).getProperty('0')
         ).asElement() as ElementHandle<HTMLButtonElement> | null;
+        await focus.evaluate((state, el) => state.expectFocus(el), handle);
         await handle.focus();
         const beforeActivation = await snapshot();
         if (
           !beforeActivation.connected ||
+          beforeActivation.active !== initial.active ||
+          !(await focus.evaluate(state => state.owned())) ||
           !(forward ? beforeActivation.nextSafe : beforeActivation.previousSafe) ||
           !(await handle.evaluate(el => el === document.activeElement)) ||
           beforeActivation.overlayOpen
@@ -181,14 +267,20 @@ export async function inspectCarousels(page: Page) {
         // A bounded delay permits authored transitions; no display is proof of neither failure nor compliance.
         await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 700)));
         const changed = await snapshot();
-        if (!changed.connected || changed.active < 0 || changed.active === initial.active) {
+        if (
+          !changed.connected ||
+          changed.active < 0 ||
+          changed.active === initial.active ||
+          !(await focus.evaluate(state => state.owned()))
+        ) {
           observations.push({
             initial,
             changed,
             status: 'unverified',
             reason: 'unchanged-ambiguous-or-replaced-slide-within-700ms',
           });
-          continue;
+          canRestore = false;
+          break;
         }
         let restoration: Record<string, unknown> = {
           status: 'unverified',
@@ -199,10 +291,13 @@ export async function inspectCarousels(page: Page) {
           !changed.overlayOpen &&
           (forward ? changed.previousSafe : changed.nextSafe)
         ) {
+          await focus.evaluate((state, el) => state.expectFocus(el), inverse);
           await inverse.focus();
           const beforeRestore = await snapshot();
           if (
             !beforeRestore.connected ||
+            beforeRestore.active !== changed.active ||
+            !(await focus.evaluate(state => state.owned())) ||
             !(forward ? beforeRestore.previousSafe : beforeRestore.nextSafe) ||
             !(await inverse.evaluate(el => el === document.activeElement)) ||
             beforeRestore.overlayOpen
@@ -213,7 +308,12 @@ export async function inspectCarousels(page: Page) {
           const restored = await snapshot();
           restoration = {
             status:
-              restored.connected && restored.active === initial.active ? 'restored' : 'unverified',
+              restored.connected &&
+              !restored.overlayOpen &&
+              restored.active === initial.active &&
+              (await focus.evaluate(state => state.owned()))
+                ? 'restored'
+                : 'unverified',
             state: restored,
           };
         }
@@ -221,44 +321,54 @@ export async function inspectCarousels(page: Page) {
           initial,
           changed,
           direction: forward ? 'next' : 'previous',
-          status: 'observed',
+          status: restoration.status === 'restored' ? 'observed' : 'unverified',
           restoration,
           keyboardActivation: 'Enter',
           sampleWindowMs: 700,
         });
+        if (restoration.status !== 'restored') {
+          canRestore = false;
+          break;
+        }
       } catch {
         observations.push({
           status: 'unverified',
           reason: 'nodes-changed-or-dependent-work-blocked',
         });
+        canRestore = false;
+        break;
       } finally {
         await bundle.dispose();
       }
     }
   } finally {
-    await originalFocus
-      .evaluate(el => {
-        if (el instanceof HTMLElement && el.isConnected) {
-          const active = document.activeElement;
-          if (active instanceof HTMLElement && active !== el) active.blur();
-          el.focus({ preventScroll: true });
-        }
-      })
-      .catch(() => {});
-    await originalFocus.dispose();
-    await page
-      .evaluate(
-        position => scrollTo({ left: position.x, top: position.y, behavior: 'instant' }),
-        originalScroll,
-      )
-      .catch(() => {});
+    try {
+      // Cleanup must not overwrite focus or state adopted by the page.
+      if (canRestore)
+        canRestore = await focus.evaluate(state => state.restore()).catch(() => false);
+      if (canRestore)
+        await page
+          .evaluate(
+            position => scrollTo({ left: position.x, top: position.y, behavior: 'instant' }),
+            originalScroll,
+          )
+          .catch(() => {
+            canRestore = false;
+          });
+    } finally {
+      await focus.evaluate(state => state.dispose()).catch(() => {});
+      await focus.dispose();
+    }
   }
+
   return {
     schemaVersion: 1,
     url: safeAuditUrl(page.url()),
     coverage: {
       observations,
       sampleLimit: 3,
+      applicationResetVerified: false,
+      stoppedAfterLoss: !canRestore,
       successfulSubmissionAttempted: false,
       autoplayVerified: false,
       gestureVerified: false,
