@@ -24,7 +24,7 @@ function fixture(t) {
   fs.mkdirSync(bin);
   // Stub the browser runner: regression checks must never contact a real store.
   fs.writeFileSync(path.join(bin, 'pnpm'), `#!/usr/bin/env node
-require('fs').appendFileSync('invocations.jsonl', JSON.stringify({args: process.argv.slice(2), url: process.env.STORE_URL, handle: process.env.PRODUCT_HANDLE, slug: process.env.SITE_SLUG, run: process.env.TEST_RUN_DATE, platform: process.env.STORE_PLATFORM, settings: JSON.parse(process.env.SITE_SETTINGS_JSON)}) + '\\n');
+require('fs').appendFileSync('invocations.jsonl', JSON.stringify({args: process.argv.slice(2), url: process.env.STORE_URL, handle: process.env.PRODUCT_HANDLE, slug: process.env.SITE_SLUG, run: process.env.TEST_RUN_DATE, platform: process.env.STORE_PLATFORM, sharedInventory: process.env.SHARED_INVENTORY_RUN, settings: JSON.parse(process.env.SITE_SETTINGS_JSON)}) + '\\n');
 process.exit(Number(process.env.STUB_EXIT || 0));
 `, { mode: 0o755 });
   return { root, env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` } };
@@ -241,4 +241,25 @@ test('buyer journey appears separately with exact step, status and escaped expec
   assert.match(dashboard, /woocommerce · Chrome · failed · step: quantity/);
   assert.ok(dashboard.includes('&lt;script&gt;bad()&lt;/script&gt;'));
   assert.ok(!dashboard.includes('<img src=x onerror=bad()>'));
+});
+
+
+test('only unfocused Full runs batch inventory; explicit modes, grep and file selections stay standalone', t => {
+  const f = fixture(t);
+  sites(f, [{ url: 'https://example.test', slug: 'store' }]);
+  for (const [args, expected] of [
+    [[], '1'], [['--project', 'Mobile Chrome'], '1'],
+    [['--mode=visual'], '0'], [['--mode=content'], '0'], [['--mode=pages'], '0'],
+    [['--grep', '@modern-web'], '0'], [['-g', '@seo'], '0'],
+    [['tests/30-inventory-visual.spec.ts'], '0'], [['04-product'], '0'],
+    [['--config=checks/seo.config.ts'], '0'],
+  ]) {
+    f.env.SHARED_INVENTORY_RUN = '1';
+    const result = run(f, 'run-sites.js', args);
+    assert.equal(result.status, 0, result.stderr);
+    const calls = fs.readFileSync(path.join(f.root, 'invocations.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+    const call = calls.at(-1);
+    assert.equal(call.sharedInventory, expected, JSON.stringify(args));
+    if (args.includes('-g')) assert.equal(call.args.filter(arg => arg === '--grep').length, 0);
+  }
 });

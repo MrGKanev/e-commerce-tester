@@ -9,8 +9,8 @@ import { waitForContent, BASE } from './helpers';
  *  - OWASP Secure Headers Project
  *  - Google Security Score (2026 criteria)
  */
+import { pageCheck } from './page-check';
 import { test, expect } from './fixtures';
-
 
 // ─── Shared: fetch headers once per describe block ───────────────────────────
 
@@ -24,8 +24,7 @@ async function fetchHeaders(request: import('@playwright/test').APIRequestContex
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('20 · Security headers', { tag: ["@full"] }, () => {
-
+test.describe('20 · Security headers', { tag: ['@full'] }, () => {
   // ── HTTPS enforcement ─────────────────────────────────────────────────────
 
   test('HTTP request redirects to HTTPS (no plain-HTTP serving)', async ({ request }) => {
@@ -54,48 +53,53 @@ test.describe('20 · Security headers', { tag: ["@full"] }, () => {
 
   // ── HSTS ─────────────────────────────────────────────────────────────────
 
-  test('Strict-Transport-Security header is present', async ({ request }) => {
+  test('security headers — shared response checks', async ({ request }) => {
     const { headers } = await fetchHeaders(request);
-    const hsts = headers['strict-transport-security'];
-    expect(hsts, 'Strict-Transport-Security header missing').toBeTruthy();
-  });
+    await pageCheck('Strict-Transport-Security header is present', async () => {
+      const hsts = headers['strict-transport-security'];
+      expect(hsts, 'Strict-Transport-Security header missing').toBeTruthy();
+    });
+    await pageCheck('HSTS max-age is at least 6 months (15768000 s)', async step => {
+      const hsts = headers['strict-transport-security'] ?? '';
+      if (!hsts) step.skip(true, 'HSTS header not present');
 
-  test('HSTS max-age is at least 6 months (15768000 s)', async ({ request }) => {
-    const { headers } = await fetchHeaders(request);
-    const hsts = headers['strict-transport-security'] ?? '';
-    if (!hsts) test.skip(true, 'HSTS header not present');
+      const match = hsts.match(/max-age=(\d+)/i);
+      if (!match) {
+        throw new Error('HSTS header present but has no max-age directive');
+      }
+      expect(
+        parseInt(match[1], 10),
+        `HSTS max-age ${match[1]}s is less than 6 months (15768000 s)`,
+      ).toBeGreaterThanOrEqual(15_768_000);
+    });
+    await pageCheck('X-Content-Type-Options: nosniff is set', async () => {
+      const val = headers['x-content-type-options'];
+      expect(val?.toLowerCase(), 'X-Content-Type-Options is not "nosniff"').toBe('nosniff');
+    });
+    await pageCheck('X-Frame-Options or CSP frame-ancestors prevents clickjacking', async () => {
+      const xfo = headers['x-frame-options'];
+      const csp = headers['content-security-policy'] ?? '';
+      const hasFrameAncestors = csp.toLowerCase().includes('frame-ancestors');
 
-    const match = hsts.match(/max-age=(\d+)/i);
-    if (!match) {
-      throw new Error('HSTS header present but has no max-age directive');
-    }
-    expect(
-      parseInt(match[1], 10),
-      `HSTS max-age ${match[1]}s is less than 6 months (15768000 s)`,
-    ).toBeGreaterThanOrEqual(15_768_000);
+      expect(
+        xfo || hasFrameAncestors,
+        'Neither X-Frame-Options nor CSP frame-ancestors is set — clickjacking risk',
+      ).toBeTruthy();
+    });
+    await pageCheck('Server header does not expose version details', async () => {
+      const server = headers['server'] ?? '';
+      // Shopify typically returns "Shopify" without a version
+      expect(server).not.toMatch(/\d+\.\d+/);
+    });
+    await pageCheck('X-Powered-By header is not present', async () => {
+      const powered = headers['x-powered-by'];
+      expect(powered, `X-Powered-By header exposes: ${powered}`).toBeFalsy();
+    });
   });
 
   // ── Content-type sniffing ─────────────────────────────────────────────────
 
-  test('X-Content-Type-Options: nosniff is set', async ({ request }) => {
-    const { headers } = await fetchHeaders(request);
-    const val = headers['x-content-type-options'];
-    expect(val?.toLowerCase(), 'X-Content-Type-Options is not "nosniff"').toBe('nosniff');
-  });
-
   // ── Framing ───────────────────────────────────────────────────────────────
-
-  test('X-Frame-Options or CSP frame-ancestors prevents clickjacking', async ({ request }) => {
-    const { headers } = await fetchHeaders(request);
-    const xfo = headers['x-frame-options'];
-    const csp = headers['content-security-policy'] ?? '';
-    const hasFrameAncestors = csp.toLowerCase().includes('frame-ancestors');
-
-    expect(
-      xfo || hasFrameAncestors,
-      'Neither X-Frame-Options nor CSP frame-ancestors is set — clickjacking risk',
-    ).toBeTruthy();
-  });
 
   // ── Mixed content ─────────────────────────────────────────────────────────
 
@@ -129,9 +133,7 @@ test.describe('20 · Security headers', { tag: ["@full"] }, () => {
 
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
     const cookies = await page.context().cookies();
-    const sessionCookies = cookies.filter(c =>
-      /session|cart|_secure|shopify/i.test(c.name),
-    );
+    const sessionCookies = cookies.filter(c => /session|cart|_secure|shopify/i.test(c.name));
 
     if (sessionCookies.length === 0) {
       test.skip(true, 'No session/cart cookies found to inspect');
@@ -139,10 +141,7 @@ test.describe('20 · Security headers', { tag: ["@full"] }, () => {
     }
 
     const insecure = sessionCookies.filter(c => !c.secure).map(c => c.name);
-    expect(
-      insecure,
-      `Session cookies without Secure flag: ${insecure.join(', ')}`,
-    ).toHaveLength(0);
+    expect(insecure, `Session cookies without Secure flag: ${insecure.join(', ')}`).toHaveLength(0);
   });
 
   test('cookies have SameSite attribute set', async ({ page }) => {
@@ -163,9 +162,9 @@ test.describe('20 · Security headers', { tag: ["@full"] }, () => {
       console.warn(`Cookies with SameSite=None or unset: ${noSameSite.join(', ')}`);
     }
     // Soft check — SameSite=None is acceptable if paired with Secure
-    const problematic = shopifyCookies.filter(
-      c => (!c.sameSite || c.sameSite === 'None') && !c.secure,
-    ).map(c => c.name);
+    const problematic = shopifyCookies
+      .filter(c => (!c.sameSite || c.sameSite === 'None') && !c.secure)
+      .map(c => c.name);
     expect(
       problematic,
       `Cookies with SameSite=None without Secure flag: ${problematic.join(', ')}`,
@@ -173,19 +172,6 @@ test.describe('20 · Security headers', { tag: ["@full"] }, () => {
   });
 
   // ── Server information disclosure ─────────────────────────────────────────
-
-  test('Server header does not expose version details', async ({ request }) => {
-    const { headers } = await fetchHeaders(request);
-    const server = headers['server'] ?? '';
-    // Shopify typically returns "Shopify" without a version
-    expect(server).not.toMatch(/\d+\.\d+/);
-  });
-
-  test('X-Powered-By header is not present', async ({ request }) => {
-    const { headers } = await fetchHeaders(request);
-    const powered = headers['x-powered-by'];
-    expect(powered, `X-Powered-By header exposes: ${powered}`).toBeFalsy();
-  });
 
   // ── Robots.txt & sensitive paths ──────────────────────────────────────────
 
@@ -211,8 +197,7 @@ test.describe('20 · Security headers', { tag: ["@full"] }, () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('20b · Exposed API keys in JavaScript bundles', { tag: ["@full"] }, () => {
-
+test.describe('20b · Exposed API keys in JavaScript bundles', { tag: ['@full'] }, () => {
   /**
    * Patterns that should NEVER appear in client-side JavaScript:
    *  - shpat_ / shppa_ : Shopify private app tokens
@@ -222,13 +207,13 @@ test.describe('20b · Exposed API keys in JavaScript bundles', { tag: ["@full"] 
    *  - private_key / privateKey inside a JSON structure
    */
   const DANGEROUS_PATTERNS: Array<{ name: string; regex: RegExp }> = [
-    { name: 'Shopify private app token (shpat_)',    regex: /shpat_[a-zA-Z0-9]{32,}/       },
-    { name: 'Shopify private app password (shppa_)', regex: /shppa_[a-zA-Z0-9]{32,}/      },
+    { name: 'Shopify private app token (shpat_)', regex: /shpat_[a-zA-Z0-9]{32,}/ },
+    { name: 'Shopify private app password (shppa_)', regex: /shppa_[a-zA-Z0-9]{32,}/ },
     { name: 'Stripe secret key (sk_live_ / sk_test_)', regex: /sk_(live|test)_[a-zA-Z0-9]{20,}/ },
-    { name: 'GitHub PAT (ghp_)',                    regex: /ghp_[a-zA-Z0-9]{36,}/          },
-    { name: 'GitHub OAuth token (gho_)',            regex: /gho_[a-zA-Z0-9]{36,}/          },
-    { name: 'AWS Access Key ID (AKIA…)',            regex: /AKIA[A-Z0-9]{16}/              },
-    { name: 'Generic private_key in JS',            regex: /"private_key"\s*:\s*"-----BEGIN/ },
+    { name: 'GitHub PAT (ghp_)', regex: /ghp_[a-zA-Z0-9]{36,}/ },
+    { name: 'GitHub OAuth token (gho_)', regex: /gho_[a-zA-Z0-9]{36,}/ },
+    { name: 'AWS Access Key ID (AKIA…)', regex: /AKIA[A-Z0-9]{16}/ },
+    { name: 'Generic private_key in JS', regex: /"private_key"\s*:\s*"-----BEGIN/ },
   ];
 
   test('homepage JavaScript bundles contain no private API keys', async ({ page }) => {
@@ -315,9 +300,8 @@ test.describe('20b · Exposed API keys in JavaScript bundles', { tag: ["@full"] 
   test('inline <script> tags on homepage contain no private API keys', async ({ page }) => {
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
 
-    const inlineScripts = await page.$$eval(
-      'script:not([src])',
-      scripts => (scripts as HTMLScriptElement[]).map(s => s.textContent ?? ''),
+    const inlineScripts = await page.$$eval('script:not([src])', scripts =>
+      (scripts as HTMLScriptElement[]).map(s => s.textContent ?? ''),
     );
 
     const findings: string[] = [];

@@ -7,6 +7,7 @@
  *  - Technical SEO (canonical URLs, sitemap, robots.txt)
  */
 import { test, expect } from './fixtures';
+import { pageCheck } from './page-check';
 import { BASE, KNOWN_PRODUCT } from './helpers';
 
 // ─── Shared helpers ──────────────────────────────────────────────────────────
@@ -15,26 +16,26 @@ type AnyPage = import('@playwright/test').Page;
 
 /** Parse all JSON-LD script tags on the current page. */
 async function getJsonLd(page: AnyPage): Promise<unknown[]> {
-  return page.$$eval('script[type="application/ld+json"]', (scripts) =>
+  return page.$$eval('script[type="application/ld+json"]', scripts =>
     scripts
-      .map((s) => {
-        try { return JSON.parse(s.textContent ?? ''); }
-        catch { return null; }
+      .map(s => {
+        try {
+          return JSON.parse(s.textContent ?? '');
+        } catch {
+          return null;
+        }
       })
       .filter(Boolean),
   );
 }
 
 /** Find the first schema of a given @type (also searches @graph arrays). */
-function findSchema(
-  schemas: unknown[],
-  type: string,
-): Record<string, unknown> | undefined {
+function findSchema(schemas: unknown[], type: string): Record<string, unknown> | undefined {
   for (const s of schemas as Record<string, unknown>[]) {
     if (s['@type'] === type) return s;
     const graph = s['@graph'];
     if (Array.isArray(graph)) {
-      const found = (graph as Record<string, unknown>[]).find((g) => g['@type'] === type);
+      const found = (graph as Record<string, unknown>[]).find(g => g['@type'] === type);
       if (found) return found;
     }
   }
@@ -50,135 +51,121 @@ async function getMeta(page: AnyPage, prop: string): Promise<string | null> {
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-test.describe('14 · Structured Data & Open Graph', { tag: ["@full"] }, () => {
-
+test.describe('14 · Structured Data & Open Graph', { tag: ['@full'] }, () => {
   // ── Homepage JSON-LD ───────────────────────────────────────────────────────
 
-  test('homepage — has WebSite, Organization, or Store JSON-LD', async ({ page }) => {
+  test('homepage — structured data and Open Graph', async ({ page }) => {
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-    const schemas = await getJsonLd(page);
-    console.log(`Homepage JSON-LD types: ${(schemas as Record<string, unknown>[]).map(s => s['@type']).join(', ')}`);
+    await pageCheck('homepage — has WebSite, Organization, or Store JSON-LD', async () => {
+      const schemas = await getJsonLd(page);
+      console.log(
+        `Homepage JSON-LD types: ${(schemas as Record<string, unknown>[]).map(s => s['@type']).join(', ')}`,
+      );
 
-    const found = findSchema(schemas, 'WebSite')
-      ?? findSchema(schemas, 'Organization')
-      ?? findSchema(schemas, 'Store');
+      const found =
+        findSchema(schemas, 'WebSite') ??
+        findSchema(schemas, 'Organization') ??
+        findSchema(schemas, 'Store');
 
-    expect(
-      found,
-      `No WebSite / Organization / Store schema found on homepage`,
-    ).toBeDefined();
-  });
+      expect(found, `No WebSite / Organization / Store schema found on homepage`).toBeDefined();
+    });
+    await pageCheck('homepage — og:title and og:description are present', async () => {
+      const ogTitle = await getMeta(page, 'og:title');
+      const ogDescription = await getMeta(page, 'og:description');
 
-  test('homepage — og:title and og:description are present', async ({ page }) => {
-    await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+      expect(ogTitle, 'og:title meta tag is missing or empty').toBeTruthy();
+      expect(ogDescription, 'og:description meta tag is missing or empty').toBeTruthy();
+    });
+    await pageCheck('homepage — og:image is an absolute URL', async () => {
+      const ogImage = await getMeta(page, 'og:image');
+      console.log(`Homepage og:image: ${ogImage?.slice(0, 80)}`);
 
-    const ogTitle       = await getMeta(page, 'og:title');
-    const ogDescription = await getMeta(page, 'og:description');
-
-    expect(ogTitle,       'og:title meta tag is missing or empty').toBeTruthy();
-    expect(ogDescription, 'og:description meta tag is missing or empty').toBeTruthy();
-  });
-
-  test('homepage — og:image is an absolute URL', async ({ page }) => {
-    await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-
-    const ogImage = await getMeta(page, 'og:image');
-    console.log(`Homepage og:image: ${ogImage?.slice(0, 80)}`);
-
-    expect(ogImage, 'og:image meta tag is missing').toBeTruthy();
-    expect(
-      ogImage?.startsWith('http') || ogImage?.startsWith('//'),
-      `og:image "${ogImage}" is not an absolute URL`,
-    ).toBe(true);
+      expect(ogImage, 'og:image meta tag is missing').toBeTruthy();
+      expect(
+        ogImage?.startsWith('http') || ogImage?.startsWith('//'),
+        `og:image "${ogImage}" is not an absolute URL`,
+      ).toBe(true);
+    });
   });
 
   // ── Product page JSON-LD ──────────────────────────────────────────────────
 
-  test('product page — has Product JSON-LD schema', async ({ page }) => {
+  test('product page — structured data and Open Graph', async ({ page }) => {
     await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
-    const schemas = await getJsonLd(page);
+    await pageCheck('product page — has Product JSON-LD schema', async () => {
+      const schemas = await getJsonLd(page);
 
-    const product = findSchema(schemas, 'Product');
-    expect(
-      product,
-      `No Product schema found. Schemas: ${(schemas as Record<string, unknown>[]).map(s => s['@type']).join(', ')}`,
-    ).toBeDefined();
-  });
-
-  test('product page — Product schema has name and offers', async ({ page }) => {
-    await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
-    const schemas = await getJsonLd(page);
-    const product = findSchema(schemas, 'Product');
-
-    if (!product) {
-      test.skip(true, 'No Product schema — covered by previous test');
-      return;
-    }
-
-    expect(product['name'], 'Product schema missing "name"').toBeTruthy();
-    expect(product['offers'], 'Product schema missing "offers"').toBeDefined();
-
-    // Validate offers fields
-    const raw = product['offers'];
-    const offer = (Array.isArray(raw) ? raw[0] : raw) as Record<string, unknown>;
-    if (offer && typeof offer === 'object') {
+      const product = findSchema(schemas, 'Product');
       expect(
-        offer['price'] ?? offer['lowPrice'],
-        'Offer missing "price" or "lowPrice"',
+        product,
+        `No Product schema found. Schemas: ${(schemas as Record<string, unknown>[]).map(s => s['@type']).join(', ')}`,
       ).toBeDefined();
-      expect(offer['priceCurrency'], 'Offer missing "priceCurrency"').toBeTruthy();
-    }
-  });
+    });
+    await pageCheck('product page — Product schema has name and offers', async step => {
+      const schemas = await getJsonLd(page);
+      const product = findSchema(schemas, 'Product');
 
-  test('product page — Product schema has image field', async ({ page }) => {
-    await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
-    const schemas = await getJsonLd(page);
-    const product = findSchema(schemas, 'Product');
+      if (!product) {
+        step.skip(true, 'No Product schema — covered by previous test');
+        return;
+      }
 
-    if (!product) {
-      test.skip(true, 'No Product schema');
-      return;
-    }
+      expect(product['name'], 'Product schema missing "name"').toBeTruthy();
+      expect(product['offers'], 'Product schema missing "offers"').toBeDefined();
 
-    expect(product['image'], 'Product schema missing "image"').toBeDefined();
+      // Validate offers fields
+      const raw = product['offers'];
+      const offer = (Array.isArray(raw) ? raw[0] : raw) as Record<string, unknown>;
+      if (offer && typeof offer === 'object') {
+        expect(
+          offer['price'] ?? offer['lowPrice'],
+          'Offer missing "price" or "lowPrice"',
+        ).toBeDefined();
+        expect(offer['priceCurrency'], 'Offer missing "priceCurrency"').toBeTruthy();
+      }
+    });
+    await pageCheck('product page — Product schema has image field', async step => {
+      const schemas = await getJsonLd(page);
+      const product = findSchema(schemas, 'Product');
 
-    if (!product['description']) {
-      console.warn('Product schema is missing "description" (recommended for rich snippets)');
-    }
-  });
+      if (!product) {
+        step.skip(true, 'No Product schema');
+        return;
+      }
 
-  test('product page — og:title and og:image are present', async ({ page }) => {
-    await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
+      expect(product['image'], 'Product schema missing "image"').toBeDefined();
 
-    const ogTitle = await getMeta(page, 'og:title');
-    const ogImage = await getMeta(page, 'og:image');
-    const ogType  = await getMeta(page, 'og:type');
+      if (!product['description']) {
+        console.warn('Product schema is missing "description" (recommended for rich snippets)');
+      }
+    });
+    await pageCheck('product page — og:title and og:image are present', async () => {
+      const ogTitle = await getMeta(page, 'og:title');
+      const ogImage = await getMeta(page, 'og:image');
+      const ogType = await getMeta(page, 'og:type');
 
-    console.log(`Product OG: title="${ogTitle}", type="${ogType}", image="${ogImage?.slice(0, 60)}"`);
+      console.log(
+        `Product OG: title="${ogTitle}", type="${ogType}", image="${ogImage?.slice(0, 60)}"`,
+      );
 
-    expect(ogTitle, 'og:title missing on product page').toBeTruthy();
-    expect(ogImage, 'og:image missing on product page').toBeTruthy();
+      expect(ogTitle, 'og:title missing on product page').toBeTruthy();
+      expect(ogImage, 'og:image missing on product page').toBeTruthy();
 
-    if (ogType) {
-      expect(
-        ['product', 'website'].includes(ogType),
-        `og:type "${ogType}" should be "product" or "website"`,
-      ).toBe(true);
-    }
-  });
+      if (ogType) {
+        expect(
+          ['product', 'website'].includes(ogType),
+          `og:type "${ogType}" should be "product" or "website"`,
+        ).toBe(true);
+      }
+    });
+    await pageCheck('product page — has absolute canonical URL', async () => {
+      const canonical = await page.$eval('link[rel="canonical"]', el => el.getAttribute('href'));
 
-  test('product page — has absolute canonical URL', async ({ page }) => {
-    await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });
-
-    const canonical = await page
-      .$eval('link[rel="canonical"]', (el) => el.getAttribute('href'))
-      ;
-
-    expect(canonical, 'Missing <link rel="canonical"> on product page').toBeTruthy();
-    expect(
-      canonical?.startsWith('http'),
-      `Canonical URL "${canonical}" should be absolute`,
-    ).toBe(true);
+      expect(canonical, 'Missing <link rel="canonical"> on product page').toBeTruthy();
+      expect(canonical?.startsWith('http'), `Canonical URL "${canonical}" should be absolute`).toBe(
+        true,
+      );
+    });
   });
 
   // ── Collections page ──────────────────────────────────────────────────────
@@ -206,8 +193,13 @@ test.describe('14 · Structured Data & Open Graph', { tag: ["@full"] }, () => {
     const resp = await page.goto(`${BASE}/robots.txt`, { waitUntil: 'domcontentloaded' });
     expect(resp?.status(), 'robots.txt should return HTTP 200').toBe(200);
 
-    const body = await page.evaluate(() => document.body.innerText ?? document.documentElement.innerHTML);
-    expect(body.toLowerCase().includes('user-agent'), 'robots.txt should contain User-agent directive').toBe(true);
+    const body = await page.evaluate(
+      () => document.body.innerText ?? document.documentElement.innerHTML,
+    );
+    expect(
+      body.toLowerCase().includes('user-agent'),
+      'robots.txt should contain User-agent directive',
+    ).toBe(true);
 
     // Must NOT block everything — "Disallow: /" on its own line blocks all crawlers
     const blocksAll = /disallow\s*:\s*\/\s*(\n|$)/i.test(body);

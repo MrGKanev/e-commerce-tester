@@ -26,6 +26,7 @@ export async function approvedScreenshot(
   name: string,
   testInfo: TestInfo,
   options: Options = {},
+  sourceFile = testInfo.file,
 ) {
   if (testInfo.config.updateSnapshots !== 'none' || testInfo.project.ignoreSnapshots)
     throw new Error(
@@ -39,7 +40,7 @@ export async function approvedScreenshot(
   const root = baselineRoot();
   const pin = testInfo.config.metadata.visualBaseline as { revision: string | null } | undefined;
   const baseline = approved(root, site, pin?.revision);
-  const file = path.relative(testInfo.config.rootDir, testInfo.file).replaceAll(path.sep, '/');
+  const file = path.relative(testInfo.config.rootDir, sourceFile).replaceAll(path.sep, '/');
   const id = digest([file, testInfo.project.name, name].join('\0')).slice(0, 32);
   const environment = {
     commercePlatform: readSiteSettings().platform,

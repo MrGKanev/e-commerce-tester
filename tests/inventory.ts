@@ -10,6 +10,8 @@ import {
   publicUrl,
 } from '../scripts/platform-config';
 
+export const batchInventory = process.env.SHARED_INVENTORY_RUN === '1';
+
 export type InventoryPage = {
   url: string;
   type: 'home' | 'product' | 'collection' | 'search' | 'cart' | 'static';

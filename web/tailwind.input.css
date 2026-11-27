@@ -56,3 +56,6 @@
 @source '../checks/modern-web-field-sizing.spec.ts';
 
 @source '../checks/modern-web-field-geometry.spec.ts';
+@source '../checks/modern-web-control-clipping-matrix.spec.ts';
+@source '../scripts/check-shared-visits.js';
+@source '../scripts/check-visit-groups.js';

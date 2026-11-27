@@ -16,14 +16,12 @@ concurrency:
 jobs:
   modern-web-matrix:
     name: Modern Web (${{ matrix.project }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { project: 'Desktop Chrome', browser: chromium }
-          - { project: 'Mobile Chrome', browser: chromium }
           - { project: Firefox, browser: firefox }
           - { project: WebKit, browser: webkit }
           - { project: 'Mobile WebKit', browser: webkit }
@@ -37,12 +35,14 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Build fixture CSS
+        run: pnpm build:css
       - name: Cache Playwright browser
         id: playwright-cache
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: playwright-${{ runner.os }}-24.04-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install browser and system dependencies
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
@@ -69,7 +69,7 @@ jobs:
 
   checks:
     name: Quality and local browser checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
@@ -87,7 +87,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          key: playwright-${{ runner.os }}-24.04-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install Chromium and system dependencies
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium

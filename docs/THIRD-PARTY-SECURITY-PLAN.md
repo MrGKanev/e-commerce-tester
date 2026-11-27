@@ -17,7 +17,7 @@ WooCommerce monitoring also needs an installation-side track. [Official security
 
 ## What the repository currently establishes
 
-- [38-third-party-scripts.spec.ts](../tests/38-third-party-scripts.spec.ts) records external script origin/path at initial load when `monitorScripts` is enabled. It has no approved baseline, content hash or unexpected-script verdict, excludes same-origin scripts, and drops query parameters from its inventory key.
+- [38-third-party-scripts.spec.ts](../tests/38-third-party-scripts.spec.ts) records external script origin/path at initial load when `monitorScripts` is enabled. The same observer is reused by the shared Full homepage visit without another navigation; explicit selections stay standalone. It has no approved baseline, content hash or unexpected-script verdict, excludes same-origin scripts, and drops query parameters from its inventory key.
 - [20-security.spec.ts](../tests/20-security.spec.ts) includes key-pattern/header checks, not a supply-chain malware detector. Its fetched bundle checks do not replace analysis of the actual bytes received by the browser. Legacy platform routing must remain explicit.
 - [42-tracking-consent.spec.ts](../tests/42-tracking-consent.spec.ts) and [commerce-expectations.ts](../tests/commerce-expectations.ts) observe configured trackers; a previously unknown endpoint is not automatically a tracker verdict.
 - [modern-web-policy.ts](../tests/modern-web-policy.ts) records authored response/meta policies. Presence of a CSP, integrity attribute or sandbox does not demonstrate effective enforcement or safe vendor behavior.

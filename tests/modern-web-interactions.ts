@@ -17,7 +17,7 @@ import {
 } from './modern-web-field-content';
 
 /** Install before navigation. Freeze network and prevent submissions before exercising controls. */
-export async function prepareInteractionProbe(page: Page) {
+export async function prepareInteractionProbe(page: Page, preservePageLoad = false) {
   let frozen = false,
     blockedRequests = 0,
     blockedSockets = 0;
@@ -26,10 +26,18 @@ export async function prepareInteractionProbe(page: Page) {
     blockedRequests++;
     return route.abort('blockedbyclient');
   });
-  await page.context().routeWebSocket('**', async socket => {
-    blockedSockets++;
-    await socket.close();
-  });
+  let observedSockets = 0;
+  if (preservePageLoad)
+    await page.context().routeWebSocket('**', socket => {
+      observedSockets++;
+      socket.connectToServer();
+    });
+  const isolateSockets = () =>
+    page.context().routeWebSocket('**', async socket => {
+      blockedSockets++;
+      await socket.close();
+    });
+  if (!preservePageLoad) await isolateSockets();
   await page.addInitScript(() => {
     document.addEventListener(
       'submit',
@@ -44,10 +52,18 @@ export async function prepareInteractionProbe(page: Page) {
   });
   return {
     async freeze() {
+      // Existing live sockets cannot be retroactively quarantined. Keep the load
+      // authentic for screenshots and leave active checks explicitly unverified.
+      if (preservePageLoad) {
+        if (observedSockets) return false;
+        await isolateSockets();
+        if (observedSockets) return false;
+      }
       frozen = true;
       await page.evaluate(() => {
         (window as unknown as { __modernWebProbe?: boolean }).__modernWebProbe = true;
       });
+      return true;
     },
     counts: () => ({ blockedRequests, blockedSockets }),
   };

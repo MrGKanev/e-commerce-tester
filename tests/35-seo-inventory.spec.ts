@@ -1,5 +1,6 @@
+import { auditInventoryPage } from './inventory-page-audit';
 import { test, expect } from './fixtures';
-import { pageInventory } from './inventory';
+import { batchInventory, pageInventory } from './inventory';
 import { analyzeSeo, inventorySeoFindings, readSeoDocument, type SeoResult } from './seo-audit';
 import { BASE, waitForContent } from './helpers';
 import { assertNotLimited } from './pacing';
@@ -7,17 +8,29 @@ import { auditSitemaps } from './sitemap-audit';
 import { auditSeoPages } from './seo-crawl';
 
 test(
-  'SEO — metadata and JSON-LD across page inventory',
+  `${batchInventory ? 'Shared inventory — passive, visual and guarded checks' : 'SEO — metadata and JSON-LD across page inventory'}`,
   { tag: ['@full', '@pages', '@seo'] },
-  async ({ page }, testInfo) => {
+  async ({ browser }, testInfo) => {
     const entries = pageInventory();
-    test.setTimeout(Math.max(120000, entries.length * 60000));
+    test.setTimeout(Math.max(120000, entries.length * (batchInventory ? 120000 : 60000)));
     const pages: SeoResult[] = [];
     const navigationErrors: { url: string; message: string }[] = [];
     try {
       for (const entry of entries) {
         await test.step(entry.url, async () => {
+          const context = await browser.newContext();
           try {
+            const page = await context.newPage();
+            if (batchInventory) {
+              const result = await auditInventoryPage(page, entry, testInfo);
+              if (result) pages.push(result);
+              else
+                navigationErrors.push({
+                  url: entry.url,
+                  message: 'SEO inspection failed; see its named step',
+                });
+              return;
+            }
             const response = await page.goto(entry.url, { waitUntil: 'domcontentloaded' });
             await waitForContent(page);
             pages.push(
@@ -35,8 +48,10 @@ test(
               url: entry.url,
               message: error instanceof Error ? error.message : String(error),
             });
+          } finally {
+            await context.close();
+            assertNotLimited();
           }
-          assertNotLimited();
         });
       }
     } finally {

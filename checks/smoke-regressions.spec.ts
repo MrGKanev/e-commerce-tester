@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }, info) => {
   const hiddenOnly = info.project.name === 'Hidden-only Chrome';
   const missingProduct = info.titlePath.some(part => part.includes('smoke-missing'));
   test.fail(
-    (hiddenOnly && info.title.includes('linked from homepage')) ||
+    (hiddenOnly && info.title.startsWith('homepage smoke')) ||
       (missingProduct && info.title === 'page loads (not 404)'),
     'Hidden-only links and real HTTP 404 responses must remain failures',
   );
@@ -24,7 +24,7 @@ test.beforeEach(async ({ page }, info) => {
     return route.fulfill({
       status: missing ? 404 : 200,
       contentType: 'text/html',
-      body: `<!doctype html><html lang="en"><head><title>Owned smoke fixture</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><header hidden><a href="/products/smoke-good">Hidden drawer link</a></header><main><h1>Fixture product</h1><a ${hiddenOnly ? 'hidden' : ''} href="/products/smoke-good">Visible product</a></main></body></html>`,
+      body: `<!doctype html><html lang="en"><head><title>Owned smoke fixture</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><header>Store <a hidden href="/products/smoke-good">Hidden drawer link</a></header><main><h1>Fixture product</h1><a ${hiddenOnly ? 'hidden' : ''} href="/products/smoke-good">Visible product</a></main></body></html>`,
     });
   });
 });

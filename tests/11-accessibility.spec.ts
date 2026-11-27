@@ -5,7 +5,8 @@ const settings = readSiteSettings();
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 import { test, expect } from './fixtures';
 import AxeBuilder from '@axe-core/playwright';
-import { BASE, SEARCH_TERM, goto, KNOWN_PRODUCT } from './helpers';
+import { pageCheck } from './page-check';
+import { BASE, goto, KNOWN_PRODUCT } from './helpers';
 
 // Exclude third-party widgets that we cannot fix (chat, consent banners, etc.)
 const THIRD_PARTY_EXCLUDES = [
@@ -32,26 +33,83 @@ function formatViolations(violations: Violation[]): string {
 test.describe('11 · Accessibility (axe)', { tag: ['@full'] }, () => {
   // ─── Homepage ──────────────────────────────────────────────────────────────
 
-  test('homepage — axe violation count stays within threshold', async ({ page }) => {
+  test('homepage — shared axe checks', async ({ page }) => {
     await goto(page);
+    await pageCheck('homepage — axe violation count stays within threshold', async () => {
+      const results = await new AxeBuilder({ page })
+        .withTags(WCAG_TAGS)
+        .exclude(THIRD_PARTY_EXCLUDES)
+        .analyze();
 
-    const results = await new AxeBuilder({ page })
-      .withTags(WCAG_TAGS)
-      .exclude(THIRD_PARTY_EXCLUDES)
-      .analyze();
+      // Log all violations for transparency even when passing
+      if (results.violations.length > 0) {
+        console.log(
+          `Axe found ${results.violations.length} violation(s) on homepage:\n  ` +
+            formatViolations(results.violations as Violation[]),
+        );
+      }
 
-    // Log all violations for transparency even when passing
-    if (results.violations.length > 0) {
-      console.log(
-        `Axe found ${results.violations.length} violation(s) on homepage:\n  ` +
-          formatViolations(results.violations as Violation[]),
+      // No more than 10 total (minor/moderate included) — acts as a ratchet
+      expect(results.violations.length).toBeLessThanOrEqual(
+        settings.thresholds.accessibility.maxViolations,
       );
-    }
+    });
+    await pageCheck('homepage — all images have alt text', async () => {
+      const results = await new AxeBuilder({ page })
+        .withRules(['image-alt'])
+        .exclude(THIRD_PARTY_EXCLUDES)
+        .analyze();
 
-    // No more than 10 total (minor/moderate included) — acts as a ratchet
-    expect(results.violations.length).toBeLessThanOrEqual(
-      settings.thresholds.accessibility.maxViolations,
-    );
+      expect(
+        results.violations.length,
+        `Images missing alt text:\n  ${results.violations.flatMap(v => v.nodes.map((n: { html: string }) => n.html)).join('\n  ')}`,
+      ).toBe(0);
+    });
+    await pageCheck('homepage — interactive elements have accessible names', async () => {
+      const results = await new AxeBuilder({ page })
+        .withRules(['button-name', 'link-name', 'input-button-name'])
+        .exclude(THIRD_PARTY_EXCLUDES)
+        .analyze();
+
+      expect(
+        results.violations.length,
+        `Interactive elements without accessible names:\n  ${formatViolations(results.violations as Violation[])}`,
+      ).toBe(0);
+    });
+    await pageCheck('homepage — page has proper heading hierarchy', async () => {
+      const results = await new AxeBuilder({ page })
+        .withRules(['heading-order', 'page-has-heading-one'])
+        .exclude(THIRD_PARTY_EXCLUDES)
+        .analyze();
+
+      if (results.violations.length > 0) {
+        console.log('Heading issues:', formatViolations(results.violations as Violation[]));
+      }
+
+      // Heading order is a best-practice, not a blocker — warn but don't fail
+      const criticalHeadingIssues = results.violations.filter(
+        v => v.impact === 'critical' || v.impact === 'serious',
+      );
+      expect(criticalHeadingIssues.length).toBe(0);
+    });
+    await pageCheck('homepage — color contrast meets WCAG AA', async () => {
+      const results = await new AxeBuilder({ page })
+        .withRules(['color-contrast'])
+        .exclude(THIRD_PARTY_EXCLUDES)
+        .analyze();
+
+      if (results.violations.length > 0) {
+        console.log(
+          `Color contrast issues (${results.violations[0]?.nodes?.length ?? 0} elements):`,
+          formatViolations(results.violations as Violation[]),
+        );
+      }
+
+      // Contrast is often a design decision — log but allow up to 5 instances
+      expect(results.violations.flatMap(v => v.nodes).length).toBeLessThanOrEqual(
+        settings.thresholds.accessibility.maxContrastNodes,
+      );
+    });
   });
 
   // ─── Product page ──────────────────────────────────────────────────────────
@@ -79,74 +137,6 @@ test.describe('11 · Accessibility (axe)', { tag: ['@full'] }, () => {
   // ─── Static page ───────────────────────────────────────────────────────────
 
   // ─── Specific checks ───────────────────────────────────────────────────────
-
-  test('homepage — all images have alt text', async ({ page }) => {
-    await goto(page);
-
-    const results = await new AxeBuilder({ page })
-      .withRules(['image-alt'])
-      .exclude(THIRD_PARTY_EXCLUDES)
-      .analyze();
-
-    expect(
-      results.violations.length,
-      `Images missing alt text:\n  ${results.violations.flatMap(v => v.nodes.map((n: { html: string }) => n.html)).join('\n  ')}`,
-    ).toBe(0);
-  });
-
-  test('homepage — interactive elements have accessible names', async ({ page }) => {
-    await goto(page);
-
-    const results = await new AxeBuilder({ page })
-      .withRules(['button-name', 'link-name', 'input-button-name'])
-      .exclude(THIRD_PARTY_EXCLUDES)
-      .analyze();
-
-    expect(
-      results.violations.length,
-      `Interactive elements without accessible names:\n  ${formatViolations(results.violations as Violation[])}`,
-    ).toBe(0);
-  });
-
-  test('homepage — page has proper heading hierarchy', async ({ page }) => {
-    await goto(page);
-
-    const results = await new AxeBuilder({ page })
-      .withRules(['heading-order', 'page-has-heading-one'])
-      .exclude(THIRD_PARTY_EXCLUDES)
-      .analyze();
-
-    if (results.violations.length > 0) {
-      console.log('Heading issues:', formatViolations(results.violations as Violation[]));
-    }
-
-    // Heading order is a best-practice, not a blocker — warn but don't fail
-    const criticalHeadingIssues = results.violations.filter(
-      v => v.impact === 'critical' || v.impact === 'serious',
-    );
-    expect(criticalHeadingIssues.length).toBe(0);
-  });
-
-  test('homepage — color contrast meets WCAG AA', async ({ page }) => {
-    await goto(page);
-
-    const results = await new AxeBuilder({ page })
-      .withRules(['color-contrast'])
-      .exclude(THIRD_PARTY_EXCLUDES)
-      .analyze();
-
-    if (results.violations.length > 0) {
-      console.log(
-        `Color contrast issues (${results.violations[0]?.nodes?.length ?? 0} elements):`,
-        formatViolations(results.violations as Violation[]),
-      );
-    }
-
-    // Contrast is often a design decision — log but allow up to 5 instances
-    expect(results.violations.flatMap(v => v.nodes).length).toBeLessThanOrEqual(
-      settings.thresholds.accessibility.maxContrastNodes,
-    );
-  });
 
   test('product page — form controls are properly labelled', async ({ page }) => {
     await page.goto(KNOWN_PRODUCT, { waitUntil: 'domcontentloaded' });

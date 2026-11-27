@@ -7,11 +7,12 @@ import { readSiteSettings } from '../config/site-settings';
  * against every discovered product.  Falls back to KNOWN_PRODUCTS if the
  * discovery is disabled.
  *
- * Each test uses crawlConcurrently() with CONCURRENCY=2 worker pages to
+ * The shared test uses crawlConcurrently() with CONCURRENCY=2 worker pages to
  * keep run time reasonable while staying within Shopify's rate limits.
  */
 import { test, expect, Page } from './fixtures';
-import { KNOWN_PRODUCTS, ADD_TO_CART_SEL, fetchProductHandles } from './helpers';
+import { pageCheck } from './page-check';
+import { ADD_TO_CART_SEL, fetchProductHandles } from './helpers';
 
 type Product = { handle: string; url: string };
 
@@ -45,129 +46,79 @@ async function crawlConcurrently(
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('16 · Dynamic Product Crawling', { tag: ["@full"] }, () => {
-
+test.describe('16 · Dynamic Product Crawling', { tag: ['@full'] }, () => {
   let products: Product[] = [];
 
   test.beforeAll(async () => {
     products = await fetchProductHandles(25);
-    const source = readSiteSettings().inventory.discoverProducts ? 'cached discovered inventory' : 'configured inventory';
+    const source = readSiteSettings().inventory.discoverProducts
+      ? 'cached discovered inventory'
+      : 'configured inventory';
     console.log(
       `[16] Source: ${source} — ${products.length} product(s): ` +
-      products.map(p => p.handle).join(', '),
+        products.map(p => p.handle).join(', '),
     );
   });
 
   // ─── Reachability ──────────────────────────────────────────────────────────
 
-  test('all crawled products return HTTP < 400', async ({ page }) => {
-    test.setTimeout(products.length * 8_000 + 15_000);
-
-    const failed: string[] = [];
+  test('crawled products — shared checks', async ({ page }) => {
+    // Sum of the six former scenario budgets; locator/probe limits stay unchanged.
+    test.setTimeout(products.length * 52000 + 90000);
     await crawlConcurrently(page, products, CONCURRENCY, async (worker, p) => {
-      const resp = await worker.goto(p.url, { waitUntil: 'domcontentloaded' });
-      const status = resp?.status() ?? 0;
-      if (status >= 400) failed.push(`${p.handle} → HTTP ${status}`);
-    });
-
-    expect(failed.length, `Products with HTTP errors:\n  ${failed.join('\n  ')}`).toBe(0);
-  });
-
-  // ─── Title & Price ─────────────────────────────────────────────────────────
-
-  test('all crawled products have a visible H1 title', async ({ page }) => {
-    test.setTimeout(products.length * 8_000 + 15_000);
-
-    const missing: string[] = [];
-    await crawlConcurrently(page, products, CONCURRENCY, async (worker, p) => {
-      await worker.goto(p.url, { waitUntil: 'domcontentloaded' });
-      const title = (await worker.locator('h1').first().textContent())?.trim();
-      if (!title) missing.push(p.handle);
-    });
-
-    expect(missing.length, `Products missing H1 title: ${missing.join(', ')}`).toBe(0);
-  });
-
-  test('all crawled products display a price', async ({ page }) => {
-    test.setTimeout(products.length * 8_000 + 15_000);
-
-    const missing: string[] = [];
-    await crawlConcurrently(page, products, CONCURRENCY, async (worker, p) => {
-      await worker.goto(p.url, { waitUntil: 'domcontentloaded' });
-      const price = (await worker
-        .locator('.price, [class*="price"], span.money, .product__price')
-        .first()
-        .textContent()
-        )?.trim();
-      if (!price) missing.push(p.handle);
-    });
-
-    expect(missing.length, `Products missing price: ${missing.join(', ')}`).toBe(0);
-  });
-
-  // ─── Structured Data ───────────────────────────────────────────────────────
-
-  test('all crawled products expose at least one JSON-LD script', async ({ page }) => {
-    test.setTimeout(products.length * 8_000 + 15_000);
-
-    const missing: string[] = [];
-    await crawlConcurrently(page, products, CONCURRENCY, async (worker, p) => {
-      await worker.goto(p.url, { waitUntil: 'domcontentloaded' });
-      const count = await worker.$$eval(
-        'script[type="application/ld+json"]',
-        (scripts) => scripts.length,
-      );
-      if (count === 0) missing.push(p.handle);
-    });
-
-    expect(missing.length, `Products missing JSON-LD: ${missing.join(', ')}`).toBe(0);
-  });
-
-  // ─── Add to Cart button ────────────────────────────────────────────────────
-
-  test('all in-stock crawled products have an enabled add-to-cart button', async ({ page }) => {
-    test.setTimeout(products.length * 10_000 + 15_000);
-
-    const issues: string[] = [];
-    await crawlConcurrently(page, products, CONCURRENCY, async (worker, p) => {
-      await worker.goto(p.url, { waitUntil: 'domcontentloaded' });
-
-      const btn = worker.locator(ADD_TO_CART_SEL).first();
-      const count = await btn.count();
-      if (count === 0) {
-        issues.push(`${p.handle}: no add-to-cart button found`);
-        return;
-      }
-
-      const disabled = await btn.isDisabled();
-      if (disabled) {
-        console.log(`${p.handle}: add-to-cart button is disabled (sold out or unavailable)`);
-      }
-    });
-
-    expect(issues.length, `ATC button issues:\n  ${issues.join('\n  ')}`).toBe(0);
-  });
-
-  // ─── Hero image ────────────────────────────────────────────────────────────
-
-  test('all crawled products have no broken hero image', async ({ page }) => {
-    test.setTimeout(products.length * 10_000 + 15_000);
-
-    const broken: string[] = [];
-    await crawlConcurrently(page, products, CONCURRENCY, async (worker, p) => {
-      await worker.goto(p.url, { waitUntil: 'domcontentloaded' });
-
-      const imgOk = await worker.evaluate(() => {
-        const img = document.querySelector<HTMLImageElement>(
-          '.product__media img, .product-single__photo img, [data-product-media] img, .product__image img, main img',
+      await test.step(p.handle, async () => {
+        const resp = await pageCheck('Product document load', async () => {
+          const response = await worker.goto(p.url, { waitUntil: 'domcontentloaded' });
+          expect(response, 'Product navigation returned no response').not.toBeNull();
+          return response;
+        });
+        if (!resp) {
+          await test.step.skip('Product checks — document load failed', async () => {});
+          return;
+        }
+        await pageCheck('all crawled products return HTTP < 400', async () => {
+          expect(resp.status(), `${p.handle} HTTP status`).toBeLessThan(400);
+        });
+        await pageCheck('all crawled products have a visible H1 title', async () => {
+          expect(
+            (await worker.locator('h1').first().textContent())?.trim(),
+            `${p.handle} missing H1`,
+          ).toBeTruthy();
+        });
+        await pageCheck('all crawled products display a price', async () => {
+          const price = await worker
+            .locator('.price, [class*="price"], span.money, .product__price')
+            .first()
+            .textContent();
+          expect(price?.trim(), `${p.handle} missing price`).toBeTruthy();
+        });
+        await pageCheck('all crawled products expose at least one JSON-LD script', async () => {
+          expect(
+            await worker.locator('script[type="application/ld+json"]').count(),
+            `${p.handle} missing JSON-LD`,
+          ).toBeGreaterThan(0);
+        });
+        await pageCheck(
+          'all in-stock crawled products have an enabled add-to-cart button',
+          async () => {
+            const btn = worker.locator(ADD_TO_CART_SEL).first();
+            expect(await btn.count(), `${p.handle}: no add-to-cart button found`).toBeGreaterThan(
+              0,
+            );
+            if (await btn.isDisabled())
+              console.log(`${p.handle}: add-to-cart button is disabled (sold out or unavailable)`);
+          },
         );
-        if (!img) return true;
-        return img.complete && img.naturalWidth > 0;
+        await pageCheck('all crawled products have no broken hero image', async () => {
+          const ok = await worker.evaluate(() => {
+            const img = document.querySelector<HTMLImageElement>(
+              '.product__media img, .product-single__photo img, [data-product-media] img, .product__image img, main img',
+            );
+            return !img || (img.complete && img.naturalWidth > 0);
+          });
+          expect(ok, `${p.handle} has a broken hero image`).toBe(true);
+        });
       });
-
-      if (!imgOk) broken.push(p.handle);
     });
-
-    expect(broken.length, `Products with broken hero image: ${broken.join(', ')}`).toBe(0);
   });
 });

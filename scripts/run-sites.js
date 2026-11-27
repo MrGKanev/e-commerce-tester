@@ -40,7 +40,12 @@ const modeIndex = extraArgs.findIndex(arg => arg === '--mode' || arg.startsWith(
 const mode = modeIndex < 0 ? 'full' : extraArgs[modeIndex].includes('=') ? extraArgs[modeIndex].split('=')[1] : extraArgs[modeIndex + 1];
 if (!['smoke', 'full', 'visual', 'content', 'audit', 'pages'].includes(mode)) die('Mode must be smoke, full, visual, content, audit or pages');
 if (modeIndex >= 0) extraArgs.splice(modeIndex, extraArgs[modeIndex].includes('=') ? 1 : 2);
-if (!extraArgs.some(arg => arg === '--grep' || arg.startsWith('--grep='))) extraArgs.push('--grep', '@' + mode);
+// Focused file/config/grep selections keep their standalone registrations.
+const sharedInventory = mode === 'full' && extraArgs.every((arg, index) =>
+  !/^(?:--grep|--config|--test-list|--last-failed|-g$|-c$)/.test(arg) &&
+  (arg.startsWith('--') || extraArgs[index - 1] === '--project'),
+);
+if (!extraArgs.some(arg => arg === '--grep' || arg.startsWith('--grep=') || arg === '-g')) extraArgs.push('--grep', '@' + mode);
 if (!extraArgs.some(arg => arg === '--project' || arg.startsWith('--project='))) extraArgs.push('--project=Desktop Chrome');
 
 // Native Node loader preserves explicitly provided environment variables.
@@ -80,6 +85,7 @@ for (const site of sites) {
     STORE_PLATFORM: site.settings.platform,
     SITE_SETTINGS_JSON: JSON.stringify(site.settings),
     RUN_MODE: mode,
+    SHARED_INVENTORY_RUN: sharedInventory ? '1' : '0',
     SITES_FILE: sitesFile,
     PAGE_INVENTORY_FILE: path.join(reportsDir, slug, runDate, 'page-inventory.json'),
     PRODUCT_HANDLE:   site.settings.platform === 'shopify' ? site.productHandle || process.env.PRODUCT_HANDLE || 'zerno-z1' : '',

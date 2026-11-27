@@ -63,6 +63,34 @@ const layouts = [
     outcome: 'full',
   },
   {
+    name: 'partial-left',
+    outer: 'flow-root w-48 overflow-hidden',
+    control: '-ml-16 block h-11 w-48',
+    outcome: 'partial',
+    visibleWidth: 128,
+    visibleHeight: 44,
+  },
+  {
+    name: 'partial-top',
+    outer: 'flow-root h-11 overflow-hidden',
+    control: '-mt-4 block h-11 w-48',
+    outcome: 'partial',
+    visibleWidth: 192,
+    visibleHeight: 28,
+  },
+  {
+    name: 'hidden-left',
+    outer: 'flow-root w-48 overflow-hidden',
+    control: '-ml-64 block h-11 w-48',
+    outcome: 'full',
+  },
+  {
+    name: 'hidden-top',
+    outer: 'flow-root h-11 overflow-hidden',
+    control: '-mt-16 block h-11 w-48',
+    outcome: 'full',
+  },
+  {
     name: 'clip-right',
     outer: 'flow-root w-32 overflow-clip',
     control: 'block h-11 w-48',
@@ -138,6 +166,10 @@ for (const control of controls) {
         if (layout.outcome === 'partial') {
           expect(partial[0].visibleWidth).toBeGreaterThan(0);
           expect(partial[0].visibleHeight).toBeGreaterThan(0);
+          if ('visibleWidth' in layout) {
+            expect(partial[0].visibleWidth).toBe(layout.visibleWidth);
+            expect(partial[0].visibleHeight).toBe(layout.visibleHeight);
+          }
           expect(
             partial[0].visibleWidth < partial[0].width ||
               partial[0].visibleHeight < partial[0].height,
@@ -165,7 +197,7 @@ for (const control of controls) {
       }
       if (
         control.name === 'button' &&
-        ['flex-no-shrink', 'nested-axes'].includes(layout.name) &&
+        ['flex-no-shrink', 'nested-axes', 'partial-left', 'partial-top'].includes(layout.name) &&
         ['Desktop Chrome', 'Mobile Chrome'].includes(info.project.name)
       )
         await page.screenshot({ path: info.outputPath('control-clipping.png'), fullPage: true });

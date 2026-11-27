@@ -1,6 +1,6 @@
 # Third-party script and payment monitoring
 
-`44-security-monitoring.spec.ts` (`@full`, `@security`) runs on Shopify and WooCommerce, including desktop/mobile. It observes real browser script responses, destination changes and payment-interface structure. These are change-detection checks, not malware attribution or certification that a store is uncompromised. Legacy `38-third-party-scripts.spec.ts` stays an independent external-script inventory.
+`44-security-monitoring.spec.ts` (`@full`, `@security`) runs on Shopify and WooCommerce, including desktop/mobile. It observes real browser script responses, destination changes and payment-interface structure. These are change-detection checks, not malware attribution or certification that a store is uncompromised. Legacy `38-third-party-scripts.spec.ts` remains a separate external-script observation: explicit selections run standalone, while the normal shared Full run collects the same inventory during its existing homepage visit.
 
 ## Configuration
 

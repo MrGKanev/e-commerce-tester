@@ -1,8 +1,8 @@
 import { test, expect } from './fixtures';
+import { pageCheck } from './page-check';
 import { BASE, goto } from './helpers';
 
-test.describe('03 · Collections', { tag: ["@full"] }, () => {
-
+test.describe('03 · Collections', { tag: ['@full'] }, () => {
   // ─── Reachability ─────────────────────────────────────────────────────────
 
   test('/collections/all loads or redirects acceptably', async ({ request }) => {
@@ -27,124 +27,90 @@ test.describe('03 · Collections', { tag: ["@full"] }, () => {
 
   // ─── Product grid ─────────────────────────────────────────────────────────
 
-  test('collection page shows a product grid', async ({ page }) => {
+  test('collection — shared passive checks', async ({ page }) => {
     await goto(page);
     const firstCollectionLink = page.locator('a[href*="/collections/"]').first();
     const href = await firstCollectionLink.getAttribute('href');
-    const url = href?.startsWith('http') ? href : `${BASE}${href}`;
-
+    expect(href, 'Collection link has no destination').toBeTruthy();
+    const url = new URL(href!, BASE).href;
     await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await pageCheck('collection page shows a product grid', async () => {
+      const productCardSel = [
+        '.product-card',
+        '.card--product',
+        '.grid__item',
+        '.collection-grid__item',
+        '[data-product-id]',
+        'li[class*="product"]',
+        '.product-item',
+        'article',
+      ].join(', ');
 
-    const productCardSel = [
-      '.product-card',
-      '.card--product',
-      '.grid__item',
-      '.collection-grid__item',
-      '[data-product-id]',
-      'li[class*="product"]',
-      '.product-item',
-      'article',
-    ].join(', ');
+      const cards = page.locator(productCardSel);
+      const count = await cards.count();
+      expect(count, 'No product cards found on collection page').toBeGreaterThan(0);
+    });
+    await pageCheck('each product card shows a name and price', async step => {
+      // Check first 3 product cards
+      const cards = page.locator(
+        '.product-card, .card--product, .grid__item, [data-product-id], .product-item',
+      );
+      const count = await cards.count();
+      const limit = Math.min(count, 3);
+      if (limit === 0) step.skip(true, 'No product cards found');
 
-    const cards = page.locator(productCardSel);
-    const count = await cards.count();
-    expect(count, 'No product cards found on collection page').toBeGreaterThan(0);
-  });
+      for (let i = 0; i < limit; i++) {
+        const card = cards.nth(i);
+        // Should have some text (name)
+        const text = await card.textContent();
+        expect(text?.trim().length ?? 0, `Product card #${i} has no text`).toBeGreaterThan(3);
+        // Should have a link to a product
+        const link = card.locator('a[href*="/products/"]').first();
+        const linkCount = await link.count();
+        expect(linkCount, `Product card #${i} has no product link`).toBeGreaterThan(0);
+      }
+    });
+    await pageCheck('each product card has an image', async step => {
+      const cards = page.locator(
+        '.product-card, .card--product, .grid__item, [data-product-id], .product-item',
+      );
+      const count = await cards.count();
+      if (count === 0) step.skip(true, 'No product cards found');
 
-  test('each product card shows a name and price', async ({ page }) => {
-    await goto(page);
-    const firstCollectionLink = page.locator('a[href*="/collections/"]').first();
-    const href = await firstCollectionLink.getAttribute('href');
-    const url = href?.startsWith('http') ? href : `${BASE}${href}`;
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
+      const firstCard = cards.first();
+      const img = firstCard.locator('img').first();
+      await expect(img).toBeVisible();
 
-    // Check first 3 product cards
-    const cards = page.locator(
-      '.product-card, .card--product, .grid__item, [data-product-id], .product-item',
-    );
-    const count = await cards.count();
-    const limit = Math.min(count, 3);
-    if (limit === 0) test.skip(true, 'No product cards found');
-
-    for (let i = 0; i < limit; i++) {
-      const card = cards.nth(i);
-      // Should have some text (name)
-      const text = await card.textContent();
-      expect(text?.trim().length ?? 0, `Product card #${i} has no text`).toBeGreaterThan(3);
-      // Should have a link to a product
-      const link = card.locator('a[href*="/products/"]').first();
-      const linkCount = await link.count();
-      expect(linkCount, `Product card #${i} has no product link`).toBeGreaterThan(0);
-    }
-  });
-
-  test('each product card has an image', async ({ page }) => {
-    await goto(page);
-    const firstCollectionLink = page.locator('a[href*="/collections/"]').first();
-    const href = await firstCollectionLink.getAttribute('href');
-    const url = href?.startsWith('http') ? href : `${BASE}${href}`;
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
-
-    const cards = page.locator(
-      '.product-card, .card--product, .grid__item, [data-product-id], .product-item',
-    );
-    const count = await cards.count();
-    if (count === 0) test.skip(true, 'No product cards found');
-
-    const firstCard = cards.first();
-    const img = firstCard.locator('img').first();
-    await expect(img).toBeVisible();
-
-    // Verify image has loaded
-    const loaded = await img.evaluate(
-      (el) => (el as HTMLImageElement).complete && (el as HTMLImageElement).naturalWidth > 0,
-    );
-    expect(loaded, 'Product card image is broken or not loaded').toBe(true);
-  });
-
-  test('product card images have alt text', async ({ page }) => {
-    await goto(page);
-    const firstCollectionLink = page.locator('a[href*="/collections/"]').first();
-    const href = await firstCollectionLink.getAttribute('href');
-    const url = href?.startsWith('http') ? href : `${BASE}${href}`;
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
-
-    const noAlt = await page.$$eval(
-      '.product-card img, .card--product img, .grid__item img, [data-product-id] img, .product-item img',
-      (imgs) =>
-        imgs
-          .filter((img) => !img.getAttribute('alt'))
-          .map((img) => (img as HTMLImageElement).src.slice(-60)),
-    );
-    if (noAlt.length > 0) {
-      console.warn(`Product images missing alt text:\n${noAlt.join('\n')}`);
-    }
-    // Soft warning — Shopify themes sometimes lazy-fill alt from product title
-  });
-
-  test('collection page title matches URL context', async ({ page }) => {
-    await goto(page);
-    const firstCollectionLink = page.locator('a[href*="/collections/"]').first();
-    const href = await firstCollectionLink.getAttribute('href');
-    const url = href?.startsWith('http') ? href : `${BASE}${href}`;
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
-
-    const title = await page.title();
-    expect(title.trim()).not.toBe('');
-    expect(title).not.toMatch(/^Online Store$/i);
-  });
-
-  test('collection page has no horizontal overflow', async ({ page }) => {
-    await goto(page);
-    const firstCollectionLink = page.locator('a[href*="/collections/"]').first();
-    const href = await firstCollectionLink.getAttribute('href');
-    const url = href?.startsWith('http') ? href : `${BASE}${href}`;
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
-
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth > window.innerWidth + 5,
-    );
-    expect(overflow, 'Collection page has horizontal overflow (scrollbar)').toBe(false);
+      // Verify image has loaded
+      const loaded = await img.evaluate(
+        el => (el as HTMLImageElement).complete && (el as HTMLImageElement).naturalWidth > 0,
+      );
+      expect(loaded, 'Product card image is broken or not loaded').toBe(true);
+    });
+    await pageCheck('product card images have alt text', async () => {
+      const noAlt = await page.$$eval(
+        '.product-card img, .card--product img, .grid__item img, [data-product-id] img, .product-item img',
+        imgs =>
+          imgs
+            .filter(img => !img.getAttribute('alt'))
+            .map(img => (img as HTMLImageElement).src.slice(-60)),
+      );
+      if (noAlt.length > 0) {
+        console.warn(`Product images missing alt text:\n${noAlt.join('\n')}`);
+      }
+      // Soft warning — Shopify themes sometimes lazy-fill alt from product title
+    });
+    await pageCheck('collection page title matches URL context', async () => {
+      const title = await page.title();
+      expect(title.trim()).not.toBe('');
+      expect(title).not.toMatch(/^Online Store$/i);
+    });
+    await pageCheck('collection page has no horizontal overflow', async () => {
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth > window.innerWidth + 5,
+      );
+      expect(overflow, 'Collection page has horizontal overflow (scrollbar)').toBe(false);
+    });
   });
 
   test('clicking a product card navigates to the correct product page', async ({ page }) => {
@@ -161,7 +127,9 @@ test.describe('03 · Collections', { tag: ["@full"] }, () => {
     await page.waitForLoadState('domcontentloaded');
 
     const currentUrl = page.url();
-    expect(currentUrl, `Expected URL to contain /products/ but got: ${currentUrl}`).toContain('/products/');
+    expect(currentUrl, `Expected URL to contain /products/ but got: ${currentUrl}`).toContain(
+      '/products/',
+    );
 
     // Product page should have an H1
     const h1 = page.locator('h1').first();
